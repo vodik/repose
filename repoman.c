@@ -12,6 +12,7 @@
 #include <fnmatch.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -185,7 +186,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
 
 int main(int argc, char *argv[])
 {
-    const char *reponame = "vodik";
+    const char *reponame = NULL;
 
     static const struct option opts[] = {
         { "help",    no_argument,       0, 'h' },
@@ -212,6 +213,12 @@ int main(int argc, char *argv[])
         default:
             usage(stderr);
         }
+    }
+
+    struct utsname name;
+    if (reponame == NULL) {
+        uname(&name);
+        reponame = name.nodename;
     }
 
     char *dot[] = { ".", NULL };
