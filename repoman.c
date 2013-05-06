@@ -64,7 +64,7 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     char *md5sum = alpm_compute_md5sum(pkg->filename);
     char *sha256sum = alpm_compute_sha256sum(pkg->filename);
 
-    write_string(buf, "FILENAME",  filename ? filename : pkg->filename);
+    write_string(buf, "FILENAME",  filename ? &filename[1] : pkg->filename);
     write_string(buf, "NAME",      pkg->name);
     write_string(buf, "VERSION",   pkg->version);
     write_string(buf, "DESC",      pkg->desc);
