@@ -17,7 +17,6 @@ void buffer_free(buffer_t *buf);
 
 void buffer_clear(buffer_t *buf);
 
-void buffer_header(buffer_t *buf, const char *header);
 void buffer_printf(buffer_t *buf, const char *fmt, ...) __attribute__((format (printf, 2, 3)));
 void buffer_putc(buffer_t *buf, const char c);
 

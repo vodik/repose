@@ -29,7 +29,7 @@ struct repo {
 
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
-    buffer_header(buf, header);
+    buffer_printf(buf, "%%%s%%\n", header);
     for (; lst; lst = lst->next) {
         const char *str = lst->data;
         buffer_printf(buf, "%s\n", str);

@@ -63,22 +63,6 @@ void buffer_putc(buffer_t *buf, const char c)
     buf->data[buf->len] = '\0';
 }
 
-void buffer_header(buffer_t *buf, const char *header)
-{
-    size_t len = strlen(header);
-    char *p = &buf->data[buf->len];
-
-    buffer_extendby(buf, len + 4);
-
-    *p++ = '%';
-     p   = mempcpy(p, header, len);
-    *p++ = '%';
-    *p++ = '\n';
-    *p   = '\0';
-
-    buf->len += len + 3;
-}
-
 void buffer_printf(buffer_t *buf, const char *fmt, ...)
 {
     size_t len = buf->buflen - buf->len;
