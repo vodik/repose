@@ -19,7 +19,7 @@
 #include <alpm.h>
 #include <alpm_list.h>
 
-#include "alpm-simple.h"
+#include "alpm_metadata.h"
 #include "buffer.h"
 #include "hashtable.h"
 

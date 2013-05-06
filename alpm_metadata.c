@@ -1,4 +1,4 @@
-#include "alpm-simple.h"
+#include "alpm_metadata.h"
 
 #include <stdlib.h>
 #include <string.h>
