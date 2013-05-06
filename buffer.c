@@ -28,7 +28,7 @@ static inline void buffer_extendby(buffer_t *buf, size_t len)
         buf->buflen = 32;
 
     buf->buflen = next_power(len);
-    printf("--- expand: %zd\n", buf->buflen);
+    /* printf("--- expand: %zd\n", buf->buflen); */
     data = realloc(buf->data, buf->buflen);
     buf->data = data;
 }

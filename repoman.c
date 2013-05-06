@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <getopt.h>
 #include <time.h>
 #include <limits.h>
 #include <unistd.h>
@@ -135,7 +136,7 @@ static void repo_write_close(struct repo *repo)
     archive_write_free(repo->archive);
 }
 
-static alpm_list_t *find_packages(char *const *paths)
+static alpm_list_t *find_packages(char **paths)
 {
     static const char *filter = "*.pkg.tar*";
 
@@ -167,10 +168,50 @@ static alpm_list_t *find_packages(char *const *paths)
     return pkgs;
 }
 
-int main(int argc, const char *argv[])
+static void __attribute__((__noreturn__)) usage(FILE *out)
 {
+    fprintf(out, "usage: %s [options]\n", program_invocation_short_name);
+    fputs("Options:\n"
+        " -h, --help            display this help and exit\n"
+        " -v, --version         display version\n"
+        " -r, --repo=PATH       repo name to use\n", out);
+
+    exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
+}
+
+int main(int argc, char *argv[])
+{
+    const char *reponame = "vodik";
+
+    static const struct option opts[] = {
+        { "help",    no_argument,       0, 'h' },
+        { "version", no_argument,       0, 'v' },
+        { "repo",    required_argument, 0, 'r' },
+        { 0, 0, 0, 0 }
+    };
+
+    while (true) {
+        int opt = getopt_long(argc, argv, "hvr:", opts, NULL);
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'h':
+            usage(stdout);
+            break;
+        case 'v':
+            printf("%s %s\n", program_invocation_short_name, "devel");
+            return 0;
+        case 'r':
+            reponame = optarg;
+            break;
+        default:
+            usage(stderr);
+        }
+    }
+
     char *dot[] = { ".", NULL };
-    char **paths = argc > 1 ? (char **)argv + 1 : dot;
+    char **paths = argc - optind > 1 ? argv + optind + 1 : dot;
 
     struct hashtable *table = hashtable_new(17, NULL);
     alpm_list_t *pkg, *pkgs = find_packages(paths);
@@ -189,7 +230,11 @@ int main(int argc, const char *argv[])
 
     /* TEMPORARY: HACKY */
     {
-        struct repo *repo = repo_write_new("vodik.db.tar.gz");
+        char repopath[PATH_MAX], linkpath[PATH_MAX];
+        snprintf(repopath, PATH_MAX, "%s.db.tar.gz", reponame);
+        snprintf(linkpath, PATH_MAX, "%s.db", reponame);
+
+        struct repo *repo = repo_write_new(repopath);
         struct hashnode_t **nodes = table->nodes;
         size_t i;
 
@@ -205,5 +250,8 @@ int main(int argc, const char *argv[])
         }
 
         repo_write_close(repo);
+
+        /* symlink repo.db -> repo.db.tar.gz */
+        symlink(repopath, linkpath);
     }
 }
