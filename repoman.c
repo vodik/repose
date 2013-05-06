@@ -188,6 +188,25 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
+void dump_db(const char *repopath)
+{
+        alpm_db_meta_t db;
+        alpm_db_populate(repopath, &db);
+        struct hashnode_t **nodes = db.pkgcache->nodes;
+        size_t i;
+
+        printf("dumping %s\n", repopath);
+        for (i = 0; i < db.pkgcache->size; ++i) {
+            struct hashnode_t *node = nodes[i];
+            while (node) {
+                alpm_pkg_meta_t *pkg = node->val;
+                printf("found: %s-%s [%s]\n", pkg->name, pkg->version, pkg->arch);
+                node = node->next;
+            }
+        }
+        printf("\n");
+}
+
 int main(int argc, char *argv[])
 {
     const char *reponame = NULL;
@@ -251,6 +270,8 @@ int main(int argc, char *argv[])
         char repopath[PATH_MAX], linkpath[PATH_MAX];
         snprintf(repopath, PATH_MAX, "%s.db.tar.gz", reponame);
         snprintf(linkpath, PATH_MAX, "%s.db", reponame);
+
+        dump_db(repopath);
 
         struct repo *repo = repo_write_new(repopath);
         struct hashnode_t **nodes = table->nodes;

@@ -13,7 +13,7 @@
 #include <archive_entry.h>
 #include "archive_extra.h"
 
-static void read_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
+static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 {
     char *var;
 
@@ -57,7 +57,7 @@ static void read_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
         pkg->makedepends = alpm_list_add(pkg->makedepends, strdup(buf));
 }
 
-static void read_metadata(struct archive *a, struct archive_entry *ae, alpm_pkg_meta_t *pkg)
+static void read_pkg_metadata(struct archive *a, struct archive_entry *ae, alpm_pkg_meta_t *pkg)
 {
     off_t entry_size = archive_entry_size(ae);
 
@@ -66,7 +66,7 @@ static void read_metadata(struct archive *a, struct archive_entry *ae, alpm_pkg_
     };
 
     while(archive_fgets(a, &buf, entry_size) == ARCHIVE_OK && buf.real_line_size > 0) {
-        read_metadata_line(buf.line, pkg);
+        read_pkg_metadata_line(buf.line, pkg);
     }
 
     free(buf.line);
@@ -120,7 +120,7 @@ int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)
         const char *entry_name = archive_entry_pathname(entry);
 
         if (S_ISREG(mode) && strcmp(entry_name, ".PKGINFO") == 0) {
-            read_metadata(archive, entry, pkg);
+            read_pkg_metadata(archive, entry, pkg);
             break;
         }
     }
@@ -163,4 +163,143 @@ void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
     alpm_list_free_inner(pkg->makedepends, free);
 
     free(pkg);
+}
+
+static inline void read_desc_entry(struct archive *archive, struct archive_read_buffer *buf, off_t entry_size, char **data)
+{
+    archive_fgets(archive, buf, entry_size);
+    *data = strdup(buf->line);
+}
+
+static void read_desc(struct archive *archive, struct archive_entry *entry, alpm_pkg_meta_t *pkg)
+{
+    off_t entry_size = archive_entry_size(entry);
+
+    /* TODO: allocated too many times */
+    struct archive_read_buffer buf = {
+        .line = malloc(entry_size)
+    };
+
+    while(archive_fgets(archive, &buf, entry_size) == ARCHIVE_OK) {
+        if (strcmp(buf.line, "%FILENAME%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->filename);
+        } else if (strcmp(buf.line, "%NAME%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->name);
+        } else if (strcmp(buf.line, "%DESC%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->desc);
+        } else if (strcmp(buf.line, "%VERSION%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->version);
+        } else if (strcmp(buf.line, "%ARCH%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->arch);
+        }
+    }
+
+    free(buf.line);
+}
+
+static alpm_pkg_meta_t *load_pkg(alpm_db_meta_t *db, char *entryname)
+{
+    char *p = entryname;
+    p = strrchr(p, '-');
+    p = strrchr(p, '-');
+    *++p = '\0';
+
+    alpm_pkg_meta_t *metadata = hashtable_get(db->pkgcache, entryname);
+
+    if (metadata == NULL) {
+        metadata = calloc(1, sizeof(alpm_pkg_meta_t));
+        metadata->name = strdup(entryname);
+        metadata->version = strdup(p);
+    }
+
+    hashtable_add(db->pkgcache, metadata->name, metadata);
+    return metadata;
+}
+
+static void db_read_pkg(alpm_db_meta_t *db, struct archive *archive,
+                        struct archive_entry *entry)
+{
+    char *entryname = strdup(archive_entry_pathname(entry));
+    char *filename  = strsep(&entryname, "/");
+    if (entryname == NULL)
+        return;
+
+    if (strcmp(entryname, "desc") == 0) {
+        alpm_pkg_meta_t *pkg = load_pkg(db, filename);
+        read_desc(archive, entry, pkg);
+    }
+
+    free(filename);
+}
+
+int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
+{
+    struct archive *archive = NULL;
+    struct stat st;
+    char *memblock = MAP_FAILED;
+    int fd = 0, rc = 0;
+
+    fd = open(filename, O_RDONLY);
+    if (fd < 0) {
+        if(errno == ENOENT)
+            err(EXIT_FAILURE, "failed to open %s", filename);
+        rc = -errno;
+        goto cleanup;
+    }
+
+    fstat(fd, &st);
+    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+    if (memblock == MAP_FAILED)
+        err(EXIT_FAILURE, "failed to mmap package %s", filename);
+
+
+    archive = archive_read_new();
+    archive_read_support_filter_all(archive);
+    archive_read_support_format_all(archive);
+
+    int r = archive_read_open_memory(archive, memblock, st.st_size);
+    if (r != ARCHIVE_OK) {
+        warnx("%s is not an archive", filename);
+        rc = -1;
+        goto cleanup;
+    }
+
+    db->pkgcache = hashtable_new(23, NULL); //_alpm_pkghash_create(23);
+    if (db->pkgcache == NULL) {
+        rc = -1;
+        goto cleanup;
+    }
+
+    for (;;) {
+        struct archive_entry *entry;
+
+        r = archive_read_next_header(archive, &entry);
+        if (r == ARCHIVE_EOF) {
+            break;
+        } else if (r != ARCHIVE_OK) {
+            errx(EXIT_FAILURE, "failed to read header: %s", archive_error_string(archive));
+        }
+
+        const mode_t mode = archive_entry_mode(entry);
+        if (S_ISDIR(mode))
+            continue;
+
+        /* we have desc, depends, or deltas - parse it */
+        /* alpm_pkg_meta_t *pkg = NULL; */
+        db_read_pkg(db, archive, entry);
+    }
+
+cleanup:
+    if (fd >= 0)
+        close(fd);
+
+    if (memblock != MAP_FAILED)
+        munmap(memblock, st.st_size);
+
+    if (archive) {
+        archive_read_close(archive);
+        archive_read_free(archive);
+    }
+
+    return rc;
 }
