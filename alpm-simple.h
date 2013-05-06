@@ -10,8 +10,6 @@ typedef struct alpm_pkg_meta {
     char *desc;
     char *url;
     char *packager;
-    /* char *md5sum; */
-    /* char *sha256sum; */
     char *arch;
     off_t size;
     off_t isize;
@@ -25,5 +23,6 @@ typedef struct alpm_pkg_meta {
 } alpm_pkg_meta_t;
 
 int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **pkg);
+void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg);
 
 #endif

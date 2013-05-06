@@ -141,3 +141,23 @@ cleanup:
 
     return rc;
 }
+
+void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
+{
+    free(pkg->filename);
+    free(pkg->name);
+    free(pkg->version);
+    free(pkg->desc);
+    free(pkg->url);
+    free(pkg->packager);
+    free(pkg->arch);
+
+    alpm_list_free_inner(pkg->license, free);
+    alpm_list_free_inner(pkg->depends, free);
+    alpm_list_free_inner(pkg->conflicts, free);
+    alpm_list_free_inner(pkg->provides, free);
+    alpm_list_free_inner(pkg->optdepends, free);
+    alpm_list_free_inner(pkg->makedepends, free);
+
+    free(pkg);
+}

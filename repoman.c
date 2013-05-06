@@ -60,9 +60,9 @@ static void write_depends_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 
 static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
-    const char *md5sum = alpm_compute_md5sum(pkg->filename);
-    const char *sha256sum = alpm_compute_sha256sum(pkg->filename);
     const char *filename = strrchr(pkg->filename, '/');
+    char *md5sum = alpm_compute_md5sum(pkg->filename);
+    char *sha256sum = alpm_compute_sha256sum(pkg->filename);
 
     write_string(buf, "FILENAME",  filename ? filename : pkg->filename);
     write_string(buf, "NAME",      pkg->name);
@@ -77,6 +77,9 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     write_string(buf, "ARCH",      pkg->arch);
     write_long(buf,   "BUILDDATE", pkg->builddate);
     write_string(buf, "PACKAGER",  pkg->packager);
+
+    free(md5sum);
+    free(sha256sum);
 }
 
 static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
@@ -139,6 +142,7 @@ static void repo_write_close(struct repo *repo)
     buffer_free(&repo->buf);
     archive_entry_free(repo->entry);
     archive_write_free(repo->archive);
+    free(repo);
 }
 
 static alpm_list_t *find_packages(char **paths)
@@ -234,8 +238,11 @@ int main(int argc, char *argv[])
         alpm_pkg_load_metadata(path, &metadata);
         alpm_pkg_meta_t *old = hashtable_get(table, metadata->name);
 
-        if (old == NULL || alpm_pkg_vercmp(metadata->version, old->version) > 0)
+        if (old == NULL || alpm_pkg_vercmp(metadata->version, old->version) > 0) {
             hashtable_add(table, metadata->name, metadata);
+            if (old)
+                alpm_pkg_free_metadata(old);
+        }
         /* pkg->data = metadata; */
     }
 
