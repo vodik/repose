@@ -201,6 +201,13 @@ void dump_db(const char *repopath)
             while (node) {
                 alpm_pkg_meta_t *pkg = node->val;
                 printf("found: %s-%s [%s]\n", pkg->name, pkg->version, pkg->arch);
+
+                alpm_list_t *x = pkg->depends;
+                for(; x; x = x->next) {
+                    const char *data = x->data;
+                    printf(" depends: %s\n", data);
+                }
+
                 node = node->next;
             }
         }

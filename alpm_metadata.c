@@ -165,6 +165,34 @@ void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
     free(pkg);
 }
 
+static size_t _alpm_strip_newline(char *str, size_t len)
+{
+	if(*str == '\0') {
+		return 0;
+	}
+	if(len == 0) {
+		len = strlen(str);
+	}
+	while(len > 0 && str[len - 1] == '\n') {
+		len--;
+	}
+	str[len] = '\0';
+
+	return len;
+}
+
+static inline void read_desc_list(struct archive *archive, struct archive_read_buffer *buf, off_t entry_size, alpm_list_t **list)
+{
+    for (;;) {
+        archive_fgets(archive, buf, entry_size);
+
+        if (_alpm_strip_newline(buf->line, buf->real_line_size) == 0)
+            return;
+
+        *list = alpm_list_add(*list, strdup(buf->line));
+    }
+}
+
 static inline void read_desc_entry(struct archive *archive, struct archive_read_buffer *buf, off_t entry_size, char **data)
 {
     archive_fgets(archive, buf, entry_size);
@@ -185,13 +213,17 @@ static void read_desc(struct archive *archive, struct archive_entry *entry, alpm
         if (strcmp(buf.line, "%FILENAME%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->filename);
         } else if (strcmp(buf.line, "%NAME%") == 0) {
+            /* XXX: name should already be set, rather, validate it */
             read_desc_entry(archive, &buf, entry_size, &pkg->name);
         } else if (strcmp(buf.line, "%VERSION%") == 0) {
+            /* XXX: version should already be set, rather, validate it */
             read_desc_entry(archive, &buf, entry_size, &pkg->version);
         } else if (strcmp(buf.line, "%DESC%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->desc);
         } else if (strcmp(buf.line, "%CSIZE%") == 0) {
+            /* TODO */
         } else if (strcmp(buf.line, "%ISIZE%") == 0) {
+            /* TODO */
         } else if (strcmp(buf.line, "%MD5SUM%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->md5sum);
         } else if (strcmp(buf.line, "%SHA256SUM%") == 0) {
@@ -199,15 +231,23 @@ static void read_desc(struct archive *archive, struct archive_entry *entry, alpm
         } else if (strcmp(buf.line, "%URL%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->url);
         } else if (strcmp(buf.line, "%LICENSE%") == 0) {
+            read_desc_list(archive, &buf, entry_size, &pkg->license);
         } else if (strcmp(buf.line, "%ARCH%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->arch);
         } else if (strcmp(buf.line, "%BUILDDATE%") == 0) {
+            /* TODO */
         } else if (strcmp(buf.line, "%PACKAGER%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->packager);
         } else if (strcmp(buf.line, "%DEPENDS%") == 0) {
+            read_desc_list(archive, &buf, entry_size, &pkg->depends);
         } else if (strcmp(buf.line, "%CONFLICTS%") == 0) {
+            read_desc_list(archive, &buf, entry_size, &pkg->conflicts);
         } else if (strcmp(buf.line, "%PROVIDES%") == 0) {
+            read_desc_list(archive, &buf, entry_size, &pkg->provides);
         } else if (strcmp(buf.line, "%OPTDEPENDS%") == 0) {
+            read_desc_list(archive, &buf, entry_size, &pkg->optdepends);
         } else if (strcmp(buf.line, "%MAKEDEPENDS%") == 0) {
+            read_desc_list(archive, &buf, entry_size, &pkg->makedepends);
         }
     }
 
@@ -241,7 +281,7 @@ static void db_read_pkg(alpm_db_meta_t *db, struct archive *archive,
     if (entryname == NULL)
         return;
 
-    if (strcmp(entryname, "desc") == 0) {
+    if (strcmp(entryname, "desc") == 0 || strcmp(entryname, "depends") == 0) {
         alpm_pkg_meta_t *pkg = load_pkg(db, filename);
         read_desc(archive, entry, pkg);
     }
