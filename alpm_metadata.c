@@ -180,17 +180,34 @@ static void read_desc(struct archive *archive, struct archive_entry *entry, alpm
         .line = malloc(entry_size)
     };
 
+    /* TODO: finish */
     while(archive_fgets(archive, &buf, entry_size) == ARCHIVE_OK) {
         if (strcmp(buf.line, "%FILENAME%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->filename);
         } else if (strcmp(buf.line, "%NAME%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->name);
-        } else if (strcmp(buf.line, "%DESC%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->desc);
         } else if (strcmp(buf.line, "%VERSION%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->version);
+        } else if (strcmp(buf.line, "%DESC%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->desc);
+        } else if (strcmp(buf.line, "%CSIZE%") == 0) {
+        } else if (strcmp(buf.line, "%ISIZE%") == 0) {
+        } else if (strcmp(buf.line, "%MD5SUM%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->md5sum);
+        } else if (strcmp(buf.line, "%SHA256SUM%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->sha256sum);
+        } else if (strcmp(buf.line, "%URL%") == 0) {
+            read_desc_entry(archive, &buf, entry_size, &pkg->url);
+        } else if (strcmp(buf.line, "%LICENSE%") == 0) {
         } else if (strcmp(buf.line, "%ARCH%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->arch);
+        } else if (strcmp(buf.line, "%BUILDDATE%") == 0) {
+        } else if (strcmp(buf.line, "%PACKAGER%") == 0) {
+        } else if (strcmp(buf.line, "%DEPENDS%") == 0) {
+        } else if (strcmp(buf.line, "%CONFLICTS%") == 0) {
+        } else if (strcmp(buf.line, "%PROVIDES%") == 0) {
+        } else if (strcmp(buf.line, "%OPTDEPENDS%") == 0) {
+        } else if (strcmp(buf.line, "%MAKEDEPENDS%") == 0) {
         }
     }
 

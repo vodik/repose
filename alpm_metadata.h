@@ -12,6 +12,8 @@ typedef struct alpm_pkg_meta {
     char *desc;
     char *url;
     char *packager;
+    char *md5sum;
+    char *sha256sum;
     char *arch;
     off_t size;
     off_t isize;
