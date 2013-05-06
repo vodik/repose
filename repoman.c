@@ -29,6 +29,12 @@ struct repo {
     struct buffer buf;
 };
 
+enum repoman_action {
+    ACTION_VERIFY,
+    ACTION_UPDATE,
+    INVALID_ACTION
+};
+
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
     buffer_printf(buf, "%%%s%%\n", header);
@@ -177,109 +183,96 @@ static alpm_list_t *find_packages(char **paths)
     return pkgs;
 }
 
-static void __attribute__((__noreturn__)) usage(FILE *out)
-{
-    fprintf(out, "usage: %s [options]\n", program_invocation_short_name);
-    fputs("Options:\n"
-        " -h, --help            display this help and exit\n"
-        " -v, --version         display version\n"
-        " -r, --repo=PATH       repo name to use\n", out);
-
-    exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
-}
-
-void dump_db(const char *repopath)
+static int verify_db(const char *repopath)
 {
         alpm_db_meta_t db;
         alpm_db_populate(repopath, &db);
         struct hashnode_t **nodes = db.pkgcache->nodes;
         size_t i;
+        int rc = 0;
 
-        printf("dumping %s\n", repopath);
         for (i = 0; i < db.pkgcache->size; ++i) {
-            struct hashnode_t *node = nodes[i];
-            while (node) {
+            struct hashnode_t *node;
+            for (node = nodes[i]; node; node = node->next) {
                 alpm_pkg_meta_t *pkg = node->val;
-                printf("found: %s-%s [%s]\n", pkg->name, pkg->version, pkg->arch);
+                struct stat st;
 
-                alpm_list_t *x = pkg->depends;
-                for(; x; x = x->next) {
-                    const char *data = x->data;
-                    printf(" depends: %s\n", data);
+                if (stat(pkg->filename, &st) < 0) {
+                    warn("couldn't find pkg %s", pkg->filename);
+                    rc = 1;
+                    continue;
                 }
 
-                node = node->next;
+                char *md5sum = alpm_compute_md5sum(pkg->filename);
+                if (strcmp(pkg->md5sum, md5sum) != 0) {
+                    warnx("md5 sum for pkg %s is different", pkg->filename);
+                    rc = 1;
+                    continue;
+                }
+                free(md5sum);
+
+                char *sha256sum = alpm_compute_sha256sum(pkg->filename);
+                if (strcmp(pkg->sha256sum, sha256sum) != 0) {
+                    warnx("sha256 sum for pkg %s is different", pkg->filename);
+                    rc = 1;
+                    continue;
+                }
+                free(sha256sum);
             }
         }
-        printf("\n");
+
+        if (rc == 0)
+            printf("repo okay!\n");
+
+        return rc;
 }
 
-int main(int argc, char *argv[])
+static int update_db(const char *repopath, int argc, char *argv[])
 {
-    const char *reponame = NULL;
+    struct stat st;
+    struct hashtable *table = NULL;
+    bool dirty = false;
 
-    static const struct option opts[] = {
-        { "help",    no_argument,       0, 'h' },
-        { "version", no_argument,       0, 'v' },
-        { "repo",    required_argument, 0, 'r' },
-        { 0, 0, 0, 0 }
-    };
+    /* read the existing repo or construct a new package cache */
+    if (stat(repopath, &st) < 0) {
+        warnx("repo doesn't exist, creating...");
+        table = hashtable_new(17, NULL);
+        dirty = true;
+    } else {
+        alpm_db_meta_t db;
+        alpm_db_populate(repopath, &db);
+        table = db.pkgcache;
 
-    while (true) {
-        int opt = getopt_long(argc, argv, "hvr:", opts, NULL);
-        if (opt == -1)
-            break;
+        /* XXX: verify entries still exist here */
+    }
 
-        switch (opt) {
-        case 'h':
-            usage(stdout);
-            break;
-        case 'v':
-            printf("%s %s\n", program_invocation_short_name, "devel");
-            return 0;
-        case 'r':
-            reponame = optarg;
-            break;
-        default:
-            usage(stderr);
+    /* if some file paths were specified, find all packages */
+    if (argc > 0) {
+        alpm_list_t *pkg, *pkgs = find_packages(argv);
+
+        for (pkg = pkgs; pkg; pkg = pkg->next) {
+            const char *path = pkg->data;
+            alpm_pkg_meta_t *metadata;
+
+            alpm_pkg_load_metadata(path, &metadata);
+            alpm_pkg_meta_t *old = hashtable_get(table, metadata->name);
+
+            if (old == NULL || alpm_pkg_vercmp(metadata->version, old->version) == 1) {
+                hashtable_add(table, metadata->name, metadata);
+                if (old) {
+                    printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
+                    alpm_pkg_free_metadata(old);
+                } else  {
+                    printf("ADDING: %s-%s\n", metadata->name, metadata->version);
+                }
+                dirty = true;
+            }
         }
     }
 
-    struct utsname name;
-    if (reponame == NULL) {
-        uname(&name);
-        reponame = name.nodename;
-    }
-
-    char *dot[] = { ".", NULL };
-    char **paths = argc - optind > 1 ? argv + optind + 1 : dot;
-
-    struct hashtable *table = hashtable_new(17, NULL);
-    alpm_list_t *pkg, *pkgs = find_packages(paths);
-
-    for (pkg = pkgs; pkg; pkg = pkg->next) {
-        const char *path = pkg->data;
-        alpm_pkg_meta_t *metadata;
-
-        alpm_pkg_load_metadata(path, &metadata);
-        alpm_pkg_meta_t *old = hashtable_get(table, metadata->name);
-
-        if (old == NULL || alpm_pkg_vercmp(metadata->version, old->version) > 0) {
-            hashtable_add(table, metadata->name, metadata);
-            if (old)
-                alpm_pkg_free_metadata(old);
-        }
-        /* pkg->data = metadata; */
-    }
-
-    /* TEMPORARY: HACKY */
+    /* TEMPORARY: HACKY, write a new repo out */
+    if (dirty)
     {
-        char repopath[PATH_MAX], linkpath[PATH_MAX];
-        snprintf(repopath, PATH_MAX, "%s.db.tar.gz", reponame);
-        snprintf(linkpath, PATH_MAX, "%s.db", reponame);
-
-        dump_db(repopath);
-
         struct repo *repo = repo_write_new(repopath);
         struct hashnode_t **nodes = table->nodes;
         size_t i;
@@ -296,8 +289,86 @@ int main(int argc, char *argv[])
         }
 
         repo_write_close(repo);
-
-        /* symlink repo.db -> repo.db.tar.gz */
-        symlink(repopath, linkpath);
+    } else {
+        printf("repo %s does not need updating\n", repopath);
     }
+
+    return 0;
+}
+
+static void __attribute__((__noreturn__)) usage(FILE *out)
+{
+    fprintf(out, "usage: %s [options]\n", program_invocation_short_name);
+    fputs("Options:\n"
+        " -h, --help            display this help and exit\n"
+        " -v, --version         display version\n"
+        " -r, --repo=PATH       repo name to use\n", out);
+
+    exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
+}
+
+int main(int argc, char *argv[])
+{
+    const char *reponame = NULL;
+    enum repoman_action action = INVALID_ACTION;
+
+    static const struct option opts[] = {
+        { "help",    no_argument,       0, 'h' },
+        { "version", no_argument,       0, 'v' },
+        { "verify",  no_argument,       0, 'V' },
+        { "update",  no_argument,       0, 'U' },
+        { "repo",    required_argument, 0, 'r' },
+        { 0, 0, 0, 0 }
+    };
+
+    while (true) {
+        int opt = getopt_long(argc, argv, "hvVUr:", opts, NULL);
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'h':
+            usage(stdout);
+            break;
+        case 'v':
+            printf("%s %s\n", program_invocation_short_name, "devel");
+            return 0;
+        case 'r':
+            reponame = optarg;
+            break;
+        case 'V':
+            action = ACTION_VERIFY;
+            break;
+        case 'U':
+            action = ACTION_UPDATE;
+            break;
+        default:
+            usage(stderr);
+        }
+    }
+
+    struct utsname name;
+    if (reponame == NULL) {
+        uname(&name);
+        reponame = name.nodename;
+    }
+
+    char repopath[PATH_MAX], linkpath[PATH_MAX];
+    snprintf(repopath, PATH_MAX, "%s.db.tar.gz", reponame);
+    snprintf(linkpath, PATH_MAX, "%s.db", reponame);
+
+    int rc = 1;
+    switch (action) {
+    case ACTION_VERIFY:
+        rc = verify_db(repopath);
+        break;
+    default:
+        rc = update_db(repopath, argc - optind, argv + optind);
+        if (rc == 0)
+            /* symlink repo.db -> repo.db.tar.gz */
+            symlink(repopath, linkpath);
+        break;
+    };
+
+    return rc;
 }
