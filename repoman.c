@@ -61,7 +61,11 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
     const char *md5sum = alpm_compute_md5sum(pkg->filename);
     const char *sha256sum = alpm_compute_sha256sum(pkg->filename);
+    const char *filename = strrchr(pkg->filename, '/');
 
+    write_string(buf, "FILENAME",  filename ? filename : pkg->filename);
+    write_string(buf, "NAME",      pkg->name);
+    write_string(buf, "VERSION",   pkg->version);
     write_string(buf, "DESC",      pkg->desc);
     write_long(buf,   "CSIZE",     (long)pkg->size);
     write_long(buf,   "ISIZE",     (long)pkg->isize);
