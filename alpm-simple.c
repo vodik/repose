@@ -15,8 +15,13 @@
 
 static void read_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 {
-    char *var = strsep(&buf, " = ");
+    char *var;
 
+    /* XXX: not really handling comments properly */
+    if (buf[0] == '#')
+        return;
+
+    var = strsep(&buf, " = ");
     if (buf == NULL)
         return;
     buf += 2;
@@ -122,8 +127,6 @@ int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)
 
     pkg->filename = strdup(filename);
     pkg->size = st.st_size;
-    /* pkg->md5sum = alpm_compute_md5sum(filename); */
-    /* pkg->sha256sum = alpm_compute_sha256sum(filename); */
 
     *_pkg = pkg;
 
