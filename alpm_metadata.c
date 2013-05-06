@@ -256,20 +256,24 @@ static void read_desc(struct archive *archive, struct archive_entry *entry, alpm
 
 static alpm_pkg_meta_t *load_pkg(alpm_db_meta_t *db, char *entryname)
 {
-    char *p = entryname;
-    p = strrchr(p, '-');
-    p = strrchr(p, '-');
-    *++p = '\0';
+    size_t len = strlen(entryname);
+    int x = 2;
+    while(len > 0 && x > 0) {
+        if (entryname[len - 1] == '-')
+            --x;
+        --len;
+    }
+    entryname[len] = '\0';
 
     alpm_pkg_meta_t *metadata = hashtable_get(db->pkgcache, entryname);
 
     if (metadata == NULL) {
         metadata = calloc(1, sizeof(alpm_pkg_meta_t));
         metadata->name = strdup(entryname);
-        metadata->version = strdup(p);
+        metadata->version = strdup(entryname + len + 1);
+        hashtable_add(db->pkgcache, metadata->name, metadata);
     }
 
-    hashtable_add(db->pkgcache, metadata->name, metadata);
     return metadata;
 }
 
