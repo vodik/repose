@@ -302,6 +302,8 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
     fputs("Options:\n"
         " -h, --help            display this help and exit\n"
         " -v, --version         display version\n"
+        " -V, --verify          verify the contents of the database\n"
+        " -U, --update          update the database\n"
         " -r, --repo=PATH       repo name to use\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
