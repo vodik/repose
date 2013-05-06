@@ -22,7 +22,8 @@
 #include "hashtable.h"
 
 struct repo {
-    struct archive *a;
+    struct archive *archive;
+    struct archive_entry *entry;
     struct buffer buf;
 };
 
@@ -92,11 +93,12 @@ static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
 static struct repo *repo_write_new(const char *filename)
 {
     struct repo *repo = malloc(sizeof(struct repo));
-    repo->a = archive_write_new();
+    repo->archive = archive_write_new();
+    repo->entry = archive_entry_new();
 
-    archive_write_add_filter_gzip(repo->a);
-    archive_write_set_format_pax_restricted(repo->a);
-    archive_write_open_filename(repo->a, filename);
+    archive_write_add_filter_gzip(repo->archive);
+    archive_write_set_format_pax_restricted(repo->archive);
+    archive_write_open_filename(repo->archive, filename);
 
     buffer_init(&repo->buf, 512);
 
@@ -105,33 +107,32 @@ static struct repo *repo_write_new(const char *filename)
 
 static void repo_write_pkg(struct repo *repo, alpm_pkg_meta_t *pkg)
 {
-    struct archive_entry *entry = archive_entry_new();
     char path[PATH_MAX];
 
+    archive_entry_clear(repo->entry);
     buffer_clear(&repo->buf);
     write_desc_file(pkg, &repo->buf);
 
     /* generate the 'desc' file */
     snprintf(path, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "desc");
-    archive_write_buffer(repo->a, entry, path, &repo->buf);
+    archive_write_buffer(repo->archive, repo->entry, path, &repo->buf);
 
-    archive_entry_clear(entry);
+    archive_entry_clear(repo->entry);
     buffer_clear(&repo->buf);
     write_depends_file(pkg, &repo->buf);
 
     /* generate the 'depends' file */
     snprintf(path, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "depends");
-    archive_write_buffer(repo->a, entry, path, &repo->buf);
-
-    archive_entry_free(entry);
+    archive_write_buffer(repo->archive, repo->entry, path, &repo->buf);
 }
 
 static void repo_write_close(struct repo *repo)
 {
-    buffer_free(&repo->buf);
+    archive_write_close(repo->archive);
 
-    archive_write_close(repo->a);
-    archive_write_free(repo->a);
+    buffer_free(&repo->buf);
+    archive_entry_free(repo->entry);
+    archive_write_free(repo->archive);
 }
 
 static alpm_list_t *find_packages(char *const *paths)
