@@ -223,8 +223,8 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
     size_t entry_size = archive_entry_size(entry);
     char *buf = malloc(entry_size);
 
-    /* TODO: finish */
-    while(archive_fgets(reader, buf, entry_size) == ARCHIVE_OK) {
+    /* TODO: check -1 might not be the best here. need actual rc */
+    while(archive_fgets(reader, buf, entry_size) != -1) {
         if (strcmp(buf, "%FILENAME%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->filename);
         } else if (strcmp(buf, "%NAME%") == 0) {
@@ -365,6 +365,7 @@ int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
 
         /* we have desc, depends, or deltas - parse it */
         /* alpm_pkg_meta_t *pkg = NULL; */
+        reader->ret = ARCHIVE_OK;
         db_read_pkg(db, reader, entry);
     }
 

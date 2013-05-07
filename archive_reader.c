@@ -23,7 +23,7 @@ struct archive_reader *archive_reader_new(struct archive *a)
 int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
 {
     char *line_offset = line;
-    size_t bytes_r = 0;
+    int bytes_r = 0;
 
     for (;;) {
         size_t new, block_remaining;
@@ -34,7 +34,8 @@ int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
             int64_t offset;
             if(r->ret == ARCHIVE_EOF) {
                 /* reached end of archive on the last read, now we are out of data */
-                return bytes_r;
+                /* printf("RETUDNING: %d\n", bytes_r); */
+                return bytes_r > 0 ? bytes_r : -1;
             }
 
             r->ret = archive_read_data_block(r->archive, (const void **)&r->block,
