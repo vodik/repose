@@ -199,6 +199,27 @@ static inline void read_desc_entry(struct archive *archive, struct archive_read_
     *data = strdup(buf->line);
 }
 
+static int xstrtol(const char *str, long *out)
+{
+    char *end = NULL;
+
+    if (str == NULL || *str == '\0')
+        return -1;
+
+    errno = 0;
+    *out = strtol(str, &end, 10);
+    if (errno || str == end || (end && *end))
+        return -1;
+
+    return 0;
+}
+
+static inline void read_desc_long(struct archive *archive, struct archive_read_buffer *buf, off_t entry_size, long *data)
+{
+    archive_fgets(archive, buf, entry_size);
+    xstrtol(buf->line, data);
+}
+
 static void read_desc(struct archive *archive, struct archive_entry *entry, alpm_pkg_meta_t *pkg)
 {
     off_t entry_size = archive_entry_size(entry);
@@ -221,9 +242,9 @@ static void read_desc(struct archive *archive, struct archive_entry *entry, alpm
         } else if (strcmp(buf.line, "%DESC%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->desc);
         } else if (strcmp(buf.line, "%CSIZE%") == 0) {
-            /* TODO */
+            read_desc_long(archive, &buf, entry_size, (long *)&pkg->size);
         } else if (strcmp(buf.line, "%ISIZE%") == 0) {
-            /* TODO */
+            read_desc_long(archive, &buf, entry_size, (long *)&pkg->isize);
         } else if (strcmp(buf.line, "%MD5SUM%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->md5sum);
         } else if (strcmp(buf.line, "%SHA256SUM%") == 0) {
@@ -235,7 +256,7 @@ static void read_desc(struct archive *archive, struct archive_entry *entry, alpm
         } else if (strcmp(buf.line, "%ARCH%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->arch);
         } else if (strcmp(buf.line, "%BUILDDATE%") == 0) {
-            /* TODO */
+            read_desc_long(archive, &buf, entry_size, &pkg->builddate);
         } else if (strcmp(buf.line, "%PACKAGER%") == 0) {
             read_desc_entry(archive, &buf, entry_size, &pkg->packager);
         } else if (strcmp(buf.line, "%DEPENDS%") == 0) {
