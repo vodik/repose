@@ -232,7 +232,7 @@ static int verify_db(const char *repopath)
     return rc;
 }
 
-static int update_db(const char *repopath, int argc, char *argv[])
+static int update_db(const char *repopath, int argc, char *argv[], int clean)
 {
     struct stat st;
     struct hashtable *table = hashtable_new(17, NULL);
@@ -276,7 +276,9 @@ static int update_db(const char *repopath, int argc, char *argv[])
             alpm_pkg_load_metadata(path, &metadata);
             alpm_pkg_meta_t *old = hashtable_get(table, metadata->name);
 
-            if (old == NULL || alpm_pkg_vercmp(metadata->version, old->version) == 1) {
+            int vercmp = alpm_pkg_vercmp(metadata->version, old->version);
+
+            if (old == NULL || vercmp == 1) {
                 hashtable_add(table, metadata->name, metadata);
                 if (old) {
                     printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
@@ -286,6 +288,9 @@ static int update_db(const char *repopath, int argc, char *argv[])
                 }
                 dirty = true;
             }
+
+            if (vercmp == -1 && clean)
+                unlink(metadata->filename);
         }
     }
 
@@ -358,6 +363,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -V, --verify          verify the contents of the database\n"
         " -U, --update          update the database\n"
         " -Q, --query           query the database\n"
+        " -c, --clean           remove stuff\n"
         " -r, --repo=PATH       repo name to use\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -367,6 +373,7 @@ int main(int argc, char *argv[])
 {
     const char *reponame = NULL;
     enum repoman_action action = INVALID_ACTION;
+    int clean = 0;
 
     static const struct option opts[] = {
         { "help",    no_argument,       0, 'h' },
@@ -379,7 +386,7 @@ int main(int argc, char *argv[])
     };
 
     while (true) {
-        int opt = getopt_long(argc, argv, "hvVUQr:", opts, NULL);
+        int opt = getopt_long(argc, argv, "hvVUQcr:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -390,9 +397,6 @@ int main(int argc, char *argv[])
         case 'v':
             printf("%s %s\n", program_invocation_short_name, "devel");
             return 0;
-        case 'r':
-            reponame = optarg;
-            break;
         case 'V':
             action = ACTION_VERIFY;
             break;
@@ -401,6 +405,12 @@ int main(int argc, char *argv[])
             break;
         case 'Q':
             action = ACTION_QUERY;
+            break;
+        case 'c':
+            ++clean;
+            break;
+        case 'r':
+            reponame = optarg;
             break;
         default:
             usage(stderr);
@@ -423,7 +433,7 @@ int main(int argc, char *argv[])
         rc = verify_db(repopath);
         break;
     case ACTION_UPDATE:
-        rc = update_db(repopath, argc - optind, argv + optind);
+        rc = update_db(repopath, argc - optind, argv + optind, clean);
         if (rc == 0)
             /* symlink repo.db -> repo.db.tar.gz */
             symlink(repopath, linkpath);
