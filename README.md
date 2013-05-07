@@ -14,3 +14,7 @@ Add all packages in the current directory to foo.db.tar.gz
 
 Verify the packages foo.db.tar.gz refers to can be accessed and the
 md5sum and sha256sum match.
+
+    repoman -Qr foo pkg ...
+
+Print information about `pkg` much like how `pacman -Qi pkg` works
