@@ -32,6 +32,7 @@ struct repo {
 enum repoman_action {
     ACTION_VERIFY,
     ACTION_UPDATE,
+    ACTION_QUERY,
     INVALID_ACTION
 };
 
@@ -296,6 +297,39 @@ static int update_db(const char *repopath, int argc, char *argv[])
     return 0;
 }
 
+static int query_db(const char *repopath, int argc, char *argv[])
+{
+    struct stat st;
+
+    /* read the existing repo or construct a new package cache */
+    if (stat(repopath, &st) < 0) {
+        warnx("repo doesn't exist");
+        return 1;
+    } else if (argc > 0) {
+        alpm_db_meta_t db;
+        alpm_db_populate(repopath, &db);
+
+        int i;
+        for (i = 0; i < argc; ++i) {
+            const alpm_pkg_meta_t *pkg = hashtable_get(db.pkgcache, argv[i]);
+            if (pkg == NULL) {
+                warn("pkg not found");
+                return 1;
+            }
+
+            printf("Filename     : %s\n", pkg->filename);
+            printf("Name         : %s\n", pkg->name);
+            printf("Version      : %s\n", pkg->version);
+            printf("Description  : %s\n", pkg->desc);
+            printf("Architecture : %s\n", pkg->arch);
+            printf("URL          : %s\n", pkg->url);
+            printf("Packager     : %s\n\n", pkg->packager);
+        }
+    }
+
+    return 0;
+}
+
 static void __attribute__((__noreturn__)) usage(FILE *out)
 {
     fprintf(out, "usage: %s [options]\n", program_invocation_short_name);
@@ -304,6 +338,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -v, --version         display version\n"
         " -V, --verify          verify the contents of the database\n"
         " -U, --update          update the database\n"
+        " -Q, --query           query the database\n"
         " -r, --repo=PATH       repo name to use\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -319,12 +354,13 @@ int main(int argc, char *argv[])
         { "version", no_argument,       0, 'v' },
         { "verify",  no_argument,       0, 'V' },
         { "update",  no_argument,       0, 'U' },
+        { "query",    no_argument,      0, 'Q' },
         { "repo",    required_argument, 0, 'r' },
         { 0, 0, 0, 0 }
     };
 
     while (true) {
-        int opt = getopt_long(argc, argv, "hvVUr:", opts, NULL);
+        int opt = getopt_long(argc, argv, "hvVUQr:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -343,6 +379,9 @@ int main(int argc, char *argv[])
             break;
         case 'U':
             action = ACTION_UPDATE;
+            break;
+        case 'Q':
+            action = ACTION_QUERY;
             break;
         default:
             usage(stderr);
@@ -364,11 +403,16 @@ int main(int argc, char *argv[])
     case ACTION_VERIFY:
         rc = verify_db(repopath);
         break;
-    default:
+    case ACTION_UPDATE:
         rc = update_db(repopath, argc - optind, argv + optind);
         if (rc == 0)
             /* symlink repo.db -> repo.db.tar.gz */
             symlink(repopath, linkpath);
+        break;
+    case ACTION_QUERY:
+        rc = query_db(repopath, argc - optind, argv + optind);
+        break;
+    default:
         break;
     };
 
