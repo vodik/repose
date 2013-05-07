@@ -23,7 +23,7 @@ struct archive_reader *archive_reader_new(struct archive *a)
 int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
 {
     char *line_offset = line;
-    size_t bytes_w = 0;
+    size_t bytes_r = 0;
 
     for (;;) {
         size_t new, block_remaining;
@@ -34,7 +34,7 @@ int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
             int64_t offset;
             if(r->ret == ARCHIVE_EOF) {
                 /* reached end of archive on the last read, now we are out of data */
-                return bytes_w;
+                return bytes_r;
             }
 
             r->ret = archive_read_data_block(r->archive, (const void **)&r->block,
@@ -68,9 +68,9 @@ int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
 
             line_offset[len] = '\0';
             r->block_offset = eol + 1;
-            bytes_w = line_offset + len - line;
+            bytes_r = line_offset + len - line;
             /* this is the main return point; from here you can read b->line */
-            return bytes_w;
+            return bytes_r;
         } else {
             /* we've looked through the whole block but no newline, copy it */
             size_t len = (size_t)(r->block + r->block_size - r->block_offset);
@@ -80,11 +80,11 @@ int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
              * returned on next call */
             if (len == 0) {
                 line_offset[0] = '\0';
-                bytes_w = line_offset - line;
-                return bytes_w;
+                bytes_r = line_offset - line;
+                return bytes_r;
             }
         }
     }
 
-    return bytes_w;
+    return bytes_r;
 }
