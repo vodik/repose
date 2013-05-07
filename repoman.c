@@ -212,24 +212,24 @@ static int verify_pkg(const alpm_pkg_meta_t *pkg)
 
 static int verify_db(const char *repopath)
 {
-        alpm_db_meta_t db;
-        alpm_db_populate(repopath, &db);
-        struct hashnode_t **nodes = db.pkgcache->nodes;
-        size_t i;
-        int rc = 0;
+    alpm_db_meta_t db;
+    alpm_db_populate(repopath, &db);
+    struct hashnode_t **nodes = db.pkgcache->nodes;
+    size_t i;
+    int rc = 0;
 
-        for (i = 0; i < db.pkgcache->size; ++i) {
-            struct hashnode_t *node;
-            for (node = nodes[i]; node; node = node->next) {
-                alpm_pkg_meta_t *pkg = node->val;
-                rc |= verify_pkg(pkg);
-            }
+    for (i = 0; i < db.pkgcache->size; ++i) {
+        struct hashnode_t *node;
+        for (node = nodes[i]; node; node = node->next) {
+            alpm_pkg_meta_t *pkg = node->val;
+            rc |= verify_pkg(pkg);
         }
+    }
 
-        if (rc == 0)
-            printf("repo okay!\n");
+    if (rc == 0)
+        printf("repo okay!\n");
 
-        return rc;
+    return rc;
 }
 
 static int update_db(const char *repopath, int argc, char *argv[])
