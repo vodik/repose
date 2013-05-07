@@ -11,7 +11,7 @@
 #include <alpm.h>
 #include <archive.h>
 #include <archive_entry.h>
-#include "archive_extra.h"
+#include "archive_reader.h"
 
 static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 {
@@ -57,19 +57,18 @@ static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
         pkg->makedepends = alpm_list_add(pkg->makedepends, strdup(buf));
 }
 
-static void read_pkg_metadata(struct archive *a, struct archive_entry *ae, alpm_pkg_meta_t *pkg)
+static void read_pkg_metadata(struct archive *archive, struct archive_entry *entry, alpm_pkg_meta_t *pkg)
 {
-    off_t entry_size = archive_entry_size(ae);
+    struct archive_reader *reader = archive_reader_new(archive);
+    size_t entry_size = archive_entry_size(entry);
+    char *line = malloc(entry_size);
 
-    struct archive_read_buffer buf = {
-        .line = malloc(entry_size)
-    };
-
-    while(archive_fgets(a, &buf, entry_size) == ARCHIVE_OK && buf.real_line_size > 0) {
-        read_pkg_metadata_line(buf.line, pkg);
+    while (archive_fgets(reader, line, entry_size) > 0) {
+        read_pkg_metadata_line(line, pkg);
     }
 
-    free(buf.line);
+    free(reader);
+    free(line);
 }
 
 int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)
@@ -181,22 +180,20 @@ static size_t _alpm_strip_newline(char *str, size_t len)
 	return len;
 }
 
-static inline void read_desc_list(struct archive *archive, struct archive_read_buffer *buf, off_t entry_size, alpm_list_t **list)
+static inline void read_desc_list(struct archive_reader *reader, char *buf, size_t entry_size, alpm_list_t **list)
 {
     for (;;) {
-        archive_fgets(archive, buf, entry_size);
-
-        if (_alpm_strip_newline(buf->line, buf->real_line_size) == 0)
+        int bytes_r = archive_fgets(reader, buf, entry_size);
+        if (_alpm_strip_newline(buf, bytes_r) == 0)
             return;
-
-        *list = alpm_list_add(*list, strdup(buf->line));
+        *list = alpm_list_add(*list, strdup(buf));
     }
 }
 
-static inline void read_desc_entry(struct archive *archive, struct archive_read_buffer *buf, off_t entry_size, char **data)
+static inline void read_desc_entry(struct archive_reader *reader, char *buf, size_t entry_size, char **data)
 {
-    archive_fgets(archive, buf, entry_size);
-    *data = strdup(buf->line);
+    archive_fgets(reader, buf, entry_size);
+    *data = strdup(buf);
 }
 
 static int xstrtol(const char *str, long *out)
@@ -214,65 +211,61 @@ static int xstrtol(const char *str, long *out)
     return 0;
 }
 
-static inline void read_desc_long(struct archive *archive, struct archive_read_buffer *buf, off_t entry_size, long *data)
+static inline void read_desc_long(struct archive_reader *reader, char *buf, size_t entry_size, long *data)
 {
-    archive_fgets(archive, buf, entry_size);
-    xstrtol(buf->line, data);
+    archive_fgets(reader, buf, entry_size);
+    xstrtol(buf, data);
 }
 
-static void read_desc(struct archive *archive, struct archive_entry *entry, alpm_pkg_meta_t *pkg)
+static void read_desc(struct archive_reader *reader, struct archive_entry *entry, alpm_pkg_meta_t *pkg)
 {
-    off_t entry_size = archive_entry_size(entry);
-
-    /* TODO: allocated too many times */
-    struct archive_read_buffer buf = {
-        .line = malloc(entry_size)
-    };
+    size_t entry_size = archive_entry_size(entry);
+    char *buf = malloc(entry_size);
 
     /* TODO: finish */
-    while(archive_fgets(archive, &buf, entry_size) == ARCHIVE_OK) {
-        if (strcmp(buf.line, "%FILENAME%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->filename);
-        } else if (strcmp(buf.line, "%NAME%") == 0) {
+    while(archive_fgets(reader, buf, entry_size) == ARCHIVE_OK) {
+        if (strcmp(buf, "%FILENAME%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->filename);
+        } else if (strcmp(buf, "%NAME%") == 0) {
             /* XXX: name should already be set, rather, validate it */
-            read_desc_entry(archive, &buf, entry_size, &pkg->name);
-        } else if (strcmp(buf.line, "%VERSION%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->name);
+        } else if (strcmp(buf, "%VERSION%") == 0) {
             /* XXX: version should already be set, rather, validate it */
-            read_desc_entry(archive, &buf, entry_size, &pkg->version);
-        } else if (strcmp(buf.line, "%DESC%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->desc);
-        } else if (strcmp(buf.line, "%CSIZE%") == 0) {
-            read_desc_long(archive, &buf, entry_size, (long *)&pkg->size);
-        } else if (strcmp(buf.line, "%ISIZE%") == 0) {
-            read_desc_long(archive, &buf, entry_size, (long *)&pkg->isize);
-        } else if (strcmp(buf.line, "%MD5SUM%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->md5sum);
-        } else if (strcmp(buf.line, "%SHA256SUM%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->sha256sum);
-        } else if (strcmp(buf.line, "%URL%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->url);
-        } else if (strcmp(buf.line, "%LICENSE%") == 0) {
-            read_desc_list(archive, &buf, entry_size, &pkg->license);
-        } else if (strcmp(buf.line, "%ARCH%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->arch);
-        } else if (strcmp(buf.line, "%BUILDDATE%") == 0) {
-            read_desc_long(archive, &buf, entry_size, &pkg->builddate);
-        } else if (strcmp(buf.line, "%PACKAGER%") == 0) {
-            read_desc_entry(archive, &buf, entry_size, &pkg->packager);
-        } else if (strcmp(buf.line, "%DEPENDS%") == 0) {
-            read_desc_list(archive, &buf, entry_size, &pkg->depends);
-        } else if (strcmp(buf.line, "%CONFLICTS%") == 0) {
-            read_desc_list(archive, &buf, entry_size, &pkg->conflicts);
-        } else if (strcmp(buf.line, "%PROVIDES%") == 0) {
-            read_desc_list(archive, &buf, entry_size, &pkg->provides);
-        } else if (strcmp(buf.line, "%OPTDEPENDS%") == 0) {
-            read_desc_list(archive, &buf, entry_size, &pkg->optdepends);
-        } else if (strcmp(buf.line, "%MAKEDEPENDS%") == 0) {
-            read_desc_list(archive, &buf, entry_size, &pkg->makedepends);
+            read_desc_entry(reader, buf, entry_size, &pkg->version);
+        } else if (strcmp(buf, "%DESC%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->desc);
+        } else if (strcmp(buf, "%CSIZE%") == 0) {
+            read_desc_long(reader, buf, entry_size, (long *)&pkg->size);
+        } else if (strcmp(buf, "%ISIZE%") == 0) {
+            read_desc_long(reader, buf, entry_size, (long *)&pkg->isize);
+        } else if (strcmp(buf, "%MD5SUM%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->md5sum);
+        } else if (strcmp(buf, "%SHA256SUM%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->sha256sum);
+        } else if (strcmp(buf, "%URL%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->url);
+        } else if (strcmp(buf, "%LICENSE%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->license);
+        } else if (strcmp(buf, "%ARCH%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->arch);
+        } else if (strcmp(buf, "%BUILDDATE%") == 0) {
+            read_desc_long(reader, buf, entry_size, &pkg->builddate);
+        } else if (strcmp(buf, "%PACKAGER%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->packager);
+        } else if (strcmp(buf, "%DEPENDS%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->depends);
+        } else if (strcmp(buf, "%CONFLICTS%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->conflicts);
+        } else if (strcmp(buf, "%PROVIDES%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->provides);
+        } else if (strcmp(buf, "%OPTDEPENDS%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->optdepends);
+        } else if (strcmp(buf, "%MAKEDEPENDS%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->makedepends);
         }
     }
 
-    free(buf.line);
+    free(buf);
 }
 
 static alpm_pkg_meta_t *load_pkg(alpm_db_meta_t *db, char *entryname)
@@ -298,7 +291,7 @@ static alpm_pkg_meta_t *load_pkg(alpm_db_meta_t *db, char *entryname)
     return metadata;
 }
 
-static void db_read_pkg(alpm_db_meta_t *db, struct archive *archive,
+static void db_read_pkg(alpm_db_meta_t *db, struct archive_reader *reader,
                         struct archive_entry *entry)
 {
     char *entryname = strdup(archive_entry_pathname(entry));
@@ -308,7 +301,7 @@ static void db_read_pkg(alpm_db_meta_t *db, struct archive *archive,
 
     if (strcmp(entryname, "desc") == 0 || strcmp(entryname, "depends") == 0) {
         alpm_pkg_meta_t *pkg = load_pkg(db, filename);
-        read_desc(archive, entry, pkg);
+        read_desc(reader, entry, pkg);
     }
 
     free(filename);
@@ -317,6 +310,7 @@ static void db_read_pkg(alpm_db_meta_t *db, struct archive *archive,
 int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
 {
     struct archive *archive = NULL;
+    struct archive_reader* reader = NULL;
     struct stat st;
     char *memblock = MAP_FAILED;
     int fd = 0, rc = 0;
@@ -336,6 +330,8 @@ int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
 
 
     archive = archive_read_new();
+    reader = archive_reader_new(archive);
+
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
@@ -368,7 +364,7 @@ int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
 
         /* we have desc, depends, or deltas - parse it */
         /* alpm_pkg_meta_t *pkg = NULL; */
-        db_read_pkg(db, archive, entry);
+        db_read_pkg(db, reader, entry);
     }
 
 cleanup:
@@ -381,6 +377,7 @@ cleanup:
     if (archive) {
         archive_read_close(archive);
         archive_read_free(archive);
+        free(reader);
     }
 
     return rc;
