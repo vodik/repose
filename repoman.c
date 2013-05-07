@@ -276,7 +276,7 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
             alpm_pkg_load_metadata(path, &metadata);
             alpm_pkg_meta_t *old = hashtable_get(table, metadata->name);
 
-            int vercmp = alpm_pkg_vercmp(metadata->version, old->version);
+            int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
 
             if (old == NULL || vercmp == 1) {
                 hashtable_add(table, metadata->name, metadata);
