@@ -12,6 +12,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include "archive_reader.h"
+#include "pkghash.h"
 
 static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 {
@@ -279,13 +280,13 @@ static alpm_pkg_meta_t *load_pkg(alpm_db_meta_t *db, char *entryname)
     }
     entryname[len] = '\0';
 
-    alpm_pkg_meta_t *metadata = hashtable_get(db->pkgcache, entryname);
+    alpm_pkg_meta_t *metadata = _alpm_pkghash_find(db->pkgcache, entryname);
 
     if (metadata == NULL) {
         metadata = calloc(1, sizeof(alpm_pkg_meta_t));
         metadata->name = strdup(entryname);
         metadata->version = strdup(entryname + len + 1);
-        hashtable_add(db->pkgcache, metadata->name, metadata);
+        _alpm_pkghash_add(db->pkgcache, metadata);
     }
 
     return metadata;
@@ -342,7 +343,7 @@ int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
         goto cleanup;
     }
 
-    db->pkgcache = hashtable_new(23, NULL); //_alpm_pkghash_create(23);
+    db->pkgcache = _alpm_pkghash_create(23);
     if (db->pkgcache == NULL) {
         rc = -1;
         goto cleanup;

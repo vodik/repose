@@ -21,7 +21,7 @@
 
 #include "alpm_metadata.h"
 #include "buffer.h"
-#include "hashtable.h"
+#include "pkghash.h"
 
 struct repo {
     struct archive *archive;
@@ -214,16 +214,13 @@ static int verify_db(const char *repopath)
 {
     alpm_db_meta_t db;
     alpm_db_populate(repopath, &db);
-    struct hashnode_t **nodes = db.pkgcache->nodes;
-    size_t i;
+
+    alpm_list_t *pkg, *pkgs = db.pkgcache->list;
     int rc = 0;
 
-    for (i = 0; i < db.pkgcache->size; ++i) {
-        struct hashnode_t *node;
-        for (node = nodes[i]; node; node = node->next) {
-            alpm_pkg_meta_t *pkg = node->val;
-            rc |= verify_pkg(pkg);
-        }
+    for (pkg = pkgs; pkg; pkg = pkg->next) {
+        alpm_pkg_meta_t *metadata = pkg->data;
+        rc |= verify_pkg(metadata);
     }
 
     if (rc == 0)
@@ -235,8 +232,8 @@ static int verify_db(const char *repopath)
 static int update_db(const char *repopath, int argc, char *argv[], int clean)
 {
     struct stat st;
-    struct hashtable *table = hashtable_new(17, NULL);
     bool dirty = false;
+    alpm_pkghash_t *cache = _alpm_pkghash_create(23);
 
     /* read the existing repo or construct a new package cache */
     if (stat(repopath, &st) < 0) {
@@ -247,20 +244,16 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
         alpm_db_populate(repopath, &db);
 
         /* XXX: verify entries still exist here */
-        struct hashnode_t **nodes = db.pkgcache->nodes;
-        size_t i;
+        alpm_list_t *pkg, *db_pkgs = db.pkgcache->list;
 
-        for (i = 0; i < db.pkgcache->size; ++i) {
-            struct hashnode_t *node;
-            for (node = nodes[i]; node; node = node->next) {
-                alpm_pkg_meta_t *metadata = node->val;
-                if (verify_pkg(metadata) == 1) {
-                    printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
-                    alpm_pkg_free_metadata(metadata);
-                    dirty = true;
-                } else {
-                    hashtable_add(table, metadata->name, metadata);
-                }
+        for (pkg = db_pkgs; pkg; pkg = pkg->next) {
+            alpm_pkg_meta_t *metadata = pkg->data;
+            if (verify_pkg(metadata) == 1) {
+                printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+                alpm_pkg_free_metadata(metadata);
+                dirty = true;
+            } else {
+                cache = _alpm_pkghash_add(cache, metadata);
             }
         }
     }
@@ -274,12 +267,12 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
             alpm_pkg_meta_t *metadata;
 
             alpm_pkg_load_metadata(path, &metadata);
-            alpm_pkg_meta_t *old = hashtable_get(table, metadata->name);
+            alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, metadata->name);
 
             int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
 
             if (old == NULL || vercmp == 1) {
-                hashtable_add(table, metadata->name, metadata);
+                cache = _alpm_pkghash_add(cache, metadata);
                 if (old) {
                     printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
                     if (clean)
@@ -300,18 +293,11 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
     if (dirty)
     {
         struct repo *repo = repo_write_new(repopath);
-        struct hashnode_t **nodes = table->nodes;
-        size_t i;
+        alpm_list_t *pkg, *pkgs = cache->list;
 
-        for (i = 0; i < table->size; ++i) {
-            struct hashnode_t *node = nodes[i];
-            while (node) {
-                alpm_pkg_meta_t *pkg = node->val;
-                /* printf("%s-%s [%s]\n", pkg->name, pkg->version, pkg->arch); */
-
-                repo_write_pkg(repo, pkg);
-                node = node->next;
-            }
+        for (pkg = pkgs; pkg; pkg = pkg->next) {
+            alpm_pkg_meta_t *metadata = pkg->data;
+            repo_write_pkg(repo, metadata);
         }
 
         repo_write_close(repo);
@@ -337,7 +323,7 @@ static int query_db(const char *repopath, int argc, char *argv[])
 
         int i;
         for (i = 0; i < argc; ++i) {
-            const alpm_pkg_meta_t *pkg = hashtable_get(db.pkgcache, argv[i]);
+            const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(db.pkgcache, argv[i]);
             if (pkg == NULL) {
                 warn("pkg not found");
                 return 1;
