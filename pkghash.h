@@ -47,6 +47,8 @@ struct __alpm_pkghash_t {
 
 typedef struct __alpm_pkghash_t alpm_pkghash_t;
 
+unsigned long _alpm_hash_sdbm(const char *str);
+
 alpm_pkghash_t *_alpm_pkghash_create(unsigned int size);
 
 alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg);

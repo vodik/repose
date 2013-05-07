@@ -269,43 +269,135 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
     free(buf);
 }
 
-static alpm_pkg_meta_t *load_pkg(alpm_db_meta_t *db, char *entryname)
+static int _alpm_splitname(const char *target, char **name, char **version,
+		unsigned long *name_hash)
 {
-    size_t len = strlen(entryname);
-    int x = 2;
-    while(len > 0 && x > 0) {
-        if (entryname[len - 1] == '-')
-            --x;
-        --len;
-    }
-    entryname[len] = '\0';
+	/* the format of a db entry is as follows:
+	 *    package-version-rel/
+	 *    package-version-rel/desc (we ignore the filename portion)
+	 * package name can contain hyphens, so parse from the back- go bact
+	 * two hyphens and we have split the version from the name.
+	 */
+	const char *pkgver, *end;
 
-    alpm_pkg_meta_t *metadata = _alpm_pkghash_find(db->pkgcache, entryname);
+	if(target == NULL) {
+		return -1;
+	}
 
-    if (metadata == NULL) {
-        metadata = calloc(1, sizeof(alpm_pkg_meta_t));
-        metadata->name = strdup(entryname);
-        metadata->version = strdup(entryname + len + 1);
-        _alpm_pkghash_add(db->pkgcache, metadata);
-    }
+	/* remove anything trailing a '/' */
+	end = strchr(target, '/');
+	if(!end) {
+		end = target + strlen(target);
+	}
 
-    return metadata;
+	/* do the magic parsing- find the beginning of the version string
+	 * by doing two iterations of same loop to lop off two hyphens */
+	for(pkgver = end - 1; *pkgver && *pkgver != '-'; pkgver--);
+	for(pkgver = pkgver - 1; *pkgver && *pkgver != '-'; pkgver--);
+	if(*pkgver != '-' || pkgver == target) {
+		return -1;
+	}
+
+	/* copy into fields and return */
+	if(version) {
+		if(*version) {
+			free(*version);
+		}
+		/* version actually points to the dash, so need to increment 1 and account
+		 * for potential end character */
+		*version = strndup(pkgver + 1, end - pkgver - 1);
+        if(!*version)
+            return -1;
+	}
+
+	if(name) {
+		if(*name) {
+			free(*name);
+		}
+		*name = strndup(target, pkgver - target);
+        if(!*name)
+            return -1;
+		if(name_hash) {
+			*name_hash = _alpm_hash_sdbm(*name);
+		}
+	}
+
+	return 0;
+}
+
+static alpm_pkg_meta_t *load_pkg_for_entry(alpm_db_meta_t *db, const char *entryname,
+		const char **entry_filename, alpm_pkg_meta_t *likely_pkg)
+{
+	char *pkgname = NULL, *pkgver = NULL;
+	unsigned long pkgname_hash;
+	alpm_pkg_meta_t *pkg;
+
+	/* get package and db file names */
+	if(entry_filename) {
+		char *fname = strrchr(entryname, '/');
+		if(fname) {
+			*entry_filename = fname + 1;
+		} else {
+			*entry_filename = NULL;
+		}
+	}
+	if(_alpm_splitname(entryname, &pkgname, &pkgver, &pkgname_hash) != 0) {
+		/* _alpm_log(db->handle, ALPM_LOG_ERROR, */
+		/* 		_("invalid name for database entry '%s'\n"), entryname); */
+		return NULL;
+	}
+
+	if(likely_pkg && pkgname_hash == likely_pkg->name_hash
+			&& strcmp(likely_pkg->name, pkgname) == 0) {
+		pkg = likely_pkg;
+	} else {
+		pkg = _alpm_pkghash_find(db->pkgcache, pkgname);
+	}
+	if(pkg == NULL) {
+		pkg = calloc(1, sizeof(alpm_pkg_meta_t));
+		if(pkg == NULL) {
+			/* RET_ERR(db->handle, ALPM_ERR_MEMORY, NULL); */
+            return NULL;
+		}
+
+        pkg->filename = strdup(entryname);
+		pkg->name = pkgname;
+		pkg->version = pkgver;
+		pkg->name_hash = pkgname_hash;
+
+		/* pkg->origin = ALPM_PKG_FROM_SYNCDB; */
+		/* pkg->origin_data.db = db; */
+		/* pkg->ops = &default_pkg_ops; */
+		/* pkg->ops->get_validation = _sync_get_validation; */
+		/* pkg->handle = db->handle; */
+
+		/* add to the collection */
+		/* _alpm_log(db->handle, ALPM_LOG_FUNCTION, "adding '%s' to package cache for db '%s'\n", */
+		/* 		pkg->name, db->treename); */
+		db->pkgcache = _alpm_pkghash_add(db->pkgcache, pkg);
+	} else {
+		free(pkgname);
+		free(pkgver);
+	}
+
+    return pkg;
 }
 
 static void db_read_pkg(alpm_db_meta_t *db, struct archive_reader *reader,
                         struct archive_entry *entry)
 {
-    char *entryname = strdup(archive_entry_pathname(entry));
-    char *filename  = strsep(&entryname, "/");
-    if (entryname == NULL)
-        return;
+    const char *entryname = archive_entry_pathname(entry);
+    const char *filename;  //= strsep(&entryname, "/");
+    /* if (entryname == NULL) */
+    /*     return; */
 
-    if (strcmp(entryname, "desc") == 0 || strcmp(entryname, "depends") == 0) {
-        alpm_pkg_meta_t *pkg = load_pkg(db, filename);
+    alpm_pkg_meta_t *pkg = load_pkg_for_entry(db, entryname, (const char **)&filename, NULL);
+
+    if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0) {
         read_desc(reader, entry, pkg);
     }
 
-    free(filename);
+    /* free(filename); */
 }
 
 int alpm_db_populate(const char *filename, alpm_db_meta_t *db)

@@ -24,7 +24,7 @@
 #include "pkghash.h"
 /* #include "util.h" */
 
-static unsigned long _alpm_hash_sdbm(const char *str)
+unsigned long _alpm_hash_sdbm(const char *str)
 {
 	unsigned long hash = 0;
 	int c;
