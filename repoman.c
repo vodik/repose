@@ -184,6 +184,32 @@ static alpm_list_t *find_packages(char **paths)
     return pkgs;
 }
 
+static int verify_pkg(const alpm_pkg_meta_t *pkg)
+{
+    struct stat st;
+
+    if (stat(pkg->filename, &st) < 0) {
+        warn("couldn't find pkg %s", pkg->filename);
+        return 1;
+    }
+
+    char *md5sum = alpm_compute_md5sum(pkg->filename);
+    if (strcmp(pkg->md5sum, md5sum) != 0) {
+        warnx("md5 sum for pkg %s is different", pkg->filename);
+        return 1;
+    }
+    free(md5sum);
+
+    char *sha256sum = alpm_compute_sha256sum(pkg->filename);
+    if (strcmp(pkg->sha256sum, sha256sum) != 0) {
+        warnx("sha256 sum for pkg %s is different", pkg->filename);
+        return 1;
+    }
+    free(sha256sum);
+
+    return 0;
+}
+
 static int verify_db(const char *repopath)
 {
         alpm_db_meta_t db;
@@ -196,29 +222,7 @@ static int verify_db(const char *repopath)
             struct hashnode_t *node;
             for (node = nodes[i]; node; node = node->next) {
                 alpm_pkg_meta_t *pkg = node->val;
-                struct stat st;
-
-                if (stat(pkg->filename, &st) < 0) {
-                    warn("couldn't find pkg %s", pkg->filename);
-                    rc = 1;
-                    continue;
-                }
-
-                char *md5sum = alpm_compute_md5sum(pkg->filename);
-                if (strcmp(pkg->md5sum, md5sum) != 0) {
-                    warnx("md5 sum for pkg %s is different", pkg->filename);
-                    rc = 1;
-                    continue;
-                }
-                free(md5sum);
-
-                char *sha256sum = alpm_compute_sha256sum(pkg->filename);
-                if (strcmp(pkg->sha256sum, sha256sum) != 0) {
-                    warnx("sha256 sum for pkg %s is different", pkg->filename);
-                    rc = 1;
-                    continue;
-                }
-                free(sha256sum);
+                rc |= verify_pkg(pkg);
             }
         }
 
@@ -231,20 +235,34 @@ static int verify_db(const char *repopath)
 static int update_db(const char *repopath, int argc, char *argv[])
 {
     struct stat st;
-    struct hashtable *table = NULL;
+    struct hashtable *table = hashtable_new(17, NULL);
     bool dirty = false;
 
     /* read the existing repo or construct a new package cache */
     if (stat(repopath, &st) < 0) {
         warnx("repo doesn't exist, creating...");
-        table = hashtable_new(17, NULL);
         dirty = true;
     } else {
         alpm_db_meta_t db;
         alpm_db_populate(repopath, &db);
-        table = db.pkgcache;
 
         /* XXX: verify entries still exist here */
+        struct hashnode_t **nodes = db.pkgcache->nodes;
+        size_t i;
+
+        for (i = 0; i < db.pkgcache->size; ++i) {
+            struct hashnode_t *node;
+            for (node = nodes[i]; node; node = node->next) {
+                alpm_pkg_meta_t *metadata = node->val;
+                if (verify_pkg(metadata) == 1) {
+                    printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+                    alpm_pkg_free_metadata(metadata);
+                    dirty = true;
+                } else {
+                    hashtable_add(table, metadata->name, metadata);
+                }
+            }
+        }
     }
 
     /* if some file paths were specified, find all packages */
@@ -282,7 +300,7 @@ static int update_db(const char *repopath, int argc, char *argv[])
             struct hashnode_t *node = nodes[i];
             while (node) {
                 alpm_pkg_meta_t *pkg = node->val;
-                printf("%s-%s [%s]\n", pkg->name, pkg->version, pkg->arch);
+                /* printf("%s-%s [%s]\n", pkg->name, pkg->version, pkg->arch); */
 
                 repo_write_pkg(repo, pkg);
                 node = node->next;
@@ -290,6 +308,7 @@ static int update_db(const char *repopath, int argc, char *argv[])
         }
 
         repo_write_close(repo);
+        printf("repo %s updated successfully\n", repopath);
     } else {
         printf("repo %s does not need updating\n", repopath);
     }
