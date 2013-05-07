@@ -282,6 +282,8 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
                 hashtable_add(table, metadata->name, metadata);
                 if (old) {
                     printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
+                    if (clean)
+                        unlink(old->filename);
                     alpm_pkg_free_metadata(old);
                 } else  {
                     printf("ADDING: %s-%s\n", metadata->name, metadata->version);
