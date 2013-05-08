@@ -6,9 +6,10 @@ At the moment, a half baked and hacked together alternative to repo-add.
 
 ### Usage
 
-    repoman -Ur foo .
+    repoman -Usr foo .
 
-Add all packages in the current directory to foo.db.tar.gz
+Add all packages in the current directory to foo.db.tar.gz and sign the
+database with gnupg.
 
     repoman -Vr foo
 
