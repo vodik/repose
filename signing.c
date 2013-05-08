@@ -81,7 +81,7 @@ static int init_gpgme(void)
 /*     } */
 /* } */
 
-void gpgme_sign(const char *file)
+void gpgme_sign(const char *file, const char *key)
 {
     gpgme_error_t err;
     gpgme_ctx_t ctx;
@@ -98,21 +98,19 @@ void gpgme_sign(const char *file)
     /* use armor for now... we're testing! */
     /* gpgme_set_armor(ctx, 1); */
 
-    /* if (key_string) */
-    /* { */
-    /*     gpgme_key_t akey; */
+    if (key) {
+        gpgme_key_t akey;
 
-    /*     err = gpgme_get_key (ctx, key_string, &akey, 1); */
-    /*     if (err) */
-    /*     { */
-    /*         exit (1); */
-    /*     } */
-    /*     err = gpgme_signers_add (ctx, akey); */
-    /*     if (gpg_err_code(err) != GPG_ERR_NO_ERROR) */
-    /*         return -1; */
+        err = gpgme_get_key(ctx, key, &akey, 1);
+        if (err)
+            errx(EXIT_FAILURE, "failed to set key %s", key);
 
-    /*     gpgme_key_unref (akey); */
-    /* } */
+        err = gpgme_signers_add(ctx, akey);
+        if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
+            errx(EXIT_FAILURE, "failed to call gpgme_signers_add()");
+
+        gpgme_key_unref(akey);
+    }
 
     err = gpgme_data_new_from_file(&in, file, 1);
     if (err)

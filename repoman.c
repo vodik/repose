@@ -378,6 +378,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -Q, --query           query the database\n"
         " -c, --clean           remove stuff\n"
         " -s, --sign            sign the generated database\n"
+        " -k, --key=KEY         the key to use to sign the database\n"
         " -r, --repo=PATH       repo name to use\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -385,7 +386,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
 
 int main(int argc, char *argv[])
 {
-    const char *reponame = NULL;
+    const char *reponame = NULL, *key = NULL;
     enum repoman_action action = INVALID_ACTION;
     int clean = 0;
     bool sign = false;
@@ -397,6 +398,7 @@ int main(int argc, char *argv[])
         { "update",  no_argument,       0, 'U' },
         { "query",   no_argument,       0, 'Q' },
         { "sign",    no_argument,       0, 's' },
+        { "key",     required_argument, 0, 'k' },
         { "repo",    required_argument, 0, 'r' },
         { 0, 0, 0, 0 }
     };
@@ -428,6 +430,9 @@ int main(int argc, char *argv[])
         case 's':
             sign = true;
             break;
+        case 'k':
+            key = optarg;
+            break;
         case 'r':
             reponame = optarg;
             break;
@@ -456,7 +461,7 @@ int main(int argc, char *argv[])
         if (rc != 0)
             return rc;
         if (sign)
-            gpgme_sign(repopath);
+            gpgme_sign(repopath, key);
 
         /* symlink repo.db -> repo.db.tar.gz */
         symlink(repopath, linkpath);
