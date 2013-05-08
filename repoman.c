@@ -237,9 +237,11 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
 
     /* read the existing repo or construct a new package cache */
     if (stat(repopath, &st) < 0) {
-        warnx("repo doesn't exist, creating...");
+        warnx("warning: repo doesn't exist, creating...");
         dirty = true;
     } else {
+        printf(":: Reading existing database...\n");
+
         alpm_db_meta_t db;
         alpm_db_populate(repopath, &db);
 
@@ -260,6 +262,8 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
 
     /* if some file paths were specified, find all packages */
     if (argc > 0) {
+        printf(":: Scanning for new packages...\n");
+
         alpm_list_t *pkg, *pkgs = find_packages(argv);
 
         for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -293,6 +297,7 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
     /* TEMPORARY: HACKY, write a new repo out */
     if (dirty)
     {
+        printf(":: Writing database to disk...\n");
         struct repo *repo = repo_write_new(repopath);
         alpm_list_t *pkg, *pkgs = cache->list;
 
