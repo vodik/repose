@@ -373,6 +373,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -U, --update          update the database\n"
         " -Q, --query           query the database\n"
         " -c, --clean           remove stuff\n"
+        " -s, --sign            sign the generated database\n"
         " -r, --repo=PATH       repo name to use\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -383,19 +384,21 @@ int main(int argc, char *argv[])
     const char *reponame = NULL;
     enum repoman_action action = INVALID_ACTION;
     int clean = 0;
+    bool sign = false;
 
     static const struct option opts[] = {
         { "help",    no_argument,       0, 'h' },
         { "version", no_argument,       0, 'v' },
         { "verify",  no_argument,       0, 'V' },
         { "update",  no_argument,       0, 'U' },
-        { "query",    no_argument,      0, 'Q' },
+        { "query",   no_argument,       0, 'Q' },
+        { "sign",    no_argument,       0, 's' },
         { "repo",    required_argument, 0, 'r' },
         { 0, 0, 0, 0 }
     };
 
     while (true) {
-        int opt = getopt_long(argc, argv, "hvVUQcr:", opts, NULL);
+        int opt = getopt_long(argc, argv, "hvVUQcsr:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -417,6 +420,9 @@ int main(int argc, char *argv[])
             break;
         case 'c':
             ++clean;
+            break;
+        case 's':
+            sign = true;
             break;
         case 'r':
             reponame = optarg;
@@ -443,11 +449,13 @@ int main(int argc, char *argv[])
         break;
     case ACTION_UPDATE:
         rc = update_db(repopath, argc - optind, argv + optind, clean);
-        if (rc == 0) {
-            /* symlink repo.db -> repo.db.tar.gz */
-            symlink(repopath, linkpath);
+        if (rc != 0)
+            return rc;
+        if (sign)
             gpgme_sign(repopath);
-        }
+
+        /* symlink repo.db -> repo.db.tar.gz */
+        symlink(repopath, linkpath);
         break;
     case ACTION_QUERY:
         rc = query_db(repopath, argc - optind, argv + optind);
