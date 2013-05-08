@@ -63,6 +63,7 @@ void buffer_putc(buffer_t *buf, const char c)
     buf->data[buf->len] = '\0';
 }
 
+/* XXX: apparently isn't resizing correctly */
 void buffer_printf(buffer_t *buf, const char *fmt, ...)
 {
     size_t len = buf->buflen - buf->len;
@@ -70,13 +71,15 @@ void buffer_printf(buffer_t *buf, const char *fmt, ...)
 
     va_list ap;
     va_start(ap, fmt);
-
     size_t rc = vsnprintf(p, len, fmt, ap);
-    while (rc >= len) {
-        buffer_extendby(buf, len + 1);
-        rc = vsnprintf(p, len, fmt, ap);
+    va_end(ap);
+
+    if (rc >= len) {
+        buffer_extendby(buf, rc + 1);
+
+        va_start(ap, fmt);
+        rc = vsnprintf(p, rc + 1, fmt, ap);
+        va_end(ap);
     }
     buf->len += rc;
-
-    va_end(ap);
 }

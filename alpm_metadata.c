@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 
@@ -13,6 +14,7 @@
 #include <archive_entry.h>
 #include "archive_reader.h"
 #include "pkghash.h"
+#include "base64.h"
 
 static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 {
@@ -72,6 +74,28 @@ static void read_pkg_metadata(struct archive *archive, struct archive_entry *ent
     free(line);
 }
 
+/* XXX: massive hack. might want to memmap too */
+static void read_pkg_signature(alpm_pkg_meta_t *pkg)
+{
+    char sig[PATH_MAX];
+    snprintf(sig, PATH_MAX, "%s.sig", pkg->filename);
+
+    int fd = open(sig, O_RDONLY);
+    if (fd < 0)
+        return;
+
+    struct stat st;
+
+    fstat(fd, &st);
+    char sigbuf[st.st_size + 1];
+    read(fd, sigbuf, st.st_size + 1);
+    size_t len = st.st_size * 3 + 1;
+
+    pkg->base64_sig = malloc(st.st_size * 3);
+    base64_encode((unsigned char *)pkg->base64_sig, &len,
+                  (const unsigned char *)sigbuf, st.st_size);
+}
+
 int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)
 {
     struct archive *archive = NULL;
@@ -129,6 +153,8 @@ int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
     pkg->size = st.st_size;
 
+    read_pkg_signature(pkg);
+
     *_pkg = pkg;
 
 cleanup:
@@ -154,6 +180,9 @@ void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
     free(pkg->desc);
     free(pkg->url);
     free(pkg->packager);
+    free(pkg->md5sum);
+    free(pkg->sha256sum);
+    free(pkg->base64_sig);
     free(pkg->arch);
 
     alpm_list_free_inner(pkg->license, free);
@@ -244,6 +273,8 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
             read_desc_entry(reader, buf, entry_size, &pkg->md5sum);
         } else if (strcmp(buf, "%SHA256SUM%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->sha256sum);
+        } else if(strcmp(buf, "%PGPSIG%") == 0) {
+            read_desc_entry(reader, buf, entry_size, &pkg->base64_sig);
         } else if (strcmp(buf, "%URL%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->url);
         } else if (strcmp(buf, "%LICENSE%") == 0) {

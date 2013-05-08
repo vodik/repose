@@ -80,6 +80,10 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     write_long(buf,   "ISIZE",     (long)pkg->isize);
     write_string(buf, "MD5SUM",    md5sum);
     write_string(buf, "SHA256SUM", sha256sum);
+
+    if (pkg->base64_sig)
+        write_string(buf, "PGPSIG", pkg->base64_sig);
+
     write_string(buf, "URL",       pkg->url);
     write_list(buf,   "LICENSE",   pkg->license);
     write_string(buf, "ARCH",      pkg->arch);
@@ -117,7 +121,8 @@ static struct repo *repo_write_new(const char *filename)
     archive_write_set_format_pax_restricted(repo->archive);
     archive_write_open_filename(repo->archive, filename);
 
-    buffer_init(&repo->buf, 512);
+    /* XXX: apparently isn't resizing correctly */
+    buffer_init(&repo->buf, 1024);
 
     return repo;
 }
@@ -155,8 +160,6 @@ static void repo_write_close(struct repo *repo)
 
 static alpm_list_t *find_packages(char **paths)
 {
-    static const char *filter = "*.pkg.tar*";
-
     FTS *ftsp;
     FTSENT *p, *chp;
     int fts_options = FTS_COMFOLLOW | FTS_LOGICAL | FTS_NOCHDIR;
@@ -173,7 +176,8 @@ static alpm_list_t *find_packages(char **paths)
     while ((p = fts_read(ftsp)) != NULL) {
         switch (p->fts_info) {
         case FTS_F:
-            if (fnmatch(filter, p->fts_path, FNM_CASEFOLD) == 0)
+            if (fnmatch("*.pkg.tar*", p->fts_path, FNM_CASEFOLD) == 0 &&
+                fnmatch("*.sig",      p->fts_path, FNM_CASEFOLD) != 0)
                 pkgs = alpm_list_add(pkgs, strdup(p->fts_path));
             break;
         default:

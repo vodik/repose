@@ -9,7 +9,7 @@ CFLAGS := -std=c99 \
 LDLIBS = -larchive -lalpm -lgpgme
 
 all: repoman
-repoman: repoman.o alpm_metadata.o archive_reader.o pkghash.o buffer.o signing.o
+repoman: repoman.o alpm_metadata.o archive_reader.o pkghash.o buffer.o signing.o base64.o
 
 install: repoman
 	install -Dm755 repoman ${DESTDIR}/usr/bin/repoman
