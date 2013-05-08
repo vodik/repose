@@ -126,6 +126,7 @@ int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)
     }
 
     pkg->filename = strdup(filename);
+    pkg->name_hash = _alpm_hash_sdbm(pkg->name);
     pkg->size = st.st_size;
 
     *_pkg = pkg;
