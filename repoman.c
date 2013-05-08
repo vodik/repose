@@ -309,6 +309,17 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
     return 0;
 }
 
+static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
+{
+    printf("Filename     : %s\n", pkg->filename);
+    printf("Name         : %s\n", pkg->name);
+    printf("Version      : %s\n", pkg->version);
+    printf("Description  : %s\n", pkg->desc);
+    printf("Architecture : %s\n", pkg->arch);
+    printf("URL          : %s\n", pkg->url);
+    printf("Packager     : %s\n\n", pkg->packager);
+}
+
 static int query_db(const char *repopath, int argc, char *argv[])
 {
     struct stat st;
@@ -317,26 +328,25 @@ static int query_db(const char *repopath, int argc, char *argv[])
     if (stat(repopath, &st) < 0) {
         warnx("repo doesn't exist");
         return 1;
-    } else if (argc > 0) {
-        alpm_db_meta_t db;
-        alpm_db_populate(repopath, &db);
+    }
 
+    alpm_db_meta_t db;
+    alpm_db_populate(repopath, &db);
+
+    if (argc > 0) {
         int i;
         for (i = 0; i < argc; ++i) {
             const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(db.pkgcache, argv[i]);
             if (pkg == NULL) {
-                warn("pkg not found");
+                warnx("pkg not found");
                 return 1;
             }
-
-            printf("Filename     : %s\n", pkg->filename);
-            printf("Name         : %s\n", pkg->name);
-            printf("Version      : %s\n", pkg->version);
-            printf("Description  : %s\n", pkg->desc);
-            printf("Architecture : %s\n", pkg->arch);
-            printf("URL          : %s\n", pkg->url);
-            printf("Packager     : %s\n\n", pkg->packager);
+            print_pkg_metadata(pkg);
         }
+    } else {
+        alpm_list_t *pkg, *pkgs = db.pkgcache->list;
+        for (pkg = pkgs; pkg; pkg = pkg->next)
+            print_pkg_metadata(pkg->data);
     }
 
     return 0;

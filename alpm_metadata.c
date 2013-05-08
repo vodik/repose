@@ -374,7 +374,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_db_meta_t *db, const char *entry
 		/* add to the collection */
 		/* _alpm_log(db->handle, ALPM_LOG_FUNCTION, "adding '%s' to package cache for db '%s'\n", */
 		/* 		pkg->name, db->treename); */
-		db->pkgcache = _alpm_pkghash_add(db->pkgcache, pkg);
+		db->pkgcache = _alpm_pkghash_add_sorted(db->pkgcache, pkg);
 	} else {
 		free(pkgname);
 		free(pkgver);
