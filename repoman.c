@@ -22,6 +22,7 @@
 #include "alpm_metadata.h"
 #include "buffer.h"
 #include "pkghash.h"
+#include "signing.h"
 
 struct repo {
     struct archive *archive;
@@ -442,9 +443,11 @@ int main(int argc, char *argv[])
         break;
     case ACTION_UPDATE:
         rc = update_db(repopath, argc - optind, argv + optind, clean);
-        if (rc == 0)
+        if (rc == 0) {
             /* symlink repo.db -> repo.db.tar.gz */
             symlink(repopath, linkpath);
+            gpgme_sign(repopath);
+        }
         break;
     case ACTION_QUERY:
         rc = query_db(repopath, argc - optind, argv + optind);
