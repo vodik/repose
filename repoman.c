@@ -233,29 +233,30 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
 {
     struct stat st;
     bool dirty = false;
-    alpm_pkghash_t *cache = _alpm_pkghash_create(23);
+    alpm_pkghash_t *cache = NULL;
 
     /* read the existing repo or construct a new package cache */
     if (stat(repopath, &st) < 0) {
         warnx("warning: repo doesn't exist, creating...");
         dirty = true;
+        cache = _alpm_pkghash_create(23);
     } else {
         printf(":: Reading existing database...\n");
 
         alpm_db_meta_t db;
         alpm_db_populate(repopath, &db);
+        cache = db.pkgcache;
 
         /* XXX: verify entries still exist here */
-        alpm_list_t *pkg, *db_pkgs = db.pkgcache->list;
+        alpm_list_t *pkg, *db_pkgs = cache->list;
 
         for (pkg = db_pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
             if (verify_pkg(metadata) == 1) {
                 printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+                cache = _alpm_pkghash_remove(cache, metadata, NULL);
                 alpm_pkg_free_metadata(metadata);
                 dirty = true;
-            } else {
-                cache = _alpm_pkghash_add(cache, metadata);
             }
         }
     }
@@ -276,7 +277,6 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
             int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
 
             if (old == NULL || vercmp == 1) {
-                cache = _alpm_pkghash_add(cache, metadata);
                 if (old) {
                     printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
                     if (clean)
@@ -286,6 +286,7 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
                 } else  {
                     printf("ADDING: %s-%s\n", metadata->name, metadata->version);
                 }
+                cache = _alpm_pkghash_add(cache, metadata);
                 dirty = true;
             }
 
