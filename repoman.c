@@ -184,7 +184,7 @@ static alpm_list_t *find_packages(char **paths)
     return pkgs;
 }
 
-static int verify_pkg(const alpm_pkg_meta_t *pkg)
+static int verify_pkg(const alpm_pkg_meta_t *pkg, bool deep)
 {
     struct stat st;
 
@@ -192,6 +192,9 @@ static int verify_pkg(const alpm_pkg_meta_t *pkg)
         warn("couldn't find pkg %s", pkg->filename);
         return 1;
     }
+
+    if (!deep)
+        return 0;
 
     char *md5sum = alpm_compute_md5sum(pkg->filename);
     if (strcmp(pkg->md5sum, md5sum) != 0) {
@@ -220,7 +223,7 @@ static int verify_db(const char *repopath)
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
-        rc |= verify_pkg(metadata);
+        rc |= verify_pkg(metadata, true);
     }
 
     if (rc == 0)
@@ -252,7 +255,7 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
 
         for (pkg = db_pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
-            if (verify_pkg(metadata) == 1) {
+            if (verify_pkg(metadata, false) == 1) {
                 printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
                 cache = _alpm_pkghash_remove(cache, metadata, NULL);
                 alpm_pkg_free_metadata(metadata);
