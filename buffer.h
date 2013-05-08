@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#include <stddef.h>
-
 typedef struct buffer {
     char *data;
     size_t len;
