@@ -36,7 +36,7 @@ enum action {
     INVALID_ACTION
 };
 
-enum {
+enum compress {
     COMPRESS_NONE,
     COMPRESS_GZIP,
     COMPRESS_BZIP2,
@@ -47,7 +47,7 @@ enum {
 struct repo {
     char path[PATH_MAX];
     char link[PATH_MAX];
-    short compression;
+    enum compress compression;
 };
 
 static struct {
@@ -133,7 +133,7 @@ static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
     archive_write_data(a, buf->data, buf->len);
 }
 
-static struct repo_writer *repo_write_new(const char *filename, short compression)
+static struct repo_writer *repo_write_new(const char *filename, enum compress compression)
 {
     struct repo_writer *repo = malloc(sizeof(struct repo_writer));
     repo->archive = archive_write_new();
@@ -154,9 +154,6 @@ static struct repo_writer *repo_write_new(const char *filename, short compressio
         break;
     case COMPRESS_COMPRESS:
         archive_write_add_filter_compress(repo->archive);
-        break;
-    default:
-        errx(EXIT_FAILURE, "compression scheme unsupported");
         break;
     }
     archive_write_set_format_pax_restricted(repo->archive);
@@ -426,8 +423,11 @@ static void find_repo(char *reponame, struct repo *r)
     if (strcmp(dot, ".db") == 0) {
         found_link = true;
 
-        if (readlink(reponame, target, PATH_MAX) < 0)
+        if (readlink(reponame, target, PATH_MAX) < 0) {
+            if (errno != ENOENT)
+                err(EXIT_FAILURE, "failed to read %s link", reponame);
             snprintf(target, PATH_MAX, "%s.tar.gz", reponame);
+        }
 
         reponame = target;
     }
