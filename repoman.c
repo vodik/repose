@@ -29,7 +29,7 @@ struct repo {
     struct buffer buf;
 };
 
-enum repoman_action {
+enum action {
     ACTION_VERIFY,
     ACTION_UPDATE,
     ACTION_QUERY,
@@ -48,6 +48,17 @@ struct repo_name {
     char repopath[PATH_MAX];
     char linkpath[PATH_MAX];
     enum repoman_compression compression;
+};
+
+static struct {
+    const char *key;
+    enum action action;
+
+    short clean;
+    int color : 1;
+    int sign : 1;
+} cfg = {
+    .action = INVALID_ACTION
 };
 
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
@@ -458,11 +469,8 @@ static void __attribute__((__noreturn__)) repo_add_usage(FILE *out)
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
-int repo_add(int argc, char *argv[])
+static void parse_repo_add_args(int *argc, char **argv[])
 {
-    const char *key = NULL;
-    bool sign = false;
-
     static const struct option opts[] = {
         { "help",    no_argument,       0, 'h' },
         { "delta",   no_argument,       0, 'd' },
@@ -476,7 +484,7 @@ int repo_add(int argc, char *argv[])
     };
 
     while (true) {
-        int opt = getopt_long(argc, argv, "hdfqsk:v", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hdfqsk:v", opts, NULL);
         if (opt == -1)
             break;
 
@@ -485,37 +493,20 @@ int repo_add(int argc, char *argv[])
             repo_add_usage(stdout);
             break;
         case 's':
-            sign = true;
+            cfg.sign = true;
             break;
         case 'k':
-            key = optarg;
+            cfg.key = optarg;
             break;
         default:
             repo_add_usage(stderr);
         }
     }
 
-    argc -= optind;
-    argv += optind;
+    cfg.action = ACTION_UPDATE;
 
-    if (argc == 0)
-        errx(EXIT_FAILURE, "not enough arguments");
-
-    struct repo_name reponame;
-
-    find_repo(argv[0], &reponame);
-    printf("REPOPATH: %s\n", reponame.repopath);
-    printf("LINKPATH: %s\n", reponame.linkpath);
-
-    int rc = update_db(&reponame, argc - 1, argv + 1, 0);
-    if (rc != 0)
-        return rc;
-    if (sign)
-        gpgme_sign(reponame.repopath, key);
-
-    /* symlink repo.db -> repo.db.tar.gz */
-    symlink(reponame.repopath, reponame.linkpath);
-    return 0;
+    *argc -= optind;
+    *argv += optind;
 }
 /* }}} */
 
@@ -535,13 +526,8 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
-int main(int argc, char *argv[])
+void parse_repoman_args(int *argc, char **argv[])
 {
-    const char *key = NULL;
-    enum repoman_action action = INVALID_ACTION;
-    int clean = 0;
-    bool sign = false;
-
     static const struct option opts[] = {
         { "help",    no_argument,       0, 'h' },
         { "version", no_argument,       0, 'v' },
@@ -553,12 +539,8 @@ int main(int argc, char *argv[])
         { 0, 0, 0, 0 }
     };
 
-    if (strcmp(program_invocation_short_name, "repo-add") == 0) {
-        return repo_add(argc, argv);
-    }
-
     while (true) {
-        int opt = getopt_long(argc, argv, "hvUQVcsk:", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvUQVcsk:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -568,32 +550,43 @@ int main(int argc, char *argv[])
             break;
         case 'v':
             printf("%s %s\n", program_invocation_short_name, "devel");
-            return 0;
+            exit(EXIT_SUCCESS);
         case 'V':
-            action = ACTION_VERIFY;
+            cfg.action = ACTION_VERIFY;
             break;
         case 'U':
-            action = ACTION_UPDATE;
+            cfg.action = ACTION_UPDATE;
             break;
         case 'Q':
-            action = ACTION_QUERY;
+            cfg.action = ACTION_QUERY;
             break;
         case 'c':
-            ++clean;
+            ++cfg.clean;
             break;
         case 's':
-            sign = true;
+            cfg.sign = true;
             break;
         case 'k':
-            key = optarg;
+            cfg.key = optarg;
             break;
         default:
             usage(stderr);
         }
     }
 
-    argc -= optind;
-    argv += optind;
+    *argc -= optind;
+    *argv += optind;
+}
+
+int main(int argc, char *argv[])
+{
+    int rc = 0;
+
+    if (strcmp(program_invocation_short_name, "repo-add") == 0) {
+        parse_repo_add_args(&argc, &argv);
+    } else {
+        parse_repoman_args(&argc, &argv);
+    }
 
     if (argc == 0)
         errx(EXIT_FAILURE, "not enough arguments");
@@ -604,17 +597,16 @@ int main(int argc, char *argv[])
     printf("REPOPATH: %s\n", reponame.repopath);
     printf("LINKPATH: %s\n", reponame.linkpath);
 
-    int rc = 1;
-    switch (action) {
+    switch (cfg.action) {
     case ACTION_VERIFY:
         rc = verify_db(reponame.repopath);
         break;
     case ACTION_UPDATE:
-        rc = update_db(&reponame, argc - 1, argv + 1, 0);
+        rc = update_db(&reponame, argc - 1, argv + 1, cfg.clean);
         if (rc != 0)
             return rc;
-        if (sign)
-            gpgme_sign(reponame.repopath, key);
+        if (cfg.sign)
+            gpgme_sign(reponame.repopath, cfg.key);
 
         /* symlink repo.db -> repo.db.tar.gz */
         symlink(reponame.repopath, reponame.linkpath);
