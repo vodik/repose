@@ -63,7 +63,6 @@ void buffer_putc(buffer_t *buf, const char c)
     buf->data[buf->len] = '\0';
 }
 
-/* XXX: apparently isn't resizing correctly */
 void buffer_printf(buffer_t *buf, const char *fmt, ...)
 {
     size_t len = buf->buflen - buf->len;
@@ -76,6 +75,7 @@ void buffer_printf(buffer_t *buf, const char *fmt, ...)
 
     if (rc >= len) {
         buffer_extendby(buf, rc + 1);
+        p = &buf->data[buf->len];
 
         va_start(ap, fmt);
         rc = vsnprintf(p, rc + 1, fmt, ap);

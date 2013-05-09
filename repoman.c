@@ -159,7 +159,6 @@ static struct repo_writer *repo_write_new(const char *filename, enum compress co
     archive_write_set_format_pax_restricted(repo->archive);
     archive_write_open_filename(repo->archive, filename);
 
-    /* XXX: apparently isn't resizing correctly */
     buffer_init(&repo->buf, 1024);
 
     return repo;
