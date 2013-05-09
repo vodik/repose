@@ -6,17 +6,17 @@ At the moment, a half baked and hacked together alternative to repo-add.
 
 ### Usage
 
-    repoman -Usr foo .
+    repoman -Us foo.db.tar.gz .
 
 Add all packages in the current directory to foo.db.tar.gz and sign the
 database with gnupg.
 
-    repoman -Vr foo
+    repoman -V foo.db.tar.gz
 
 Verify the packages foo.db.tar.gz refers to can be accessed and the
 md5sum and sha256sum match.
 
-    repoman -Qr foo pkg ...
+    repoman -Q foo.db.tar.gz pkg ...
 
 Print information about `pkg` much like how `pacman -Qi pkg` works
 

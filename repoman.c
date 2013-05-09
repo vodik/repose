@@ -12,7 +12,6 @@
 #include <fnmatch.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/utsname.h>
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -367,9 +366,37 @@ static int query_db(const char *repopath, int argc, char *argv[])
     return 0;
 }
 
+static void find_repo(char *reponame, char *repopath, char *linkpath)
+{
+    const char *dot = strrchr(reponame, '.');
+    if (!dot)
+        errx(EXIT_FAILURE, "%s invalid repo", reponame);
+
+    /* If the reponame ends in .db, we've been passed the symlink. Follow
+     * it. If the file doesn't actually exist yet, assume a .db.tar.gz
+     * extension */
+    if (strcmp(dot, ".db") == 0) {
+        snprintf(linkpath, PATH_MAX, "%s", reponame);
+        if (readlink(reponame, repopath, PATH_MAX) < 0)
+            snprintf(repopath, PATH_MAX, "%s.tar.gz", reponame);
+        return;
+    }
+
+    /* otherwise, figure it out */
+    char *var = strsep(&reponame, ".db.");
+    if (reponame == NULL)
+        errx(EXIT_FAILURE, "%s invalid repo", reponame);
+
+    snprintf(repopath, PATH_MAX, "%s.%s", var, reponame);
+    snprintf(linkpath, PATH_MAX, "%s.db", var);
+
+    /* symlink repo.db -> repo.db.tar.gz */
+    symlink(repopath, linkpath);
+}
+
 static void __attribute__((__noreturn__)) usage(FILE *out)
 {
-    fprintf(out, "usage: %s [options]\n", program_invocation_short_name);
+    fprintf(out, "usage: %s [options] <repo> [pkgs ...]\n", program_invocation_short_name);
     fputs("Options:\n"
         " -h, --help            display this help and exit\n"
         " -v, --version         display version\n"
@@ -378,15 +405,14 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -Q, --query           query the database\n"
         " -c, --clean           remove stuff\n"
         " -s, --sign            sign the generated database\n"
-        " -k, --key=KEY         the key to use to sign the database\n"
-        " -r, --repo=PATH       repo name to use\n", out);
+        " -k, --key=KEY         the key to use to sign the database\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[])
 {
-    const char *reponame = NULL, *key = NULL;
+    const char *key = NULL;
     enum repoman_action action = INVALID_ACTION;
     int clean = 0;
     bool sign = false;
@@ -399,12 +425,11 @@ int main(int argc, char *argv[])
         { "query",   no_argument,       0, 'Q' },
         { "sign",    no_argument,       0, 's' },
         { "key",     required_argument, 0, 'k' },
-        { "repo",    required_argument, 0, 'r' },
         { 0, 0, 0, 0 }
     };
 
     while (true) {
-        int opt = getopt_long(argc, argv, "hvVUQcsr:", opts, NULL);
+        int opt = getopt_long(argc, argv, "hvVUQcsk:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -433,23 +458,21 @@ int main(int argc, char *argv[])
         case 'k':
             key = optarg;
             break;
-        case 'r':
-            reponame = optarg;
-            break;
         default:
             usage(stderr);
         }
     }
 
-    struct utsname name;
-    if (reponame == NULL) {
-        uname(&name);
-        reponame = name.nodename;
-    }
+    argc -= optind;
+    argv += optind;
+
+    if (argc == 0)
+        errx(EXIT_FAILURE, "not enough arguments");
 
     char repopath[PATH_MAX], linkpath[PATH_MAX];
-    snprintf(repopath, PATH_MAX, "%s.db.tar.gz", reponame);
-    snprintf(linkpath, PATH_MAX, "%s.db", reponame);
+    find_repo(argv[0], repopath, linkpath);
+    printf("REPOPATH: %s\n", repopath);
+    printf("LINKPATH: %s\n", linkpath);
 
     int rc = 1;
     switch (action) {
@@ -462,9 +485,6 @@ int main(int argc, char *argv[])
             return rc;
         if (sign)
             gpgme_sign(repopath, key);
-
-        /* symlink repo.db -> repo.db.tar.gz */
-        symlink(repopath, linkpath);
         break;
     case ACTION_QUERY:
         rc = query_db(repopath, argc - optind, argv + optind);
