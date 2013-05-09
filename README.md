@@ -20,6 +20,17 @@ md5sum and sha256sum match.
 
 Print information about `pkg` much like how `pacman -Qi pkg` works
 
+### Compatability
+
+Backwards compatibility to the original repo tools is provided. Simply
+make symlinks against `repoman`
+
+    ln -s /usr/bin/repoman /usr/bin/repo-add
+    ln -s /usr/bin/repoman /usr/bin/repo-remove
+    ln -s /usr/bin/repoman /usr/bin/repo-elephant
+
+Note only `repo-add` is implemented at the moment.
+
 ### TODO
 
 - speed up archive updating.
