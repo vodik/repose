@@ -91,8 +91,6 @@ static void write_depends_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
     const char *filename = strrchr(pkg->filename, '/');
-    char *md5sum = alpm_compute_md5sum(pkg->filename);
-    char *sha256sum = alpm_compute_sha256sum(pkg->filename);
 
     write_string(buf, "FILENAME",  filename ? &filename[1] : pkg->filename);
     write_string(buf, "NAME",      pkg->name);
@@ -100,8 +98,22 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     write_string(buf, "DESC",      pkg->desc);
     write_long(buf,   "CSIZE",     (long)pkg->size);
     write_long(buf,   "ISIZE",     (long)pkg->isize);
-    write_string(buf, "MD5SUM",    md5sum);
-    write_string(buf, "SHA256SUM", sha256sum);
+
+    if (pkg->md5sum) {
+        write_string(buf, "MD5SUM", pkg->md5sum);
+    } else {
+        char *md5sum = alpm_compute_md5sum(pkg->filename);
+        write_string(buf, "MD5SUM", md5sum);
+        free(md5sum);
+    }
+
+    if (pkg->sha256sum) {
+        write_string(buf, "SHA256SUM", pkg->sha256sum);
+    } else {
+        char *sha256sum = alpm_compute_sha256sum(pkg->filename);
+        write_string(buf, "SHA256SUM", sha256sum);
+        free(sha256sum);
+    }
 
     if (pkg->base64_sig)
         write_string(buf, "PGPSIG", pkg->base64_sig);
@@ -111,9 +123,6 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     write_string(buf, "ARCH",      pkg->arch);
     write_long(buf,   "BUILDDATE", pkg->builddate);
     write_string(buf, "PACKAGER",  pkg->packager);
-
-    free(md5sum);
-    free(sha256sum);
 }
 
 static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
