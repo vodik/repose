@@ -594,10 +594,7 @@ int main(int argc, char *argv[])
         errx(EXIT_FAILURE, "not enough arguments");
 
     struct repo_name reponame;
-
     find_repo(argv[0], &reponame);
-    printf("REPOPATH: %s\n", reponame.repopath);
-    printf("LINKPATH: %s\n", reponame.linkpath);
 
     switch (cfg.action) {
     case ACTION_VERIFY:
