@@ -357,6 +357,9 @@ static int update_db(struct repo_name *repopath, int argc, char *argv[], int cle
 
         repo_write_close(repo);
         printf("repo %s updated successfully\n", repopath->repopath);
+
+        if (cfg.sign)
+            gpgme_sign(repopath->repopath, cfg.key);
     } else {
         printf("repo %s does not need updating\n", repopath->repopath);
     }
@@ -604,8 +607,6 @@ int main(int argc, char *argv[])
         rc = update_db(&reponame, argc - 1, argv + 1, cfg.clean);
         if (rc != 0)
             return rc;
-        if (cfg.sign)
-            gpgme_sign(reponame.repopath, cfg.key);
 
         /* symlink repo.db -> repo.db.tar.gz */
         symlink(reponame.repopath, reponame.linkpath);
