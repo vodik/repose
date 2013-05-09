@@ -23,7 +23,7 @@
 #include "pkghash.h"
 #include "signing.h"
 
-struct repo {
+struct repo_writer {
     struct archive *archive;
     struct archive_entry *entry;
     struct buffer buf;
@@ -36,18 +36,18 @@ enum action {
     INVALID_ACTION
 };
 
-enum repoman_compression {
+enum {
     COMPRESS_NONE,
-    COMPRESS_GZ,
-    COMPRESS_BZ2,
+    COMPRESS_GZIP,
+    COMPRESS_BZIP2,
     COMPRESS_XZ,
-    COMPRESS_Z
+    COMPRESS_COMPRESS
 };
 
-struct repo_name {
-    char repopath[PATH_MAX];
-    char linkpath[PATH_MAX];
-    enum repoman_compression compression;
+struct repo {
+    char path[PATH_MAX];
+    char link[PATH_MAX];
+    short compression;
 };
 
 static struct {
@@ -57,9 +57,7 @@ static struct {
     short clean;
     int color : 1;
     int sign : 1;
-} cfg = {
-    .action = INVALID_ACTION
-};
+} cfg = { .action = INVALID_ACTION };
 
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
@@ -135,9 +133,9 @@ static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
     archive_write_data(a, buf->data, buf->len);
 }
 
-static struct repo *repo_write_new(const char *filename, enum repoman_compression compression)
+static struct repo_writer *repo_write_new(const char *filename, short compression)
 {
-    struct repo *repo = malloc(sizeof(struct repo));
+    struct repo_writer *repo = malloc(sizeof(struct repo_writer));
     repo->archive = archive_write_new();
     repo->entry = archive_entry_new();
 
@@ -145,17 +143,20 @@ static struct repo *repo_write_new(const char *filename, enum repoman_compressio
     case COMPRESS_NONE:
         archive_write_add_filter_none(repo->archive);
         break;
-    case COMPRESS_GZ:
+    case COMPRESS_GZIP:
         archive_write_add_filter_gzip(repo->archive);
         break;
-    case COMPRESS_BZ2:
+    case COMPRESS_BZIP2:
         archive_write_add_filter_bzip2(repo->archive);
         break;
     case COMPRESS_XZ:
         archive_write_add_filter_xz(repo->archive);
         break;
-    case COMPRESS_Z:
+    case COMPRESS_COMPRESS:
         archive_write_add_filter_compress(repo->archive);
+        break;
+    default:
+        errx(EXIT_FAILURE, "compression scheme unsupported");
         break;
     }
     archive_write_set_format_pax_restricted(repo->archive);
@@ -167,7 +168,7 @@ static struct repo *repo_write_new(const char *filename, enum repoman_compressio
     return repo;
 }
 
-static void repo_write_pkg(struct repo *repo, alpm_pkg_meta_t *pkg)
+static void repo_write_pkg(struct repo_writer *repo, alpm_pkg_meta_t *pkg)
 {
     char path[PATH_MAX];
 
@@ -188,7 +189,7 @@ static void repo_write_pkg(struct repo *repo, alpm_pkg_meta_t *pkg)
     archive_write_buffer(repo->archive, repo->entry, path, &repo->buf);
 }
 
-static void repo_write_close(struct repo *repo)
+static void repo_write_close(struct repo_writer *repo)
 {
     archive_write_close(repo->archive);
 
@@ -258,10 +259,10 @@ static int verify_pkg(const alpm_pkg_meta_t *pkg, bool deep)
     return 0;
 }
 
-static int verify_db(const char *repopath)
+static int verify_db(const char *path)
 {
     alpm_db_meta_t db;
-    alpm_db_populate(repopath, &db);
+    alpm_db_populate(path, &db);
 
     alpm_list_t *pkg, *pkgs = db.pkgcache->list;
     int rc = 0;
@@ -277,14 +278,14 @@ static int verify_db(const char *repopath)
     return rc;
 }
 
-static int update_db(struct repo_name *repopath, int argc, char *argv[], int clean)
+static int update_db(struct repo *r, int argc, char *argv[], int clean)
 {
     struct stat st;
     bool dirty = false;
     alpm_pkghash_t *cache = NULL;
 
     /* read the existing repo or construct a new package cache */
-    if (stat(repopath->repopath, &st) < 0) {
+    if (stat(r->path, &st) < 0) {
         warnx("warning: repo doesn't exist, creating...");
         dirty = true;
         cache = _alpm_pkghash_create(23);
@@ -292,7 +293,7 @@ static int update_db(struct repo_name *repopath, int argc, char *argv[], int cle
         printf(":: Reading existing database...\n");
 
         alpm_db_meta_t db;
-        alpm_db_populate(repopath->repopath, &db);
+        alpm_db_populate(r->path, &db);
         cache = db.pkgcache;
 
         /* XXX: verify entries still exist here */
@@ -347,7 +348,7 @@ static int update_db(struct repo_name *repopath, int argc, char *argv[], int cle
     if (dirty)
     {
         printf(":: Writing database to disk...\n");
-        struct repo *repo = repo_write_new(repopath->repopath, repopath->compression);
+        struct repo_writer *repo = repo_write_new(r->path, r->compression);
         alpm_list_t *pkg, *pkgs = cache->list;
 
         for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -356,12 +357,12 @@ static int update_db(struct repo_name *repopath, int argc, char *argv[], int cle
         }
 
         repo_write_close(repo);
-        printf("repo %s updated successfully\n", repopath->repopath);
+        printf("repo %s updated successfully\n", r->path);
 
         if (cfg.sign)
-            gpgme_sign(repopath->repopath, cfg.key);
+            gpgme_sign(r->path, cfg.key);
     } else {
-        printf("repo %s does not need updating\n", repopath->repopath);
+        printf("repo %s does not need updating\n", r->path);
     }
 
     return 0;
@@ -378,18 +379,18 @@ static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
     printf("Packager     : %s\n\n", pkg->packager);
 }
 
-static int query_db(const char *repopath, int argc, char *argv[])
+static int query_db(const char *path, int argc, char *argv[])
 {
     struct stat st;
 
     /* read the existing repo or construct a new package cache */
-    if (stat(repopath, &st) < 0) {
+    if (stat(path, &st) < 0) {
         warnx("repo doesn't exist");
         return 1;
     }
 
     alpm_db_meta_t db;
-    alpm_db_populate(repopath, &db);
+    alpm_db_populate(path, &db);
 
     if (argc > 0) {
         int i;
@@ -410,7 +411,7 @@ static int query_db(const char *repopath, int argc, char *argv[])
     return 0;
 }
 
-static void find_repo(char *reponame, struct repo_name *r)
+static void find_repo(char *reponame, struct repo *r)
 {
     const char *dot = strrchr(reponame, '.');
     int found_link = false;
@@ -442,19 +443,19 @@ static void find_repo(char *reponame, struct repo_name *r)
     if (strcmp(ext, "tar") == 0) {
         r->compression = COMPRESS_NONE;
     } else if (strcmp(ext, "tar.gz") == 0) {
-        r->compression = COMPRESS_GZ;
+        r->compression = COMPRESS_GZIP;
     } else if (strcmp(ext, "tar.bz2") == 0) {
-        r->compression = COMPRESS_BZ2;
+        r->compression = COMPRESS_BZIP2;
     } else if (strcmp(ext, "tar.xz") == 0) {
         r->compression = COMPRESS_XZ;
     } else if (strcmp(ext, "tar.Z") == 0) {
-        r->compression = COMPRESS_Z;
+        r->compression = COMPRESS_COMPRESS;
     } else {
         errx(EXIT_FAILURE, "%s invalid repo", ext);
     }
 
-    snprintf(r->repopath, PATH_MAX, "%s.db.%s", reponame, ext);
-    snprintf(r->linkpath, PATH_MAX, "%s.db", reponame);
+    snprintf(r->path, PATH_MAX, "%s.db.%s", reponame, ext);
+    snprintf(r->link, PATH_MAX, "%s.db", reponame);
 }
 
 /* {{{ repo-add compat */
@@ -596,23 +597,23 @@ int main(int argc, char *argv[])
     if (argc == 0)
         errx(EXIT_FAILURE, "not enough arguments");
 
-    struct repo_name reponame;
-    find_repo(argv[0], &reponame);
+    struct repo repo;
+    find_repo(argv[0], &repo);
 
     switch (cfg.action) {
     case ACTION_VERIFY:
-        rc = verify_db(reponame.repopath);
+        rc = verify_db(repo.path);
         break;
     case ACTION_UPDATE:
-        rc = update_db(&reponame, argc - 1, argv + 1, cfg.clean);
+        rc = update_db(&repo, argc - 1, argv + 1, cfg.clean);
         if (rc != 0)
             return rc;
 
         /* symlink repo.db -> repo.db.tar.gz */
-        symlink(reponame.repopath, reponame.linkpath);
+        symlink(repo.path, repo.link);
         break;
     case ACTION_QUERY:
-        rc = query_db(reponame.repopath, argc - 1, argv + 1);
+        rc = query_db(repo.path, argc - 1, argv + 1);
         break;
     default:
         break;
