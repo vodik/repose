@@ -36,6 +36,20 @@ enum repoman_action {
     INVALID_ACTION
 };
 
+enum repoman_compression {
+    COMPRESS_NONE,
+    COMPRESS_GZ,
+    COMPRESS_BZ2,
+    COMPRESS_XZ,
+    COMPRESS_Z
+};
+
+struct repo_name {
+    char repopath[PATH_MAX];
+    char linkpath[PATH_MAX];
+    enum repoman_compression compression;
+};
+
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
     buffer_printf(buf, "%%%s%%\n", header);
@@ -110,13 +124,29 @@ static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
     archive_write_data(a, buf->data, buf->len);
 }
 
-static struct repo *repo_write_new(const char *filename)
+static struct repo *repo_write_new(const char *filename, enum repoman_compression compression)
 {
     struct repo *repo = malloc(sizeof(struct repo));
     repo->archive = archive_write_new();
     repo->entry = archive_entry_new();
 
-    archive_write_add_filter_gzip(repo->archive);
+    switch (compression) {
+    case COMPRESS_NONE:
+        archive_write_add_filter_none(repo->archive);
+        break;
+    case COMPRESS_GZ:
+        archive_write_add_filter_gzip(repo->archive);
+        break;
+    case COMPRESS_BZ2:
+        archive_write_add_filter_bzip2(repo->archive);
+        break;
+    case COMPRESS_XZ:
+        archive_write_add_filter_xz(repo->archive);
+        break;
+    case COMPRESS_Z:
+        archive_write_add_filter_compress(repo->archive);
+        break;
+    }
     archive_write_set_format_pax_restricted(repo->archive);
     archive_write_open_filename(repo->archive, filename);
 
@@ -236,14 +266,14 @@ static int verify_db(const char *repopath)
     return rc;
 }
 
-static int update_db(const char *repopath, int argc, char *argv[], int clean)
+static int update_db(struct repo_name *repopath, int argc, char *argv[], int clean)
 {
     struct stat st;
     bool dirty = false;
     alpm_pkghash_t *cache = NULL;
 
     /* read the existing repo or construct a new package cache */
-    if (stat(repopath, &st) < 0) {
+    if (stat(repopath->repopath, &st) < 0) {
         warnx("warning: repo doesn't exist, creating...");
         dirty = true;
         cache = _alpm_pkghash_create(23);
@@ -251,7 +281,7 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
         printf(":: Reading existing database...\n");
 
         alpm_db_meta_t db;
-        alpm_db_populate(repopath, &db);
+        alpm_db_populate(repopath->repopath, &db);
         cache = db.pkgcache;
 
         /* XXX: verify entries still exist here */
@@ -306,7 +336,7 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
     if (dirty)
     {
         printf(":: Writing database to disk...\n");
-        struct repo *repo = repo_write_new(repopath);
+        struct repo *repo = repo_write_new(repopath->repopath, repopath->compression);
         alpm_list_t *pkg, *pkgs = cache->list;
 
         for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -315,9 +345,9 @@ static int update_db(const char *repopath, int argc, char *argv[], int clean)
         }
 
         repo_write_close(repo);
-        printf("repo %s updated successfully\n", repopath);
+        printf("repo %s updated successfully\n", repopath->repopath);
     } else {
-        printf("repo %s does not need updating\n", repopath);
+        printf("repo %s does not need updating\n", repopath->repopath);
     }
 
     return 0;
@@ -366,20 +396,25 @@ static int query_db(const char *repopath, int argc, char *argv[])
     return 0;
 }
 
-static void find_repo(char *reponame, char *repopath, char *linkpath)
+static void find_repo(char *reponame, struct repo_name *r)
 {
     const char *dot = strrchr(reponame, '.');
+    int found_link = false;
+
     if (!dot)
         errx(EXIT_FAILURE, "%s invalid repo", reponame);
 
     /* If the reponame ends in .db, we've been passed the symlink. Follow
      * it. If the file doesn't actually exist yet, assume a .db.tar.gz
      * extension */
+    char target[PATH_MAX];
     if (strcmp(dot, ".db") == 0) {
-        snprintf(linkpath, PATH_MAX, "%s", reponame);
-        if (readlink(reponame, repopath, PATH_MAX) < 0)
-            snprintf(repopath, PATH_MAX, "%s.tar.gz", reponame);
-        return;
+        found_link = true;
+
+        if (readlink(reponame, target, PATH_MAX) < 0)
+            snprintf(target, PATH_MAX, "%s.tar.gz", reponame);
+
+        reponame = target;
     }
 
     /* otherwise, figure it out */
@@ -387,11 +422,23 @@ static void find_repo(char *reponame, char *repopath, char *linkpath)
     if (reponame == NULL)
         errx(EXIT_FAILURE, "%s invalid repo", reponame);
 
-    snprintf(repopath, PATH_MAX, "%s.%s", var, reponame);
-    snprintf(linkpath, PATH_MAX, "%s.db", var);
+    reponame += 3;
+    if (strcmp(reponame, "tar") == 0) {
+        r->compression = COMPRESS_NONE;
+    } else if (strcmp(reponame, "tar.gz") == 0) {
+        r->compression = COMPRESS_GZ;
+    } else if (strcmp(reponame, "tar.bz2") == 0) {
+        r->compression = COMPRESS_BZ2;
+    } else if (strcmp(reponame, "tar.xz") == 0) {
+        r->compression = COMPRESS_XZ;
+    } else if (strcmp(reponame, "tar.Z") == 0) {
+        r->compression = COMPRESS_Z;
+    } else {
+        errx(EXIT_FAILURE, "%s invalid repo", reponame);
+    }
 
-    /* symlink repo.db -> repo.db.tar.gz */
-    symlink(repopath, linkpath);
+    snprintf(r->repopath, PATH_MAX, "%s.db.%s", var, reponame);
+    snprintf(r->linkpath, PATH_MAX, "%s.db", var);
 }
 
 static void __attribute__((__noreturn__)) usage(FILE *out)
@@ -469,25 +516,29 @@ int main(int argc, char *argv[])
     if (argc == 0)
         errx(EXIT_FAILURE, "not enough arguments");
 
-    char repopath[PATH_MAX], linkpath[PATH_MAX];
-    find_repo(argv[0], repopath, linkpath);
-    printf("REPOPATH: %s\n", repopath);
-    printf("LINKPATH: %s\n", linkpath);
+    struct repo_name reponame;
+
+    find_repo(argv[0], &reponame);
+    printf("REPOPATH: %s\n", reponame.repopath);
+    printf("LINKPATH: %s\n", reponame.linkpath);
 
     int rc = 1;
     switch (action) {
     case ACTION_VERIFY:
-        rc = verify_db(repopath);
+        rc = verify_db(reponame.repopath);
         break;
     case ACTION_UPDATE:
-        rc = update_db(repopath, argc - optind, argv + optind, clean);
+        rc = update_db(&reponame, argc - optind, argv + optind, clean);
         if (rc != 0)
             return rc;
         if (sign)
-            gpgme_sign(repopath, key);
+            gpgme_sign(reponame.repopath, key);
+
+        /* symlink repo.db -> repo.db.tar.gz */
+        symlink(reponame.repopath, reponame.linkpath);
         break;
     case ACTION_QUERY:
-        rc = query_db(repopath, argc - optind, argv + optind);
+        rc = query_db(reponame.repopath, argc - optind, argv + optind);
         break;
     default:
         break;
