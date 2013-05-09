@@ -441,18 +441,96 @@ static void find_repo(char *reponame, struct repo_name *r)
     snprintf(r->linkpath, PATH_MAX, "%s.db", var);
 }
 
+/* {{{ repo-add compat */
+static void __attribute__((__noreturn__)) repo_add_usage(FILE *out)
+{
+    fprintf(out, "usage: %s [options] <path-to-db> [pkgs|deltas ...]\n", program_invocation_short_name);
+    fputs("Options:\n"
+        " -h, --help            display this help and exit\n"
+        " -d, --delta           generate and add deltas for package updates\n"
+        " -f, --files           update database's file list\n"
+        " --nocolor             turn off color in output\n"
+        " -q, --quiet           minimize output\n"
+        " -s, --sign            sign database with GnuPG after update\n"
+        " -k, --key=KEY         use the specified key to sign the database\n"
+        " -v, --verify          verify the contents of the database\n", out);
+
+    exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
+}
+
+int repo_add(int argc, char *argv[])
+{
+    const char *key = NULL;
+    bool sign = false;
+
+    static const struct option opts[] = {
+        { "help",    no_argument,       0, 'h' },
+        { "delta",   no_argument,       0, 'd' },
+        { "files",   no_argument,       0, 'f' },
+        { "nocolor", no_argument,       0, 0x100 },
+        { "quiet",   no_argument,       0, 'q' },
+        { "sign",    no_argument,       0, 's' },
+        { "key",     required_argument, 0, 'k' },
+        { "verify",  no_argument,       0, 'v' },
+        { 0, 0, 0, 0 }
+    };
+
+    while (true) {
+        int opt = getopt_long(argc, argv, "hdfqsk:v", opts, NULL);
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'h':
+            repo_add_usage(stdout);
+            break;
+        case 's':
+            sign = true;
+            break;
+        case 'k':
+            key = optarg;
+            break;
+        default:
+            repo_add_usage(stderr);
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+    if (argc == 0)
+        errx(EXIT_FAILURE, "not enough arguments");
+
+    struct repo_name reponame;
+
+    find_repo(argv[0], &reponame);
+    printf("REPOPATH: %s\n", reponame.repopath);
+    printf("LINKPATH: %s\n", reponame.linkpath);
+
+    int rc = update_db(&reponame, argc - 1, argv + 1, 0);
+    if (rc != 0)
+        return rc;
+    if (sign)
+        gpgme_sign(reponame.repopath, key);
+
+    /* symlink repo.db -> repo.db.tar.gz */
+    symlink(reponame.repopath, reponame.linkpath);
+    return 0;
+}
+/* }}} */
+
 static void __attribute__((__noreturn__)) usage(FILE *out)
 {
-    fprintf(out, "usage: %s [options] <repo> [pkgs ...]\n", program_invocation_short_name);
+    fprintf(out, "usage: %s [options] <path-to-db> [pkgs|deltas ...]\n", program_invocation_short_name);
     fputs("Options:\n"
         " -h, --help            display this help and exit\n"
         " -v, --version         display version\n"
-        " -V, --verify          verify the contents of the database\n"
         " -U, --update          update the database\n"
         " -Q, --query           query the database\n"
+        " -V, --verify          verify the contents of the database\n"
         " -c, --clean           remove stuff\n"
-        " -s, --sign            sign the generated database\n"
-        " -k, --key=KEY         the key to use to sign the database\n", out);
+        " -s, --sign            sign database with GnuPG after update\n"
+        " -k, --key=KEY         use the specified key to sign the database\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
 }
@@ -475,8 +553,12 @@ int main(int argc, char *argv[])
         { 0, 0, 0, 0 }
     };
 
+    if (strcmp(program_invocation_short_name, "repo-add") == 0) {
+        return repo_add(argc, argv);
+    }
+
     while (true) {
-        int opt = getopt_long(argc, argv, "hvVUQcsk:", opts, NULL);
+        int opt = getopt_long(argc, argv, "hvUQVcsk:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -528,7 +610,7 @@ int main(int argc, char *argv[])
         rc = verify_db(reponame.repopath);
         break;
     case ACTION_UPDATE:
-        rc = update_db(&reponame, argc - optind, argv + optind, clean);
+        rc = update_db(&reponame, argc - 1, argv + 1, 0);
         if (rc != 0)
             return rc;
         if (sign)
@@ -538,7 +620,7 @@ int main(int argc, char *argv[])
         symlink(reponame.repopath, reponame.linkpath);
         break;
     case ACTION_QUERY:
-        rc = query_db(reponame.repopath, argc - optind, argv + optind);
+        rc = query_db(reponame.repopath, argc - 1, argv + 1);
         break;
     default:
         break;
