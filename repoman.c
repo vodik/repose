@@ -429,27 +429,29 @@ static void find_repo(char *reponame, struct repo_name *r)
     }
 
     /* otherwise, figure it out */
-    char *var = strsep(&reponame, ".db.");
-    if (reponame == NULL)
+    char *ext = strstr(reponame, ".db.");
+    if (ext == NULL)
         errx(EXIT_FAILURE, "%s invalid repo", reponame);
 
-    reponame += 3;
-    if (strcmp(reponame, "tar") == 0) {
+    *ext = '\0';
+    ext += 4;
+
+    if (strcmp(ext, "tar") == 0) {
         r->compression = COMPRESS_NONE;
-    } else if (strcmp(reponame, "tar.gz") == 0) {
+    } else if (strcmp(ext, "tar.gz") == 0) {
         r->compression = COMPRESS_GZ;
-    } else if (strcmp(reponame, "tar.bz2") == 0) {
+    } else if (strcmp(ext, "tar.bz2") == 0) {
         r->compression = COMPRESS_BZ2;
-    } else if (strcmp(reponame, "tar.xz") == 0) {
+    } else if (strcmp(ext, "tar.xz") == 0) {
         r->compression = COMPRESS_XZ;
-    } else if (strcmp(reponame, "tar.Z") == 0) {
+    } else if (strcmp(ext, "tar.Z") == 0) {
         r->compression = COMPRESS_Z;
     } else {
-        errx(EXIT_FAILURE, "%s invalid repo", reponame);
+        errx(EXIT_FAILURE, "%s invalid repo", ext);
     }
 
-    snprintf(r->repopath, PATH_MAX, "%s.db.%s", var, reponame);
-    snprintf(r->linkpath, PATH_MAX, "%s.db", var);
+    snprintf(r->repopath, PATH_MAX, "%s.db.%s", reponame, ext);
+    snprintf(r->linkpath, PATH_MAX, "%s.db", reponame);
 }
 
 /* {{{ repo-add compat */
