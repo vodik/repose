@@ -302,6 +302,15 @@ static int verify_db(const char *path)
 /* }}} */
 
 /* {{{ UPDATE */
+static int unlink_pkg_files(const char *pkgpath)
+{
+    char sigpath[PATH_MAX];
+    snprintf(sigpath, PATH_MAX, "%s.sig", pkgpath);
+
+    unlink(pkgpath);
+    return unlink(sigpath);
+}
+
 static int update_db(struct repo *r, int argc, char *argv[], int clean)
 {
     struct stat st;
@@ -353,7 +362,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
                 if (old) {
                     printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
                     if (clean)
-                        unlink(old->filename);
+                        unlink_pkg_files(old->filename);
                     cache = _alpm_pkghash_remove(cache, old, NULL);
                     alpm_pkg_free_metadata(old);
                 } else  {
@@ -363,8 +372,10 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
                 dirty = true;
             }
 
-            if (vercmp == -1 && clean)
-                unlink(metadata->filename);
+            if (vercmp == -1 && clean) {
+                printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+                unlink_pkg_files(metadata->filename);
+            }
         }
     }
 
