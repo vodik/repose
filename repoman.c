@@ -354,7 +354,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
                     printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
                     if (clean)
                         unlink(old->filename);
-                    cache = _alpm_pkghash_remove(cache, metadata, NULL);
+                    cache = _alpm_pkghash_remove(cache, old, NULL);
                     alpm_pkg_free_metadata(old);
                 } else  {
                     printf("ADDING: %s-%s\n", metadata->name, metadata->version);
