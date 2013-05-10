@@ -59,6 +59,7 @@ static struct {
     int sign : 1;
 } cfg = { .action = INVALID_ACTION };
 
+/* {{{ WRITING REPOS */
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
     buffer_printf(buf, "%%%s%%\n", header);
@@ -204,6 +205,21 @@ static void repo_write_close(struct repo_writer *repo)
     free(repo);
 }
 
+/* TODO: compy as much data as possible from the existing repo */
+static void repo_compile(struct repo *r, alpm_pkghash_t *cache)
+{
+    struct repo_writer *repo = repo_write_new(r->path, r->compression);
+    alpm_list_t *pkg, *pkgs = cache->list;
+
+    for (pkg = pkgs; pkg; pkg = pkg->next) {
+        alpm_pkg_meta_t *metadata = pkg->data;
+        repo_write_pkg(repo, metadata);
+    }
+
+    repo_write_close(repo);
+}
+/* }}} */
+
 static alpm_list_t *find_packages(char **paths)
 {
     FTS *ftsp;
@@ -235,6 +251,7 @@ static alpm_list_t *find_packages(char **paths)
     return pkgs;
 }
 
+/* {{{ VERIFY */
 static int verify_pkg(const alpm_pkg_meta_t *pkg, bool deep)
 {
     struct stat st;
@@ -282,7 +299,9 @@ static int verify_db(const char *path)
 
     return rc;
 }
+/* }}} */
 
+/* {{{ UPDATE */
 static int update_db(struct repo *r, int argc, char *argv[], int clean)
 {
     struct stat st;
@@ -349,19 +368,10 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
         }
     }
 
-    /* TEMPORARY: HACKY, write a new repo out */
     if (dirty)
     {
         printf(":: Writing database to disk...\n");
-        struct repo_writer *repo = repo_write_new(r->path, r->compression);
-        alpm_list_t *pkg, *pkgs = cache->list;
-
-        for (pkg = pkgs; pkg; pkg = pkg->next) {
-            alpm_pkg_meta_t *metadata = pkg->data;
-            repo_write_pkg(repo, metadata);
-        }
-
-        repo_write_close(repo);
+        repo_compile(r, cache);
         printf("repo %s updated successfully\n", r->path);
 
         if (cfg.sign)
@@ -372,7 +382,9 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
 
     return 0;
 }
+/* }}} */
 
+/* {{{ QUERY */
 static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
 {
     printf("Filename     : %s\n", pkg->filename);
@@ -415,6 +427,7 @@ static int query_db(const char *path, int argc, char *argv[])
 
     return 0;
 }
+/* }}} */
 
 static void find_repo(char *reponame, struct repo *r)
 {
