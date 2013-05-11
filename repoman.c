@@ -239,8 +239,11 @@ static alpm_list_t *find_packages(char **paths)
         switch (p->fts_info) {
         case FTS_F:
             if (fnmatch("*.pkg.tar*", p->fts_path, FNM_CASEFOLD) == 0 &&
-                fnmatch("*.sig",      p->fts_path, FNM_CASEFOLD) != 0)
-                pkgs = alpm_list_add(pkgs, strdup(p->fts_path));
+                fnmatch("*.sig",      p->fts_path, FNM_CASEFOLD) != 0) {
+                alpm_pkg_meta_t *metadata;
+                alpm_pkg_load_metadata(p->fts_path, &metadata);
+                pkgs = alpm_list_add(pkgs, metadata);
+            }
             break;
         default:
             break;
@@ -350,10 +353,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
         alpm_list_t *pkg, *pkgs = find_packages(argv);
 
         for (pkg = pkgs; pkg; pkg = pkg->next) {
-            const char *path = pkg->data;
-            alpm_pkg_meta_t *metadata;
-
-            alpm_pkg_load_metadata(path, &metadata);
+            alpm_pkg_meta_t *metadata = pkg->data;
             alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, metadata->name);
 
             int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
