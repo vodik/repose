@@ -372,7 +372,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
             if (old == NULL || vercmp == 1) {
                 if (old) {
                     printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
-                    if (clean)
+                    if (clean >= 1)
                         unlink_pkg_files(old->filename);
                     cache = _alpm_pkghash_remove(cache, old, NULL);
                     alpm_pkg_free_metadata(old);
@@ -383,7 +383,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
                 dirty = true;
             }
 
-            if (vercmp == -1 && clean) {
+            if (vercmp == -1 && clean >= 2) {
                 printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
                 unlink_pkg_files(metadata->filename);
             }
@@ -427,7 +427,7 @@ static int remove_db(struct repo *r, int argc, char *argv[], int clean)
             if (pkg != NULL) {
                 db.pkgcache = _alpm_pkghash_remove(db.pkgcache, pkg, NULL);
                 printf("REMOVING: %s\n", pkg->name);
-                if (clean)
+                if (clean >= 1)
                     unlink_pkg_files(pkg->filename);
                 alpm_pkg_free_metadata(pkg);
                 dirty = true;

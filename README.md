@@ -9,7 +9,9 @@ At the moment, a half baked and hacked together alternative to repo-add.
     repoman -U --sign foo.db.tar.gz .
 
 Add all packages in the current directory to foo.db.tar.gz and sign the
-database with gnupg.
+database with gnupg. Add a `-c` flag to also delete and files removed
+from the db and a second `-c` to also remove any other outdated packages
+in the cache.
 
     repoman -V foo.db.tar.gz
 
@@ -18,7 +20,8 @@ md5sum and sha256sum match.
 
     repoman -R foo.db.tar.gz pkg ...
 
-Remove a package from the database.
+Remove a package from the database. Add `-c` to also remove the files
+from disk.
 
     repoman -Q foo.db.tar.gz pkg ...
 
