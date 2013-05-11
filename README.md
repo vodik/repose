@@ -16,6 +16,10 @@ database with gnupg.
 Verify the packages foo.db.tar.gz refers to can be accessed and the
 md5sum and sha256sum match.
 
+    repoman -R foo.db.tar.gz pkg ...
+
+Remove a package from the database.
+
     repoman -Q foo.db.tar.gz pkg ...
 
 Print information about `pkg` much like how `pacman -Qi pkg` works
@@ -29,7 +33,7 @@ make symlinks against `repoman`
     ln -s /usr/bin/repoman /usr/bin/repo-remove
     ln -s /usr/bin/repoman /usr/bin/repo-elephant
 
-Note only `repo-add` is implemented at the moment.
+Note only `repo-add` and `repo-remove` are implemented at the moment.
 
 ### TODO
 
