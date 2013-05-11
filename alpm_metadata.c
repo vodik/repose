@@ -75,14 +75,14 @@ static void read_pkg_metadata(struct archive *archive, struct archive_entry *ent
 }
 
 /* XXX: massive hack. might want to memmap too */
-static void read_pkg_signature(alpm_pkg_meta_t *pkg)
+int read_pkg_signature(alpm_pkg_meta_t *pkg)
 {
     char sig[PATH_MAX];
     snprintf(sig, PATH_MAX, "%s.sig", pkg->filename);
 
     int fd = open(sig, O_RDONLY);
     if (fd < 0)
-        return;
+        return -1;
 
     struct stat st;
 
@@ -94,6 +94,7 @@ static void read_pkg_signature(alpm_pkg_meta_t *pkg)
     pkg->base64_sig = malloc(st.st_size * 3);
     base64_encode((unsigned char *)pkg->base64_sig, &len,
                   (const unsigned char *)sigbuf, st.st_size);
+    return 0;
 }
 
 int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)

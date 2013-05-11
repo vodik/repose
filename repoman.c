@@ -255,6 +255,15 @@ static alpm_list_t *find_packages(char **paths)
     return pkgs;
 }
 
+static int unlink_pkg_files(const char *pkgpath)
+{
+    char sigpath[PATH_MAX];
+    snprintf(sigpath, PATH_MAX, "%s.sig", pkgpath);
+
+    unlink(pkgpath);
+    return unlink(sigpath);
+}
+
 /* {{{ VERIFY */
 static int verify_pkg(const alpm_pkg_meta_t *pkg, bool deep)
 {
@@ -282,6 +291,8 @@ static int verify_pkg(const alpm_pkg_meta_t *pkg, bool deep)
     }
     free(sha256sum);
 
+    /* XXX: check the signature */
+
     return 0;
 }
 
@@ -304,15 +315,6 @@ static int verify_db(const char *path)
     return rc;
 }
 /* }}} */
-
-static int unlink_pkg_files(const char *pkgpath)
-{
-    char sigpath[PATH_MAX];
-    snprintf(sigpath, PATH_MAX, "%s.sig", pkgpath);
-
-    unlink(pkgpath);
-    return unlink(sigpath);
-}
 
 /* {{{ UPDATE */
 static int update_db(struct repo *r, int argc, char *argv[], int clean)
@@ -338,10 +340,18 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
 
         for (pkg = db_pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
+
+            /* find packages that have been removed from the cache */
             if (verify_pkg(metadata, false) == 1) {
                 printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
                 cache = _alpm_pkghash_remove(cache, metadata, NULL);
                 alpm_pkg_free_metadata(metadata);
+                dirty = true;
+            }
+
+            /* check if a signature was added */
+            else if (metadata->base64_sig == NULL && read_pkg_signature(metadata) == 0) {
+                printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
                 dirty = true;
             }
         }
