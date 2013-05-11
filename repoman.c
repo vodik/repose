@@ -32,6 +32,7 @@ struct repo_writer {
 enum action {
     ACTION_VERIFY,
     ACTION_UPDATE,
+    ACTION_REMOVE,
     ACTION_QUERY,
     INVALID_ACTION
 };
@@ -304,7 +305,6 @@ static int verify_db(const char *path)
 }
 /* }}} */
 
-/* {{{ UPDATE */
 static int unlink_pkg_files(const char *pkgpath)
 {
     char sigpath[PATH_MAX];
@@ -314,6 +314,7 @@ static int unlink_pkg_files(const char *pkgpath)
     return unlink(sigpath);
 }
 
+/* {{{ UPDATE */
 static int update_db(struct repo *r, int argc, char *argv[], int clean)
 {
     struct stat st;
@@ -393,6 +394,54 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
 
     return 0;
 }
+/* }}} */
+
+/* {{{ REMOVE */
+static int remove_db(struct repo *r, int argc, char *argv[], int clean)
+{
+    alpm_db_meta_t db;
+    bool dirty = false;
+    struct stat st;
+
+    /* read the existing repo or construct a new package cache */
+    if (stat(r->path, &st) < 0) {
+        warnx("warning: repo doesn't exist...");
+        return 1;
+    } else if (argc > 0) {
+        printf(":: Reading existing database...\n");
+        alpm_db_populate(r->path, &db);
+
+        int i;
+        for (i = 0; i < argc; ++i) {
+            alpm_pkg_meta_t *pkg = _alpm_pkghash_find(db.pkgcache, argv[i]);
+            if (pkg != NULL) {
+                db.pkgcache = _alpm_pkghash_remove(db.pkgcache, pkg, NULL);
+                printf("REMOVING: %s\n", pkg->name);
+                if (clean)
+                    unlink_pkg_files(pkg->filename);
+                alpm_pkg_free_metadata(pkg);
+                dirty = true;
+                continue;
+            }
+            warnx("didn't find entry: %s\n", argv[0]);
+        }
+    }
+
+    if (dirty)
+    {
+        printf(":: Writing database to disk...\n");
+        repo_compile(r, db.pkgcache);
+        printf("repo %s updated successfully\n", r->path);
+
+        if (cfg.sign)
+            gpgme_sign(r->path, cfg.key);
+    } else {
+        printf("repo %s does not need updating\n", r->path);
+    }
+
+    return 0;
+}
+
 /* }}} */
 
 /* {{{ QUERY */
@@ -555,6 +604,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -h, --help            display this help and exit\n"
         " -v, --version         display version\n"
         " -U, --update          update the database\n"
+        " -R, --remove          remove an entry\n"
         " -Q, --query           query the database\n"
         " -V, --verify          verify the contents of the database\n"
         " -c, --clean           remove stuff\n"
@@ -571,6 +621,7 @@ void parse_repoman_args(int *argc, char **argv[])
         { "version", no_argument,       0, 'v' },
         { "verify",  no_argument,       0, 'V' },
         { "update",  no_argument,       0, 'U' },
+        { "remove",  no_argument,       0, 'R' },
         { "query",   no_argument,       0, 'Q' },
         { "sign",    no_argument,       0, 's' },
         { "key",     required_argument, 0, 'k' },
@@ -578,7 +629,7 @@ void parse_repoman_args(int *argc, char **argv[])
     };
 
     while (true) {
-        int opt = getopt_long(*argc, *argv, "hvUQVcsk:", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvURQVcsk:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -594,6 +645,9 @@ void parse_repoman_args(int *argc, char **argv[])
             break;
         case 'U':
             cfg.action = ACTION_UPDATE;
+            break;
+        case 'R':
+            cfg.action = ACTION_REMOVE;
             break;
         case 'Q':
             cfg.action = ACTION_QUERY;
@@ -638,11 +692,9 @@ int main(int argc, char *argv[])
         break;
     case ACTION_UPDATE:
         rc = update_db(&repo, argc - 1, argv + 1, cfg.clean);
-        if (rc != 0)
-            return rc;
-
-        /* symlink repo.db -> repo.db.tar.gz */
-        symlink(repo.path, repo.link);
+        break;
+    case ACTION_REMOVE:
+        rc = remove_db(&repo, argc - 1, argv + 1, cfg.clean);
         break;
     case ACTION_QUERY:
         rc = query_db(repo.path, argc - 1, argv + 1);
@@ -650,6 +702,10 @@ int main(int argc, char *argv[])
     default:
         break;
     };
+
+    /* symlink repo.db -> repo.db.tar.gz */
+    if (rc == 0)
+        symlink(repo.path, repo.link);
 
     return rc;
 }
