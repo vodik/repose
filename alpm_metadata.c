@@ -74,26 +74,32 @@ static void read_pkg_metadata(struct archive *archive, struct archive_entry *ent
     free(line);
 }
 
-/* XXX: massive hack. might want to memmap too */
 int read_pkg_signature(alpm_pkg_meta_t *pkg)
 {
     char sig[PATH_MAX];
-    snprintf(sig, PATH_MAX, "%s.sig", pkg->filename);
+    size_t sig_len = 0;
+    struct stat st;
+    char *memblock = MAP_FAILED;
+    int fd = 0;
 
-    int fd = open(sig, O_RDONLY);
+    snprintf(sig, PATH_MAX, "%s.sig", pkg->filename);
+    fd = open(sig, O_RDONLY);
     if (fd < 0)
         return -1;
 
-    struct stat st;
-
     fstat(fd, &st);
-    char sigbuf[st.st_size + 1];
-    read(fd, sigbuf, st.st_size + 1);
-    size_t len = st.st_size * 3 + 1;
+    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+    if (memblock == MAP_FAILED)
+        err(EXIT_FAILURE, "failed to mmap package signature %s", sig);
 
-    pkg->base64_sig = malloc(st.st_size * 3);
-    base64_encode((unsigned char *)pkg->base64_sig, &len,
-                  (const unsigned char *)sigbuf, st.st_size);
+    sig_len = st.st_size * 4 / 3 + 3;
+    pkg->base64_sig = malloc(sig_len);
+
+    base64_encode((unsigned char *)pkg->base64_sig, &sig_len,
+                  (const unsigned char *)memblock, st.st_size);
+
+    close(fd);
+    munmap(memblock, st.st_size);
     return 0;
 }
 
@@ -117,7 +123,6 @@ int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **_pkg)
     memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (memblock == MAP_FAILED)
         err(EXIT_FAILURE, "failed to mmap package %s", filename);
-
 
     archive = archive_read_new();
     archive_read_support_filter_all(archive);
