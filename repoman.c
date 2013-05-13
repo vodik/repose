@@ -290,6 +290,7 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
 
     while ((entry = fts_read(tree)) != NULL) {
         char root[PATH_MAX], *pkgpath = entry->fts_path;
+        char *base;
 
         /* don't search recursively */
         if (entry->fts_level > 1) {
@@ -298,12 +299,21 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
         }
 
         switch (entry->fts_info) {
+        case FTS_D:
+            realpath(pkgpath, root);
+
+            if (strcmp(root, r->root) != 0) {
+                warnx("dir and repo aren't in the same directory");
+                fts_set(tree, entry, FTS_SKIP);
+                continue;
+            }
+            break;
         case FTS_F:
             if (fnmatch("*.pkg.tar*", pkgpath, FNM_CASEFOLD) != 0 ||
                 fnmatch("*.sig",      pkgpath, FNM_CASEFOLD) == 0)
                 continue;
 
-            char *base = strrchr(pkgpath, '/');
+            base = strrchr(pkgpath, '/');
             if (base) {
                 *base = '\0';
                 realpath(pkgpath, root);
