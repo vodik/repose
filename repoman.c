@@ -424,7 +424,6 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
     /* read the existing repo or construct a new package cache */
     if (stat(r->db, &st) < 0) {
         warnx("warning: repo doesn't exist, creating...");
-        dirty = true;
         cache = _alpm_pkghash_create(23);
     } else {
         printf(":: Reading existing database...\n");
