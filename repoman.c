@@ -46,9 +46,9 @@ enum compress {
 };
 
 struct repo {
+    char *name;
     char root[PATH_MAX];
     char db[PATH_MAX];
-    char link[PATH_MAX];
     enum compress compression;
 };
 
@@ -249,32 +249,36 @@ static void find_repo(char *reponame, struct repo *r)
             errx(EXIT_FAILURE, "%s invalid repo", reponame);
     }
 
-    *dot++ = '\0';
-    base = memrchr(reponame, '/', len);
-
-    if (strcmp(dot, "db.tar") == 0) {
+    if (strcmp(dot, ".db.tar") == 0) {
         r->compression = COMPRESS_NONE;
-    } else if (strcmp(dot, "db.tar.gz") == 0) {
+    } else if (strcmp(dot, ".db.tar.gz") == 0) {
         r->compression = COMPRESS_GZIP;
-    } else if (strcmp(dot, "db.tar.bz2") == 0) {
+    } else if (strcmp(dot, ".db.tar.bz2") == 0) {
         r->compression = COMPRESS_BZIP2;
-    } else if (strcmp(dot, "db.tar.xz") == 0) {
+    } else if (strcmp(dot, ".db.tar.xz") == 0) {
         r->compression = COMPRESS_XZ;
-    } else if (strcmp(dot, "db.tar.Z") == 0) {
+    } else if (strcmp(dot, ".db.tar.Z") == 0) {
         r->compression = COMPRESS_COMPRESS;
     } else {
         errx(EXIT_FAILURE, "%s invalid repo", dot);
     }
 
-    snprintf(r->db,   PATH_MAX, "%s.%s", reponame, dot);
-    snprintf(r->link, PATH_MAX, "%s.db", reponame);
-
+    *dot++ = '\0';
+    base = memrchr(reponame, '/', len);
     if (base) {
-        *base = '\0';
+        *base++ = '\0';
         realpath(reponame, r->root);
+        snprintf(r->db, PATH_MAX, "%s/%s.%s", r->root, base, dot);
+        r->name = strdup(base);
     } else {
         realpath(".", r->root);
+        snprintf(r->db, PATH_MAX, "%s.%s", reponame, dot);
+        r->name = strdup(r->db);
     }
+
+    printf("name: %s\n", r->name);
+    printf("root: %s\n", r->root);
+    printf("db:   %s\n", r->db);
 }
 
 static inline bool repo_dir_valid(char *dirpath, char *rootpath)
@@ -288,7 +292,7 @@ static inline bool repo_dir_valid(char *dirpath, char *rootpath)
 static inline bool repo_file_valid(char *filepath, char *rootpath)
 {
     char *base = strrchr(filepath, '/');
-    int rc = 0;
+    bool rc = false;
 
     if (base) {
         *base = '\0';
@@ -712,8 +716,15 @@ int main(int argc, char *argv[])
     };
 
     /* symlink repo.db -> repo.db.tar.gz */
-    if (rc == 0)
-        symlink(repo.db, repo.link);
+    if (rc == 0) {
+        /* FIXME: there must be a more robust way to do this */
+        char link[PATH_MAX], *r = strrchr(repo.db, '/');
+
+        snprintf(link, PATH_MAX, "%s/%s.db", repo.root, repo.name);
+
+        if (symlink(r ? &r[1] : repo.db, link) < 0)
+            err(EXIT_FAILURE, "symlink to %s failed", link);
+    }
 
     return rc;
 }
