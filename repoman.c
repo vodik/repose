@@ -363,28 +363,31 @@ static int unlink_pkg_files(const char *pkgpath)
 }
 
 /* {{{ VERIFY */
-static int verify_pkg(const alpm_pkg_meta_t *pkg, bool deep)
+static int verify_pkg(struct repo *r, const alpm_pkg_meta_t *pkg, bool deep)
 {
+    char pkgpath[PATH_MAX];
     struct stat st;
 
-    if (stat(pkg->filename, &st) < 0) {
-        warn("couldn't find pkg %s", pkg->filename);
+    snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkg->filename);
+
+    if (stat(pkgpath, &st) < 0) {
+        warn("couldn't find pkg %s", pkgpath);
         return 1;
     }
 
     if (!deep)
         return 0;
 
-    char *md5sum = alpm_compute_md5sum(pkg->filename);
+    char *md5sum = alpm_compute_md5sum(pkgpath);
     if (strcmp(pkg->md5sum, md5sum) != 0) {
-        warnx("md5 sum for pkg %s is different", pkg->filename);
+        warnx("md5 sum for pkg %s is different", pkgpath);
         return 1;
     }
     free(md5sum);
 
-    char *sha256sum = alpm_compute_sha256sum(pkg->filename);
+    char *sha256sum = alpm_compute_sha256sum(pkgpath);
     if (strcmp(pkg->sha256sum, sha256sum) != 0) {
-        warnx("sha256 sum for pkg %s is different", pkg->filename);
+        warnx("sha256 sum for pkg %s is different", pkgpath);
         return 1;
     }
     free(sha256sum);
@@ -394,17 +397,17 @@ static int verify_pkg(const alpm_pkg_meta_t *pkg, bool deep)
     return 0;
 }
 
-static int verify_db(const char *path)
+static int verify_db(struct repo *r)
 {
     alpm_db_meta_t db;
-    alpm_db_populate(path, &db);
+    alpm_db_populate(r->db, &db);
 
     alpm_list_t *pkg, *pkgs = db.pkgcache->list;
     int rc = 0;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
-        rc |= verify_pkg(metadata, true);
+        rc |= verify_pkg(r, metadata, true);
     }
 
     if (rc == 0)
@@ -439,7 +442,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
             alpm_pkg_meta_t *metadata = pkg->data;
 
             /* find packages that have been removed from the cache */
-            if (verify_pkg(metadata, false) == 1) {
+            if (verify_pkg(r, metadata, false) == 1) {
                 printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
                 cache = _alpm_pkghash_remove(cache, metadata, NULL);
                 alpm_pkg_free_metadata(metadata);
@@ -693,7 +696,7 @@ int main(int argc, char *argv[])
 
     switch (cfg.action) {
     case ACTION_VERIFY:
-        rc = verify_db(repo.db);
+        rc = verify_db(&repo);
         break;
     case ACTION_UPDATE:
         rc = update_db(&repo, argc - 1, argv + 1, cfg.clean);
