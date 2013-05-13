@@ -273,11 +273,11 @@ static void find_repo(char *reponame, struct repo *r)
         *base = '\0';
         realpath(reponame, r->root);
     } else {
-        r->root[0] = '\0';
+        realpath(".", r->root);
     }
 }
 
-static alpm_list_t *find_packages(char **paths)
+static alpm_list_t *find_packages(struct repo *r, char **paths)
 {
     FTS *tree;
     FTSENT *entry;
@@ -289,6 +289,8 @@ static alpm_list_t *find_packages(char **paths)
         err(EXIT_FAILURE, "fts_open");
 
     while ((entry = fts_read(tree)) != NULL) {
+        char root[PATH_MAX], *pkgpath = entry->fts_path;
+
         /* don't search recursively */
         if (entry->fts_level > 1) {
             fts_set(tree, entry, FTS_SKIP);
@@ -297,12 +299,28 @@ static alpm_list_t *find_packages(char **paths)
 
         switch (entry->fts_info) {
         case FTS_F:
-            if (fnmatch("*.pkg.tar*", entry->fts_path, FNM_CASEFOLD) == 0 &&
-                fnmatch("*.sig",      entry->fts_path, FNM_CASEFOLD) != 0) {
-                alpm_pkg_meta_t *metadata;
-                alpm_pkg_load_metadata(entry->fts_path, &metadata);
-                pkgs = alpm_list_add(pkgs, metadata);
+            if (fnmatch("*.pkg.tar*", pkgpath, FNM_CASEFOLD) != 0 ||
+                fnmatch("*.sig",      pkgpath, FNM_CASEFOLD) == 0)
+                continue;
+
+            char *base = strrchr(pkgpath, '/');
+            if (base) {
+                *base = '\0';
+                realpath(pkgpath, root);
+                *base = '/';
+            } else {
+                realpath(".", root);
             }
+
+            if (strcmp(root, r->root) != 0) {
+                warnx("pkg and repo aren't in the same directory");
+                continue;
+            }
+
+            alpm_pkg_meta_t *metadata;
+            alpm_pkg_load_metadata(entry->fts_path, &metadata);
+            if (metadata)
+                pkgs = alpm_list_add(pkgs, metadata);
             break;
         default:
             break;
@@ -419,7 +437,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
     if (argc > 0) {
         printf(":: Scanning for new packages...\n");
 
-        alpm_list_t *pkg, *pkgs = find_packages(argv);
+        alpm_list_t *pkg, *pkgs = find_packages(r, argv);
 
         for (pkg = pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
