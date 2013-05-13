@@ -273,7 +273,7 @@ static void find_repo(char *reponame, struct repo *r)
     } else {
         realpath(".", r->root);
         snprintf(r->db, PATH_MAX, "%s.%s", reponame, dot);
-        r->name = strdup(r->db);
+        r->name = strdup(reponame);
     }
 
     printf("name: %s\n", r->name);
