@@ -366,15 +366,28 @@ static int unlink_pkg_files(const char *pkgpath)
     return unlink(sigpath);
 }
 
+/* FIXME: there must be a more robust way to do this */
+static void repo_symlink(struct repo *r)
+{
+    char link[PATH_MAX], *base = strrchr(r->db, '/');
+
+    if (access(r->db, F_OK) < 0)
+        return;
+
+    snprintf(link, PATH_MAX, "%s/%s.db", r->root, r->name);
+
+    if (symlink(base ? &base[1] : r->db, link) < 0 && errno != ENOENT)
+            err(EXIT_FAILURE, "symlink to %s failed", link);
+}
+
 /* {{{ VERIFY */
 static int verify_pkg(struct repo *r, const alpm_pkg_meta_t *pkg, bool deep)
 {
     char pkgpath[PATH_MAX];
-    struct stat st;
 
     snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkg->filename);
 
-    if (stat(pkgpath, &st) < 0) {
+    if (access(pkgpath, F_OK) < 0) {
         warn("couldn't find pkg %s", pkgpath);
         return 1;
     }
@@ -424,12 +437,11 @@ static int verify_db(struct repo *r)
 /* {{{ UPDATE */
 static int update_db(struct repo *r, int argc, char *argv[], int clean)
 {
-    struct stat st;
     bool dirty = false;
     alpm_pkghash_t *cache = NULL;
 
     /* read the existing repo or construct a new package cache */
-    if (stat(r->db, &st) < 0) {
+    if (access(r->db, F_OK) < 0) {
         warnx("warning: repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
     } else {
@@ -515,10 +527,9 @@ static int remove_db(struct repo *r, int argc, char *argv[], int clean)
 {
     alpm_db_meta_t db;
     bool dirty = false;
-    struct stat st;
 
     /* read the existing repo or construct a new package cache */
-    if (stat(r->db, &st) < 0) {
+    if (access(r->db, F_OK) < 0) {
         warnx("warning: repo doesn't exist...");
         return 1;
     } else if (argc > 0) {
@@ -572,10 +583,8 @@ static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
 
 static int query_db(const char *path, int argc, char *argv[])
 {
-    struct stat st;
-
     /* read the existing repo or construct a new package cache */
-    if (stat(path, &st) < 0) {
+    if (access(path, F_OK) < 0) {
         warnx("repo doesn't exist");
         return 1;
     }
@@ -716,15 +725,8 @@ int main(int argc, char *argv[])
     };
 
     /* symlink repo.db -> repo.db.tar.gz */
-    if (rc == 0) {
-        /* FIXME: there must be a more robust way to do this */
-        char link[PATH_MAX], *r = strrchr(repo.db, '/');
-
-        snprintf(link, PATH_MAX, "%s/%s.db", repo.root, repo.name);
-
-        if (symlink(r ? &r[1] : repo.db, link) < 0)
-            err(EXIT_FAILURE, "symlink to %s failed", link);
-    }
+    if (rc == 0)
+        repo_symlink(&repo);
 
     return rc;
 }
