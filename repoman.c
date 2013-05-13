@@ -275,10 +275,6 @@ static void find_repo(char *reponame, struct repo *r)
         snprintf(r->db, PATH_MAX, "%s.%s", reponame, dot);
         r->name = strdup(reponame);
     }
-
-    printf("name: %s\n", r->name);
-    printf("root: %s\n", r->root);
-    printf("db:   %s\n", r->db);
 }
 
 static inline bool repo_dir_valid(char *dirpath, char *rootpath)
