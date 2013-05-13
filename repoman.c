@@ -316,14 +316,14 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
         alpm_pkg_meta_t *metadata;
         char *pkgpath = entry->fts_path;
 
-        /* don't search recursively */
-        if (entry->fts_level > 1) {
-            fts_set(tree, entry, FTS_SKIP);
-            continue;
-        }
-
         switch (entry->fts_info) {
         case FTS_D:
+            /* don't search recursively */
+            if (entry->fts_level > 0) {
+                fts_set(tree, entry, FTS_SKIP);
+                continue;
+            }
+
             if (!repo_dir_valid(entry->fts_path, r->root)) {
                 warnx("dir and repo aren't in the same directory");
                 fts_set(tree, entry, FTS_SKIP);
