@@ -277,6 +277,30 @@ static void find_repo(char *reponame, struct repo *r)
     }
 }
 
+static inline bool repo_dir_valid(char *dirpath, char *rootpath)
+{
+    char root[PATH_MAX];
+    realpath(dirpath, root);
+
+    return strcmp(root, rootpath) == 0;
+}
+
+static inline bool repo_file_valid(char *filepath, char *rootpath)
+{
+    char *base = strrchr(filepath, '/');
+    int rc = 0;
+
+    if (base) {
+        *base = '\0';
+        rc = repo_dir_valid(filepath, rootpath);
+        *base = '/';
+    } else {
+        rc = repo_dir_valid(".", rootpath);
+    }
+
+    return rc;
+}
+
 static alpm_list_t *find_packages(struct repo *r, char **paths)
 {
     FTS *tree;
@@ -289,8 +313,8 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
         err(EXIT_FAILURE, "fts_open");
 
     while ((entry = fts_read(tree)) != NULL) {
-        char root[PATH_MAX], *pkgpath = entry->fts_path;
-        char *base;
+        alpm_pkg_meta_t *metadata;
+        char *pkgpath = entry->fts_path;
 
         /* don't search recursively */
         if (entry->fts_level > 1) {
@@ -300,9 +324,7 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
 
         switch (entry->fts_info) {
         case FTS_D:
-            realpath(pkgpath, root);
-
-            if (strcmp(root, r->root) != 0) {
+            if (!repo_dir_valid(entry->fts_path, r->root)) {
                 warnx("dir and repo aren't in the same directory");
                 fts_set(tree, entry, FTS_SKIP);
                 continue;
@@ -313,22 +335,12 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
                 fnmatch("*.sig",      pkgpath, FNM_CASEFOLD) == 0)
                 continue;
 
-            base = strrchr(pkgpath, '/');
-            if (base) {
-                *base = '\0';
-                realpath(pkgpath, root);
-                *base = '/';
-            } else {
-                realpath(".", root);
-            }
-
-            if (strcmp(root, r->root) != 0) {
+            if (!repo_file_valid(entry->fts_path, r->root)) {
                 warnx("pkg and repo aren't in the same directory");
                 continue;
             }
 
-            alpm_pkg_meta_t *metadata;
-            alpm_pkg_load_metadata(entry->fts_path, &metadata);
+            alpm_pkg_load_metadata(pkgpath, &metadata);
             if (metadata)
                 pkgs = alpm_list_add(pkgs, metadata);
             break;
