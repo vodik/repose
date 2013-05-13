@@ -367,6 +367,7 @@ static int unlink_pkg_files(const char *pkgpath)
 static void repo_symlink(struct repo *r)
 {
     char link[PATH_MAX], *base = strrchr(r->db, '/');
+    char fixme[PATH_MAX];
 
     if (access(r->db, F_OK) < 0)
         return;
@@ -374,6 +375,12 @@ static void repo_symlink(struct repo *r)
     snprintf(link, PATH_MAX, "%s/%s.db", r->root, r->name);
 
     if (symlink(base ? &base[1] : r->db, link) < 0 && errno != ENOENT)
+            err(EXIT_FAILURE, "symlink to %s failed", link);
+
+    snprintf(fixme, PATH_MAX, "%s.sig", base ? &base[1] : r->db);
+    snprintf(link, PATH_MAX, "%s/%s.db.sig", r->root, r->name);
+
+    if (symlink(fixme, link) < 0 && errno != ENOENT)
             err(EXIT_FAILURE, "symlink to %s failed", link);
 }
 
