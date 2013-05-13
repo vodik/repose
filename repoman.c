@@ -363,6 +363,7 @@ static int unlink_pkg_files(const char *pkgpath)
 }
 
 /* FIXME: there must be a more robust way to do this */
+/* FIXME: should also link signature */
 static void repo_symlink(struct repo *r)
 {
     char link[PATH_MAX], *base = strrchr(r->db, '/');
@@ -405,7 +406,7 @@ static int verify_pkg(struct repo *r, const alpm_pkg_meta_t *pkg, bool deep)
     }
     free(sha256sum);
 
-    /* XXX: check the signature */
+    /* FIXME: verify the signature */
 
     return 0;
 }
@@ -447,7 +448,6 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
         alpm_db_populate(r->db, &db);
         cache = db.pkgcache;
 
-        /* XXX: verify entries still exist here */
         alpm_list_t *pkg, *db_pkgs = cache->list;
 
         for (pkg = db_pkgs; pkg; pkg = pkg->next) {

@@ -20,7 +20,7 @@ static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 {
     char *var;
 
-    /* XXX: not really handling comments properly */
+    /* FIXME: not really handling comments properly */
     if (buf[0] == '#')
         return;
 
@@ -259,15 +259,15 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
     size_t entry_size = archive_entry_size(entry);
     char *buf = malloc(entry_size);
 
-    /* TODO: check -1 might not be the best here. need actual rc */
+    /* FIXME: check -1 might not be the best here. need actual rc */
     while(archive_fgets(reader, buf, entry_size) != -1) {
         if (strcmp(buf, "%FILENAME%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->filename);
         } else if (strcmp(buf, "%NAME%") == 0) {
-            /* XXX: name should already be set, rather, validate it */
+            /* FIXME: name should already be set, rather, validate it */
             read_desc_entry(reader, buf, entry_size, &pkg->name);
         } else if (strcmp(buf, "%VERSION%") == 0) {
-            /* XXX: version should already be set, rather, validate it */
+            /* FIXME: version should already be set, rather, validate it */
             read_desc_entry(reader, buf, entry_size, &pkg->version);
         } else if (strcmp(buf, "%DESC%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->desc);
