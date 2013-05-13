@@ -239,7 +239,7 @@ static void find_repo(char *reponame, struct repo *r)
         if (len < 0) {
             if (errno != ENOENT)
                 err(EXIT_FAILURE, "failed to read %s link", reponame);
-            snprintf(target, PATH_MAX, "%s.tar.gz", reponame);
+            len = snprintf(target, PATH_MAX, "%s.tar.gz", reponame);
         }
 
         /* recalculate positions */
