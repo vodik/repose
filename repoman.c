@@ -222,28 +222,85 @@ static void repo_compile(struct repo *r, alpm_pkghash_t *cache)
 }
 /* }}} */
 
+static void find_repo(char *reponame, struct repo *r)
+{
+    int len = strlen(reponame);
+    char *base, *dot = memchr(reponame, '.', len);
+
+    if (!dot)
+        errx(EXIT_FAILURE, "%s invalid repo", reponame);
+
+    /* If the reponame ends in .db, we've been passed the symlink. Follow
+     * it. If the file doesn't actually exist yet, assume a .db.tar.gz
+     * extension */
+    char target[PATH_MAX];
+    if (strcmp(dot, ".db") == 0) {
+        len = readlink(reponame, target, PATH_MAX);
+        if (len < 0) {
+            if (errno != ENOENT)
+                err(EXIT_FAILURE, "failed to read %s link", reponame);
+            snprintf(target, PATH_MAX, "%s.tar.gz", reponame);
+        }
+
+        /* recalculate positions */
+        reponame = target;
+        dot = memchr(reponame, '.', len);
+        if (dot == NULL)
+            errx(EXIT_FAILURE, "%s invalid repo", reponame);
+    }
+
+    *dot++ = '\0';
+    base = memrchr(reponame, '/', len);
+
+    if (strcmp(dot, "db.tar") == 0) {
+        r->compression = COMPRESS_NONE;
+    } else if (strcmp(dot, "db.tar.gz") == 0) {
+        r->compression = COMPRESS_GZIP;
+    } else if (strcmp(dot, "db.tar.bz2") == 0) {
+        r->compression = COMPRESS_BZIP2;
+    } else if (strcmp(dot, "db.tar.xz") == 0) {
+        r->compression = COMPRESS_XZ;
+    } else if (strcmp(dot, "db.tar.Z") == 0) {
+        r->compression = COMPRESS_COMPRESS;
+    } else {
+        errx(EXIT_FAILURE, "%s invalid repo", dot);
+    }
+
+    snprintf(r->db,   PATH_MAX, "%s.%s", reponame, dot);
+    snprintf(r->link, PATH_MAX, "%s.db", reponame);
+
+    if (base) {
+        *base = '\0';
+        realpath(reponame, r->root);
+    } else {
+        r->root[0] = '\0';
+    }
+}
+
 static alpm_list_t *find_packages(char **paths)
 {
-    FTS *ftsp;
-    FTSENT *p, *chp;
+    FTS *tree;
+    FTSENT *entry;
     int fts_options = FTS_COMFOLLOW | FTS_LOGICAL | FTS_NOCHDIR;
     alpm_list_t *pkgs = NULL;
 
-    ftsp = fts_open(paths, fts_options, NULL);
-    if (ftsp == NULL)
+    tree = fts_open(paths, fts_options, NULL);
+    if (tree == NULL)
         err(EXIT_FAILURE, "fts_open");
 
-    chp = fts_children(ftsp, 0);
-    if (chp == NULL)
-        return 0;
+    while ((entry = fts_read(tree)) != NULL) {
+        /* don't search recursively */
+        if (entry->fts_level > 1) {
+            fts_set(tree, entry, FTS_SKIP);
+            continue;
+        }
 
-    while ((p = fts_read(ftsp)) != NULL) {
-        switch (p->fts_info) {
+        switch (entry->fts_info) {
         case FTS_F:
-            if (fnmatch("*.pkg.tar*", p->fts_path, FNM_CASEFOLD) == 0 &&
-                fnmatch("*.sig",      p->fts_path, FNM_CASEFOLD) != 0) {
+            if (fnmatch("*.pkg.tar*", entry->fts_path, FNM_CASEFOLD) == 0 &&
+                fnmatch("*.sig",      entry->fts_path, FNM_CASEFOLD) != 0) {
                 alpm_pkg_meta_t *metadata;
-                alpm_pkg_load_metadata(p->fts_path, &metadata);
+                alpm_pkg_load_metadata(entry->fts_path, &metadata);
                 pkgs = alpm_list_add(pkgs, metadata);
             }
             break;
@@ -252,7 +309,7 @@ static alpm_list_t *find_packages(char **paths)
         }
     }
 
-    fts_close(ftsp);
+    fts_close(tree);
     return pkgs;
 }
 
@@ -499,61 +556,6 @@ static int query_db(const char *path, int argc, char *argv[])
     return 0;
 }
 /* }}} */
-
-static void find_repo(char *reponame, struct repo *r)
-{
-    int len = strlen(reponame);
-    char *base, *dot = memchr(reponame, '.', len);
-
-    if (!dot)
-        errx(EXIT_FAILURE, "%s invalid repo", reponame);
-
-    /* If the reponame ends in .db, we've been passed the symlink. Follow
-     * it. If the file doesn't actually exist yet, assume a .db.tar.gz
-     * extension */
-    char target[PATH_MAX];
-    if (strcmp(dot, ".db") == 0) {
-        len = readlink(reponame, target, PATH_MAX);
-        if (len < 0) {
-            if (errno != ENOENT)
-                err(EXIT_FAILURE, "failed to read %s link", reponame);
-            snprintf(target, PATH_MAX, "%s.tar.gz", reponame);
-        }
-
-        /* reclculate positions */
-        reponame = target;
-        dot = memchr(reponame, '.', len);
-        if (dot == NULL)
-            errx(EXIT_FAILURE, "%s invalid repo", reponame);
-    }
-
-    *dot++ = '\0';
-    base = memrchr(reponame, '/', len);
-
-    if (strcmp(dot, "db.tar") == 0) {
-        r->compression = COMPRESS_NONE;
-    } else if (strcmp(dot, "db.tar.gz") == 0) {
-        r->compression = COMPRESS_GZIP;
-    } else if (strcmp(dot, "db.tar.bz2") == 0) {
-        r->compression = COMPRESS_BZIP2;
-    } else if (strcmp(dot, "db.tar.xz") == 0) {
-        r->compression = COMPRESS_XZ;
-    } else if (strcmp(dot, "db.tar.Z") == 0) {
-        r->compression = COMPRESS_COMPRESS;
-    } else {
-        errx(EXIT_FAILURE, "%s invalid repo", dot);
-    }
-
-    snprintf(r->db,   PATH_MAX, "%s.%s", reponame, dot);
-    snprintf(r->link, PATH_MAX, "%s.db", reponame);
-
-    if (base) {
-        *base = '\0';
-        realpath(reponame, r->root);
-    } else {
-        realpath(".", r->root);
-    }
-}
 
 /* {{{ COMPAT! */
 #include "repo-compat.c"
