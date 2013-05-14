@@ -6,12 +6,13 @@ At the moment, a half baked and hacked together alternative to repo-add.
 
 ### Usage
 
-    repoman -U --sign foo.db.tar.gz .
+    repoman -U --sign foo.db.tar.gz
 
-Add all packages in the current directory to foo.db.tar.gz and sign the
-database with gnupg. Add a `-c` flag to also delete and files removed
-from the db and a second `-c` to also remove any other outdated packages
-in the cache.
+Add all packages in the current directory to foo.db.tar.gz and then sign
+the database with gnupg.
+
+Add a `-c` flag to also delete and files removed from the db and a
+second `-c` to also remove any other outdated packages in the cache.
 
     repoman -V foo.db.tar.gz
 
