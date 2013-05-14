@@ -379,13 +379,13 @@ static void repo_symlink(repo_t *r)
 
     snprintf(link, PATH_MAX, "%s/%s.db", r->root, r->name);
 
-    if (symlink(base ? &base[1] : r->db, link) < 0 && errno != ENOENT)
+    if (symlink(base ? &base[1] : r->db, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 
     snprintf(fixme, PATH_MAX, "%s.sig", base ? &base[1] : r->db);
     snprintf(link, PATH_MAX, "%s/%s.db.sig", r->root, r->name);
 
-    if (symlink(fixme, link) < 0 && errno != ENOENT)
+    if (symlink(fixme, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 }
 
