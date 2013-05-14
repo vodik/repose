@@ -45,12 +45,12 @@ enum compress {
     COMPRESS_COMPRESS
 };
 
-struct repo {
+typedef struct repo {
     char *name;
     char root[PATH_MAX];
     char db[PATH_MAX];
     enum compress compression;
-};
+} repo_t;
 
 static struct {
     const char *key;
@@ -208,7 +208,7 @@ static void repo_write_close(struct repo_writer *repo)
 }
 
 /* TODO: compy as much data as possible from the existing repo */
-static void repo_compile(struct repo *r, alpm_pkghash_t *cache)
+static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 {
     struct repo_writer *repo = repo_write_new(r->db, r->compression);
     alpm_list_t *pkg, *pkgs = cache->list;
@@ -222,7 +222,7 @@ static void repo_compile(struct repo *r, alpm_pkghash_t *cache)
 }
 /* }}} */
 
-static void find_repo(char *reponame, struct repo *r)
+static void find_repo(char *reponame, repo_t *r)
 {
     int len = strlen(reponame);
     char *base, *dot = memchr(reponame, '.', len);
@@ -301,7 +301,7 @@ static inline bool repo_file_valid(char *filepath, char *rootpath)
     return rc;
 }
 
-static alpm_list_t *find_packages(struct repo *r, char **paths)
+static alpm_list_t *find_packages(repo_t *r, char **paths)
 {
     FTS *tree;
     FTSENT *entry;
@@ -353,7 +353,7 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
     return pkgs;
 }
 
-static int unlink_pkg_files(struct repo *r, const alpm_pkg_meta_t *metadata)
+static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
 {
     char rmpath[PATH_MAX];
 
@@ -369,7 +369,7 @@ static int unlink_pkg_files(struct repo *r, const alpm_pkg_meta_t *metadata)
 
 /* FIXME: there must be a more robust way to do this */
 /* FIXME: should also link signature */
-static void repo_symlink(struct repo *r)
+static void repo_symlink(repo_t *r)
 {
     char link[PATH_MAX], *base = strrchr(r->db, '/');
     char fixme[PATH_MAX];
@@ -390,7 +390,7 @@ static void repo_symlink(struct repo *r)
 }
 
 /* {{{ VERIFY */
-static int verify_pkg(struct repo *r, const alpm_pkg_meta_t *pkg, bool deep)
+static int verify_pkg(repo_t *r, const alpm_pkg_meta_t *pkg, bool deep)
 {
     char pkgpath[PATH_MAX];
 
@@ -423,7 +423,7 @@ static int verify_pkg(struct repo *r, const alpm_pkg_meta_t *pkg, bool deep)
     return 0;
 }
 
-static int verify_db(struct repo *r)
+static int verify_db(repo_t *r)
 {
     alpm_db_meta_t db;
     alpm_db_populate(r->db, &db);
@@ -444,7 +444,7 @@ static int verify_db(struct repo *r)
 /* }}} */
 
 /* {{{ UPDATE */
-static int update_db(struct repo *r, int argc, char *argv[], int clean)
+static int update_db(repo_t *r, int argc, char *argv[], int clean)
 {
     bool dirty = false;
     alpm_pkghash_t *cache = NULL;
@@ -533,7 +533,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
 /* }}} */
 
 /* {{{ REMOVE */
-static int remove_db(struct repo *r, int argc, char *argv[], int clean)
+static int remove_db(repo_t *r, int argc, char *argv[], int clean)
 {
     alpm_db_meta_t db;
     bool dirty = false;
@@ -714,7 +714,7 @@ int main(int argc, char *argv[])
     if (argc == 0)
         errx(EXIT_FAILURE, "not enough arguments");
 
-    struct repo repo;
+    repo_t repo;
     find_repo(argv[0], &repo);
 
     switch (cfg.action) {
