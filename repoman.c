@@ -23,12 +23,6 @@
 #include "pkghash.h"
 #include "signing.h"
 
-struct repo_writer {
-    struct archive *archive;
-    struct archive_entry *entry;
-    struct buffer buf;
-};
-
 enum action {
     ACTION_VERIFY,
     ACTION_UPDATE,
@@ -51,6 +45,12 @@ typedef struct repo {
     char db[PATH_MAX];
     enum compress compression;
 } repo_t;
+
+typedef struct repo_writer {
+    struct archive *archive;
+    struct archive_entry *entry;
+    struct buffer buf;
+} repo_writer_t;
 
 static struct {
     const char *key;
@@ -145,9 +145,9 @@ static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
     archive_write_data(a, buf->data, buf->len);
 }
 
-static struct repo_writer *repo_write_new(const char *filename, enum compress compression)
+static repo_writer_t *repo_write_new(const char *filename, enum compress compression)
 {
-    struct repo_writer *repo = malloc(sizeof(struct repo_writer));
+    repo_writer_t *repo = malloc(sizeof(repo_writer_t));
     repo->archive = archive_write_new();
     repo->entry = archive_entry_new();
 
@@ -176,7 +176,7 @@ static struct repo_writer *repo_write_new(const char *filename, enum compress co
     return repo;
 }
 
-static void repo_write_pkg(struct repo_writer *repo, alpm_pkg_meta_t *pkg)
+static void repo_write_pkg(repo_writer_t *repo, alpm_pkg_meta_t *pkg)
 {
     char path[PATH_MAX];
 
@@ -197,7 +197,7 @@ static void repo_write_pkg(struct repo_writer *repo, alpm_pkg_meta_t *pkg)
     archive_write_buffer(repo->archive, repo->entry, path, &repo->buf);
 }
 
-static void repo_write_close(struct repo_writer *repo)
+static void repo_write_close(repo_writer_t *repo)
 {
     archive_write_close(repo->archive);
 
@@ -210,7 +210,7 @@ static void repo_write_close(struct repo_writer *repo)
 /* TODO: compy as much data as possible from the existing repo */
 static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 {
-    struct repo_writer *repo = repo_write_new(r->db, r->compression);
+    repo_writer_t *repo = repo_write_new(r->db, r->compression);
     alpm_list_t *pkg, *pkgs = cache->list;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
