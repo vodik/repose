@@ -477,35 +477,39 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
     }
 
     /* if some file paths were specified, find all packages */
+    printf(":: Scanning for new packages...\n");
+
+    alpm_list_t *pkg, *pkgs;
     if (argc > 0) {
-        printf(":: Scanning for new packages...\n");
+        pkgs = find_packages(r, argv);
+    } else {
+        char *default_path[] = { r->root, NULL };
+        pkgs = find_packages(r, default_path);
+    }
 
-        alpm_list_t *pkg, *pkgs = find_packages(r, argv);
+    for (pkg = pkgs; pkg; pkg = pkg->next) {
+        alpm_pkg_meta_t *metadata = pkg->data;
+        alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, metadata->name);
 
-        for (pkg = pkgs; pkg; pkg = pkg->next) {
-            alpm_pkg_meta_t *metadata = pkg->data;
-            alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, metadata->name);
+        int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
 
-            int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
-
-            if (old == NULL || vercmp == 1) {
-                if (old) {
-                    printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
-                    if (clean >= 1)
-                        unlink_pkg_files(old->filename);
-                    cache = _alpm_pkghash_remove(cache, old, NULL);
-                    alpm_pkg_free_metadata(old);
-                } else  {
-                    printf("ADDING: %s-%s\n", metadata->name, metadata->version);
-                }
-                cache = _alpm_pkghash_add(cache, metadata);
-                dirty = true;
+        if (old == NULL || vercmp == 1) {
+            if (old) {
+                printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
+                if (clean >= 1)
+                    unlink_pkg_files(old->filename);
+                cache = _alpm_pkghash_remove(cache, old, NULL);
+                alpm_pkg_free_metadata(old);
+            } else  {
+                printf("ADDING: %s-%s\n", metadata->name, metadata->version);
             }
+            cache = _alpm_pkghash_add(cache, metadata);
+            dirty = true;
+        }
 
-            if (vercmp == -1 && clean >= 2) {
-                printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
-                unlink_pkg_files(metadata->filename);
-            }
+        if (vercmp == -1 && clean >= 2) {
+            printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+            unlink_pkg_files(metadata->filename);
         }
     }
 
