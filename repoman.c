@@ -353,13 +353,18 @@ static alpm_list_t *find_packages(struct repo *r, char **paths)
     return pkgs;
 }
 
-static int unlink_pkg_files(const char *pkgpath)
+static int unlink_pkg_files(struct repo *r, const alpm_pkg_meta_t *metadata)
 {
-    char sigpath[PATH_MAX];
-    snprintf(sigpath, PATH_MAX, "%s.sig", pkgpath);
+    char rmpath[PATH_MAX];
 
-    unlink(pkgpath);
-    return unlink(sigpath);
+    printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+
+    snprintf(rmpath, PATH_MAX, "%s/%s", r->root, metadata->filename);
+    unlink(rmpath);
+
+    snprintf(rmpath, PATH_MAX, "%s/%s.sig", r->root, metadata->filename);
+    unlink(rmpath);
+    return 0;
 }
 
 /* FIXME: there must be a more robust way to do this */
@@ -497,7 +502,7 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
             if (old) {
                 printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
                 if (clean >= 1)
-                    unlink_pkg_files(old->filename);
+                    unlink_pkg_files(r, old);
                 cache = _alpm_pkghash_remove(cache, old, NULL);
                 alpm_pkg_free_metadata(old);
             } else  {
@@ -507,10 +512,8 @@ static int update_db(struct repo *r, int argc, char *argv[], int clean)
             dirty = true;
         }
 
-        if (vercmp == -1 && clean >= 2) {
-            printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
-            unlink_pkg_files(metadata->filename);
-        }
+        if (vercmp == -1 && clean >= 2)
+            unlink_pkg_files(r, metadata);
     }
 
     if (dirty)
@@ -550,7 +553,7 @@ static int remove_db(struct repo *r, int argc, char *argv[], int clean)
                 db.pkgcache = _alpm_pkghash_remove(db.pkgcache, pkg, NULL);
                 printf("REMOVING: %s\n", pkg->name);
                 if (clean >= 1)
-                    unlink_pkg_files(pkg->filename);
+                    unlink_pkg_files(r, pkg);
                 alpm_pkg_free_metadata(pkg);
                 dirty = true;
                 continue;
