@@ -335,7 +335,7 @@ static alpm_list_t *find_packages(repo_t *r, char **paths)
                 fnmatch("*.sig",      pkgpath, FNM_CASEFOLD) == 0)
                 continue;
 
-            if (!repo_file_valid(entry->fts_path, r->root)) {
+            if (entry->fts_level > 0 && !repo_file_valid(entry->fts_path, r->root)) {
                 warnx("pkg and repo aren't in the same directory");
                 continue;
             }
