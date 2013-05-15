@@ -235,12 +235,10 @@ static void find_repo(char *path, repo_t *r)
     size_t len = strlen(real);
     char *dot = memchr(real, '.', len);
     char *div = memrchr(real, '/', len);
-    bool foo = false;
 
     if (!dot) {
         errx(EXIT_FAILURE, "no file extension");
     } else if (strcmp(dot, ".db") == 0) {
-        foo = true;
         r->compression = COMPRESS_GZIP;
     } else if (strcmp(dot, ".db.tar") == 0) {
         r->compression = COMPRESS_NONE;
@@ -262,10 +260,11 @@ static void find_repo(char *path, repo_t *r)
     strncpy(r->root, real, div - real);
     strncpy(r->name, div + 1, dot - div - 1);
 
-    if (foo)
+    if (*dot == '\0') {
         snprintf(r->file, PATH_MAX, "%s.tar.gz", r->name);
-    else
+    } else {
         strcpy(r->file, div + 1);
+    }
 
     printf("path: %s\n", real);
     printf("root: %s\n", r->root);
