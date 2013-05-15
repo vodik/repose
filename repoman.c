@@ -265,11 +265,6 @@ static void find_repo(char *path, repo_t *r)
     } else {
         strcpy(r->file, div + 1);
     }
-
-    printf("path: %s\n", real);
-    printf("root: %s\n", r->root);
-    printf("name: %s\n", r->name);
-    printf("file: %s\n", r->file);
 }
 
 static inline bool repo_dir_valid(char *dirpath, char *rootpath)
@@ -368,12 +363,10 @@ static void repo_symlink(repo_t *r)
     char fixme[PATH_MAX];
 
     snprintf(fixme, PATH_MAX, "%s/%s", r->root, r->file);
-    printf("FIXME: %s\n", fixme);
     if (access(fixme, F_OK) < 0)
         return;
 
     snprintf(link, PATH_MAX, "%s/%s", r->root, r->name);
-    printf("LINK: %s\n", link);
     if (symlink(r->file, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 
@@ -382,13 +375,11 @@ static void repo_symlink(repo_t *r)
 
     /* now the signature */
     snprintf(fixme, PATH_MAX, "%s/%s.sig", r->root, r->file);
-    printf("FIXME: %s\n", fixme);
     if (access(fixme, F_OK) < 0)
         return;
 
     snprintf(fixme, PATH_MAX, "%s.sig", r->file);
     snprintf(link, PATH_MAX, "%s/%s.sig", r->root, r->name);
-    printf("LINK: %s\n", link);
     if (symlink(fixme, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 }
