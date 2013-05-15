@@ -533,7 +533,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
         printf("repo %s updated successfully\n", r->full);
 
         if (cfg.sign)
-            gpgme_sign(r->full, cfg.key);
+            gpgme_sign(r->root, r->full, cfg.key);
     } else {
         printf("repo %s does not need updating\n", r->full);
     }
@@ -581,7 +581,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
         printf("repo %s updated successfully\n", r->full);
 
         if (cfg.sign)
-            gpgme_sign(r->full, cfg.key);
+            gpgme_sign(r->root, r->full, cfg.key);
     } else {
         printf("repo %s does not need updating\n", r->full);
     }
