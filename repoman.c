@@ -40,9 +40,9 @@ enum compress {
 };
 
 typedef struct repo {
-    char name[PATH_MAX];
     char root[PATH_MAX];
-    char full[PATH_MAX];
+    char name[PATH_MAX];
+    char file[PATH_MAX];
     enum compress compression;
 } repo_t;
 
@@ -211,7 +211,7 @@ static void repo_write_close(repo_writer_t *repo)
 static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 {
     char repopath[PATH_MAX];
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->full);
+    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
 
     repo_writer_t *repo = repo_write_new(repopath, r->compression);
     alpm_list_t *pkg, *pkgs = cache->list;
@@ -225,34 +225,24 @@ static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 }
 /* }}} */
 
-static void find_repo(char *reponame, repo_t *r)
+static void find_repo(char *path, repo_t *r)
 {
-    int len = strlen(reponame);
-    char *base, *dot = memchr(reponame, '.', len);
+    char real[PATH_MAX];
 
-    if (!dot)
-        errx(EXIT_FAILURE, "%s invalid repo", reponame);
+    if (realpath(path, real) == NULL && errno != ENOENT)
+        err(EXIT_FAILURE, "failed to find repo");
 
-    /* If the reponame ends in .db, we've been passed the symlink. Follow
-     * it. If the file doesn't actually exist yet, assume a .db.tar.gz
-     * extension */
-    char target[PATH_MAX];
-    if (strcmp(dot, ".db") == 0) {
-        len = readlink(reponame, target, PATH_MAX);
-        if (len < 0) {
-            if (errno != ENOENT)
-                err(EXIT_FAILURE, "failed to read %s link", reponame);
-            len = snprintf(target, PATH_MAX, "%s.tar.gz", reponame);
-        }
+    size_t len = strlen(real);
+    char *dot = memchr(real, '.', len);
+    char *div = memrchr(real, '/', len);
+    bool foo = false;
 
-        /* recalculate positions */
-        reponame = target;
-        dot = memchr(reponame, '.', len);
-        if (dot == NULL)
-            errx(EXIT_FAILURE, "%s invalid repo", reponame);
-    }
-
-    if (strcmp(dot, ".db.tar") == 0) {
+    if (!dot) {
+        errx(EXIT_FAILURE, "no file extension");
+    } else if (strcmp(dot, ".db") == 0) {
+        foo = true;
+        r->compression = COMPRESS_GZIP;
+    } else if (strcmp(dot, ".db.tar") == 0) {
         r->compression = COMPRESS_NONE;
     } else if (strcmp(dot, ".db.tar.gz") == 0) {
         r->compression = COMPRESS_GZIP;
@@ -263,23 +253,24 @@ static void find_repo(char *reponame, repo_t *r)
     } else if (strcmp(dot, ".db.tar.Z") == 0) {
         r->compression = COMPRESS_COMPRESS;
     } else {
-        errx(EXIT_FAILURE, "%s invalid repo", dot);
+        errx(EXIT_FAILURE, "%s invalid repo type", dot);
     }
 
-    *dot = '\0';
-    base = memrchr(reponame, '/', len);
-    if (base) {
-        *base++ = '\0';
-        realpath(reponame, r->root);
-        reponame = base;
-    } else {
-        realpath(".", r->root);
-    }
+    /* skip '.db' */
+    dot += 3;
 
-    /* r->name = strdup(reponame); */
-    snprintf(r->name, PATH_MAX, "%s.db", reponame);
-    *dot = '.';
-    snprintf(r->full, PATH_MAX, "%s", /*r->root,*/ reponame);
+    strncpy(r->root, real, div - real);
+    strncpy(r->name, div + 1, dot - div - 1);
+
+    if (foo)
+        snprintf(r->file, PATH_MAX, "%s.tar.gz", r->name);
+    else
+        strcpy(r->file, div + 1);
+
+    printf("path: %s\n", real);
+    printf("root: %s\n", r->root);
+    printf("name: %s\n", r->name);
+    printf("file: %s\n", r->file);
 }
 
 static inline bool repo_dir_valid(char *dirpath, char *rootpath)
@@ -377,21 +368,29 @@ static void repo_symlink(repo_t *r)
     char link[PATH_MAX];
     char fixme[PATH_MAX];
 
-    snprintf(fixme, PATH_MAX, "%s/%s", r->root, r->full);
+    snprintf(fixme, PATH_MAX, "%s/%s", r->root, r->file);
+    printf("FIXME: %s\n", fixme);
     if (access(fixme, F_OK) < 0)
         return;
 
     snprintf(link, PATH_MAX, "%s/%s", r->root, r->name);
-    if (symlink(r->full, link) < 0 && errno != EEXIST)
+    printf("LINK: %s\n", link);
+    if (symlink(r->file, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 
+    if (!cfg.sign)
+        return;
+
     /* now the signature */
-    snprintf(fixme, PATH_MAX, "%s/%s.sig", r->root, r->full);
+    snprintf(fixme, PATH_MAX, "%s/%s.sig", r->root, r->file);
+    printf("FIXME: %s\n", fixme);
     if (access(fixme, F_OK) < 0)
         return;
 
-    snprintf(link, PATH_MAX, "%s/%s.db.sig", r->root, r->name);
-    if (symlink(r->full, link) < 0 && errno != EEXIST)
+    snprintf(fixme, PATH_MAX, "%s.sig", r->file);
+    snprintf(link, PATH_MAX, "%s/%s.sig", r->root, r->name);
+    printf("LINK: %s\n", link);
+    if (symlink(fixme, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 }
 
@@ -433,7 +432,7 @@ static int verify_db(repo_t *r)
     alpm_db_meta_t db;
     char repopath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->full);
+    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
     alpm_db_populate(repopath, &db);
 
     alpm_list_t *pkg, *pkgs = db.pkgcache->list;
@@ -459,7 +458,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
     alpm_pkghash_t *cache = NULL;
     char repopath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->full);
+    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
     if (access(repopath, F_OK) < 0) {
         warnx("warning: repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
@@ -530,12 +529,12 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
     {
         printf(":: Writing database to disk...\n");
         repo_compile(r, cache);
-        printf("repo %s updated successfully\n", r->full);
+        printf("repo %s updated successfully\n", r->name);
 
         if (cfg.sign)
-            gpgme_sign(r->root, r->full, cfg.key);
+            gpgme_sign(r->root, r->file, cfg.key);
     } else {
-        printf("repo %s does not need updating\n", r->full);
+        printf("repo %s does not need updating\n", r->name);
     }
 
     return 0;
@@ -550,7 +549,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
     bool dirty = false;
     char repopath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->full);
+    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
     if (access(repopath, F_OK) < 0) {
         warnx("warning: repo doesn't exist...");
         return 1;
@@ -578,12 +577,12 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
     {
         printf(":: Writing database to disk...\n");
         repo_compile(r, db.pkgcache);
-        printf("repo %s updated successfully\n", r->full);
+        printf("repo %s updated successfully\n", r->name);
 
         if (cfg.sign)
-            gpgme_sign(r->root, r->full, cfg.key);
+            gpgme_sign(r->root, r->name, cfg.key);
     } else {
-        printf("repo %s does not need updating\n", r->full);
+        printf("repo %s does not need updating\n", r->name);
     }
 
     return 0;
@@ -608,7 +607,7 @@ static int query_db(repo_t *r, int argc, char *argv[])
 {
     char repopath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->full);
+    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
     if (access(repopath, F_OK) < 0) {
         warnx("repo doesn't exist");
         return 1;
