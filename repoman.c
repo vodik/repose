@@ -280,16 +280,13 @@ static repo_t *find_repo(char *path)
     /* check for a signature */
     char sig[PATH_MAX];
     snprintf(sig, PATH_MAX, "%s.sig", real);
-
     if (access(sig, F_OK) == 0) {
         if (gpgme_verify(real, sig) < 0)
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
 
         r->db_signed = true;
-    } else {
     }
 
-    /* alpm_db_populate(real, &r->db); */
     return r;
 }
 
