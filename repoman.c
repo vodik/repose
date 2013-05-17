@@ -278,10 +278,15 @@ static repo_t *find_repo(char *path)
     }
 
     /* check for a signature */
-    strcat(real, ".sig");
-    if (access(real, F_OK) == 0) {
+    char sig[PATH_MAX];
+    snprintf(sig, PATH_MAX, "%s.sig", real);
+
+    if (access(sig, F_OK) == 0) {
+        if (gpgme_verify(real, sig) < 0)
+            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
+
         r->db_signed = true;
-        warnx("repo is signed, i should probably validate it...");
+    } else {
     }
 
     /* alpm_db_populate(real, &r->db); */
@@ -708,6 +713,9 @@ int main(int argc, char *argv[])
 
     // FIXME: should be a function
     repo = find_repo(argv[0]);
+    if (!repo)
+        return 1;
+
     snprintf(repopath, PATH_MAX, "%s/%s", repo->root, repo->file);
     if (access(repopath, F_OK) < 0) {
         warn("couldn't open repo %s", repo->name);

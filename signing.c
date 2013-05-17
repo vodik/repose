@@ -44,42 +44,64 @@ static int init_gpgme(void)
     return 0;
 }
 
-/* static void print_data(gpgme_data_t dh) */
-/* { */
-/* #define BUF_SIZE 512 */
-/*     char buf[BUF_SIZE + 1]; */
-/*     int ret; */
+int gpgme_verify(const char *filepath, const char *sigpath)
+{
+    gpgme_error_t err;
+    gpgme_ctx_t ctx;
+    gpgme_data_t in, sig;
+    gpgme_verify_result_t result;
+    gpgme_signature_t sigs;
+    int rc = 0;
 
-/*     ret = gpgme_data_seek(dh, 0, SEEK_SET); */
-/*     if (ret) */
-/*         return; */
+    if (init_gpgme() < 0)
+        return -1;
 
-/*     while ((ret = gpgme_data_read(dh, buf, BUF_SIZE)) > 0) */
-/*         fwrite (buf, ret, 1, stdout); */
+    err = gpgme_new(&ctx);
+    if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
+        errx(EXIT_FAILURE, "failed to call gpgme_new()");
 
-/*     if (ret < 0) */
-/*         return; */
-/* } */
+    err = gpgme_data_new_from_file(&in, filepath, 1);
+    if (err)
+        errx(EXIT_FAILURE, "error reading `%s': %s\n", filepath, gpgme_strerror(err));
 
-/* static void print_result(gpgme_sign_result_t result) */
-/* { */
-/*     gpgme_invalid_key_t invkey; */
-/*     gpgme_new_signature_t sig; */
+    err = gpgme_data_new_from_file(&sig, sigpath, 1);
+    if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
+        errx(EXIT_FAILURE, "error reading `%s': %s\n", filepath, gpgme_strerror(err));
 
-/*     for (invkey = result->invalid_signers; invkey; invkey = invkey->next) { */
-/*         printf("Signing key `%s' not used: %s <%s>\n", */
-/*                invkey->fpr ? invkey->fpr : "[none]", */
-/*                gpgme_strerror (invkey->reason), gpgme_strsource (invkey->reason)); */
-/*     } */
+    err = gpgme_op_verify(ctx, sig, in, NULL);
+    if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
+        errx(EXIT_FAILURE, "failed to verify: %s\n", gpgme_strerror(err));
 
-/*     for (sig = result->signatures; sig; sig = sig->next) { */
-/*         printf("Key fingerprint: %s\n", sig->fpr ? sig->fpr : "[none]"); */
-/*         printf("Public key algo: %d\n", sig->pubkey_algo); */
-/*         printf("Hash algo .....: %d\n", sig->hash_algo); */
-/*         printf("Creation time .: %ld\n", sig->timestamp); */
-/*         printf("Sig class .....: 0x%u\n", sig->sig_class); */
-/*     } */
-/* } */
+    result = gpgme_op_verify_result(ctx);
+    if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
+        errx(EXIT_FAILURE, "failed to get results: %s", gpgme_strerror(err));
+
+    sigs = result->signatures;
+    if (gpgme_err_code(sigs->status) != GPG_ERR_NO_ERROR) {
+        warnx("unexpected signature status: %s", gpgme_strerror(sigs->status));
+        rc = -1;
+    } else if (sigs->next) {
+        warnx("unexpected number of signatures");
+        rc = -1;
+    } else if (sigs->summary == GPGME_SIGSUM_RED) {
+        warnx("unexpected signature summary 0x%x", sigs->summary);
+        rc = -1;
+    } else if (sigs->wrong_key_usage) {
+        warnx("unexpected wrong key usage");
+        rc = -1;
+    } else if (sigs->validity != GPGME_VALIDITY_FULL) {
+        warnx("unexpected validity 0x%x", sigs->validity);
+        rc = -1;
+    } else if (gpgme_err_code(sigs->validity_reason) != GPG_ERR_NO_ERROR) {
+        warnx("unexpected validity reason: %s", gpgme_strerror(sigs->validity_reason));
+        rc = -1;
+    }
+
+    gpgme_data_release(in);
+    gpgme_data_release(sig);
+    gpgme_release(ctx);
+    return rc;
+}
 
 void gpgme_sign(const char *root, const char *file, const char *key)
 {
@@ -154,4 +176,5 @@ void gpgme_sign(const char *root, const char *file, const char *key)
 
     gpgme_data_release(out);
     gpgme_data_release(in);
+    gpgme_release(ctx);
 }
