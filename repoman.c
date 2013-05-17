@@ -212,7 +212,10 @@ static void repo_write_close(repo_writer_t *repo)
 static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 {
     char repopath[PATH_MAX];
+    char linkpath[PATH_MAX];
+
     snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
+    snprintf(linkpath, PATH_MAX, "%s/%s", r->root, r->name);
 
     repo_writer_t *repo = repo_write_new(repopath, r->compression);
     alpm_list_t *pkg, *pkgs = cache->list;
@@ -223,6 +226,9 @@ static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
     }
 
     repo_write_close(repo);
+
+    if (symlink(r->file, linkpath) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink to %s failed", linkpath);
 }
 /* }}} */
 
@@ -359,32 +365,17 @@ static int unlink_pkg_files(/*repo_t *r, */const alpm_pkg_meta_t *metadata)
     return 0;
 }
 
-/* FIXME: there must be a more robust way to do this */
-/* FIXME: should also link signature */
-static void repo_symlink(repo_t *r)
+static void repo_sign(repo_t *r)
 {
     char link[PATH_MAX];
-    char fixme[PATH_MAX];
+    char signature[PATH_MAX];
 
-    snprintf(fixme, PATH_MAX, "%s/%s", r->root, r->file);
-    if (access(fixme, F_OK) < 0)
-        return;
+    /* XXX: check return type */
+    gpgme_sign(r->root, r->file, cfg.key);
 
-    snprintf(link, PATH_MAX, "%s/%s", r->root, r->name);
-    if (symlink(r->file, link) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink to %s failed", link);
-
-    if (!cfg.sign)
-        return;
-
-    /* now the signature */
-    snprintf(fixme, PATH_MAX, "%s/%s.sig", r->root, r->file);
-    if (access(fixme, F_OK) < 0)
-        return;
-
-    snprintf(fixme, PATH_MAX, "%s.sig", r->file);
+    snprintf(signature, PATH_MAX, "%s.sig", r->file);
     snprintf(link, PATH_MAX, "%s/%s.sig", r->root, r->name);
-    if (symlink(fixme, link) < 0 && errno != EEXIST)
+    if (symlink(signature, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 }
 
@@ -515,7 +506,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
         printf("repo %s updated successfully\n", r->name);
 
         if (cfg.sign)
-            gpgme_sign(r->root, r->file, cfg.key);
+            repo_sign(r);
     } else {
         printf("repo %s does not need updating\n", r->name);
     }
@@ -559,7 +550,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
         printf("repo %s updated successfully\n", r->name);
 
         if (cfg.sign)
-            gpgme_sign(r->root, r->name, cfg.key);
+            repo_sign(r);
     } else {
         printf("repo %s does not need updating\n", r->name);
     }
@@ -731,10 +722,6 @@ int main(int argc, char *argv[])
     default:
         break;
     };
-
-    /* symlink repo.db -> repo.db.tar.gz */
-    if (rc == 0)
-        repo_symlink(&repo);
 
     return rc;
 }
