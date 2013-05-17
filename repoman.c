@@ -451,7 +451,8 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
     } else {
         printf(":: Reading existing database...\n");
 
-        alpm_list_t *pkg, *db_pkgs = r->db->pkgcache->list;
+        cache = r->db->pkgcache;
+        alpm_list_t *pkg, *db_pkgs = cache->list;
 
         for (pkg = db_pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
@@ -708,6 +709,7 @@ int main(int argc, char *argv[])
     snprintf(repopath, PATH_MAX, "%s/%s", repo.root, repo.file);
     if (access(repopath, F_OK) < 0) {
         warn("couldn't open repo %s", repo.name);
+        repo.db = NULL;
     } else {
         alpm_db_populate(repopath, &db);
         repo.db = &db;
