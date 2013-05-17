@@ -40,7 +40,7 @@ enum compress {
 };
 
 typedef struct repo {
-    /* alpm_db_meta_t db; */
+    alpm_db_meta_t *db;
     char root[PATH_MAX];
     char name[PATH_MAX];
     char file[PATH_MAX];
@@ -421,9 +421,9 @@ static int verify_pkg(repo_t *r, const alpm_pkg_meta_t *pkg, bool deep)
     return 0;
 }
 
-static int verify_db(repo_t *r, alpm_db_meta_t *db)
+static int verify_db(repo_t *r)
 {
-    alpm_list_t *pkg, *pkgs = db->pkgcache->list;
+    alpm_list_t *pkg, *pkgs = r->db->pkgcache->list;
     int rc = 0;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -439,22 +439,19 @@ static int verify_db(repo_t *r, alpm_db_meta_t *db)
 /* }}} */
 
 /* {{{ UPDATE */
-    /* read the existing repo or construct a new package cache */
-static int update_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[], int clean)
+/* read the existing repo or construct a new package cache */
+static int update_db(repo_t *r, int argc, char *argv[], int clean)
 {
     bool dirty = false;
     alpm_pkghash_t *cache = NULL;
-    char repopath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
-    if (db == NULL) {
+    if (r->db == NULL) {
         warnx("repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
     } else {
         printf(":: Reading existing database...\n");
 
-        cache = db->pkgcache;
-        alpm_list_t *pkg, *db_pkgs = cache->list;
+        alpm_list_t *pkg, *db_pkgs = r->db->pkgcache->list;
 
         for (pkg = db_pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
@@ -528,13 +525,11 @@ static int update_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[], int 
 
 /* {{{ REMOVE */
     /* read the existing repo or construct a new package cache */
-static int remove_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[], int clean)
+static int remove_db(repo_t *r, int argc, char *argv[], int clean)
 {
     bool dirty = false;
-    char repopath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
-    if (db == NULL) {
+    if (r->db == NULL) {
         warnx("repo doesn't exist...");
         return 1;
     } else if (argc > 0) {
@@ -542,9 +537,9 @@ static int remove_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[], int 
 
         int i;
         for (i = 0; i < argc; ++i) {
-            alpm_pkg_meta_t *pkg = _alpm_pkghash_find(db->pkgcache, argv[i]);
+            alpm_pkg_meta_t *pkg = _alpm_pkghash_find(r->db->pkgcache, argv[i]);
             if (pkg != NULL) {
-                db->pkgcache = _alpm_pkghash_remove(db->pkgcache, pkg, NULL);
+                r->db->pkgcache = _alpm_pkghash_remove(r->db->pkgcache, pkg, NULL);
                 printf("REMOVING: %s\n", pkg->name);
                 if (clean >= 1)
                     unlink_pkg_files(pkg);
@@ -559,7 +554,7 @@ static int remove_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[], int 
     if (dirty)
     {
         printf(":: Writing database to disk...\n");
-        repo_compile(r, db->pkgcache);
+        repo_compile(r, r->db->pkgcache);
         printf("repo %s updated successfully\n", r->name);
 
         if (cfg.sign)
@@ -586,12 +581,9 @@ static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
 }
 
     /* read the existing repo or construct a new package cache */
-static int query_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[])
+static int query_db(repo_t *r, int argc, char *argv[])
 {
-    char repopath[PATH_MAX];
-
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
-    if (db == NULL) {
+    if (r->db == NULL) {
         warnx("repo doesn't exist");
         return 1;
     }
@@ -599,7 +591,7 @@ static int query_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[])
     if (argc > 0) {
         int i;
         for (i = 0; i < argc; ++i) {
-            const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(db->pkgcache, argv[i]);
+            const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(r->db->pkgcache, argv[i]);
             if (pkg == NULL) {
                 warnx("pkg not found");
                 return 1;
@@ -607,7 +599,7 @@ static int query_db(repo_t *r, alpm_db_meta_t *db, int argc, char *argv[])
             print_pkg_metadata(pkg);
         }
     } else {
-        alpm_list_t *pkg, *pkgs = db->pkgcache->list;
+        alpm_list_t *pkg, *pkgs = r->db->pkgcache->list;
         for (pkg = pkgs; pkg; pkg = pkg->next)
             print_pkg_metadata(pkg->data);
     }
@@ -712,29 +704,27 @@ int main(int argc, char *argv[])
         errx(EXIT_FAILURE, "not enough arguments");
 
     // FIXME: should be a function
-    alpm_db_meta_t *_db = NULL;
-
     find_repo(argv[0], &repo);
     snprintf(repopath, PATH_MAX, "%s/%s", repo.root, repo.file);
     if (access(repopath, F_OK) < 0) {
         warn("couldn't open repo %s", repo.name);
     } else {
         alpm_db_populate(repopath, &db);
-        _db = &db;
+        repo.db = &db;
     }
 
     switch (cfg.action) {
     case ACTION_VERIFY:
-        rc = verify_db(&repo, _db);
+        rc = verify_db(&repo);
         break;
     case ACTION_UPDATE:
-        rc = update_db(&repo, _db, argc - 1, argv + 1, cfg.clean);
+        rc = update_db(&repo, argc - 1, argv + 1, cfg.clean);
         break;
     case ACTION_REMOVE:
-        rc = remove_db(&repo, _db, argc - 1, argv + 1, cfg.clean);
+        rc = remove_db(&repo, argc - 1, argv + 1, cfg.clean);
         break;
     case ACTION_QUERY:
-        rc = query_db(&repo, _db, argc - 1, argv + 1);
+        rc = query_db(&repo, argc - 1, argv + 1);
         break;
     default:
         break;
