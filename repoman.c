@@ -277,6 +277,13 @@ static repo_t *find_repo(char *path)
         strcpy(r->file, div + 1);
     }
 
+    /* check for a signature */
+    strcat(real, ".sig");
+    if (access(real, F_OK) == 0) {
+        r->db_signed = true;
+        warnx("repo is signed, i should probably validate it...");
+    }
+
     /* alpm_db_populate(real, &r->db); */
     return r;
 }
@@ -503,17 +510,18 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
             unlink_pkg_files(metadata);
     }
 
-    if (dirty)
-    {
+    if (dirty) {
         printf(":: Writing database to disk...\n");
         repo_compile(r, cache);
         printf("repo %s updated successfully\n", r->name);
-
-        if (cfg.sign)
-            repo_sign(r);
     } else {
         printf("repo %s does not need updating\n", r->name);
     }
+
+    /* FIXME: repo.db.sig symlink needs to be validated seperately it
+     * appears */
+    if ((cfg.sign && dirty) || (cfg.sign && !r->db_signed))
+        repo_sign(r);
 
     return 0;
 }
@@ -547,17 +555,16 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
         }
     }
 
-    if (dirty)
-    {
+    if (dirty) {
         printf(":: Writing database to disk...\n");
         repo_compile(r, r->db->pkgcache);
         printf("repo %s updated successfully\n", r->name);
-
-        if (cfg.sign)
-            repo_sign(r);
     } else {
         printf("repo %s does not need updating\n", r->name);
     }
+
+    if ((cfg.sign && dirty) || (cfg.sign && !r->db_signed))
+        repo_sign(r);
 
     return 0;
 }
