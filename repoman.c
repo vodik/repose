@@ -44,6 +44,7 @@ typedef struct repo {
     char root[PATH_MAX];
     char name[PATH_MAX];
     char file[PATH_MAX];
+    bool db_signed;
     enum compress compression;
 } repo_t;
 
@@ -232,7 +233,7 @@ static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 }
 /* }}} */
 
-static void find_repo(char *path, repo_t *r)
+static repo_t *find_repo(char *path)
 {
     char real[PATH_MAX];
 
@@ -242,6 +243,8 @@ static void find_repo(char *path, repo_t *r)
     size_t len = strlen(real);
     char *dot = memchr(real, '.', len);
     char *div = memrchr(real, '/', len);
+
+    repo_t *r = calloc(1, sizeof(repo_t));
 
     /* FIXME: figure this out on compression */
     if (!dot) {
@@ -275,6 +278,7 @@ static void find_repo(char *path, repo_t *r)
     }
 
     /* alpm_db_populate(real, &r->db); */
+    return r;
 }
 
 static inline bool repo_dir_valid(char *dirpath, char *rootpath)
@@ -516,7 +520,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
 /* }}} */
 
 /* {{{ REMOVE */
-    /* read the existing repo or construct a new package cache */
+/* read the existing repo or construct a new package cache */
 static int remove_db(repo_t *r, int argc, char *argv[], int clean)
 {
     bool dirty = false;
@@ -572,7 +576,7 @@ static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
     printf("Packager     : %s\n\n", pkg->packager);
 }
 
-    /* read the existing repo or construct a new package cache */
+/* read the existing repo or construct a new package cache */
 static int query_db(repo_t *r, int argc, char *argv[])
 {
     if (r->db == NULL) {
@@ -680,7 +684,7 @@ void parse_repoman_args(int *argc, char **argv[])
 int main(int argc, char *argv[])
 {
     char repopath[PATH_MAX];
-    repo_t repo;
+    repo_t *repo;
     alpm_db_meta_t db;
     int rc = 0;
 
@@ -696,28 +700,28 @@ int main(int argc, char *argv[])
         errx(EXIT_FAILURE, "not enough arguments");
 
     // FIXME: should be a function
-    find_repo(argv[0], &repo);
-    snprintf(repopath, PATH_MAX, "%s/%s", repo.root, repo.file);
+    repo = find_repo(argv[0]);
+    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, repo->file);
     if (access(repopath, F_OK) < 0) {
-        warn("couldn't open repo %s", repo.name);
-        repo.db = NULL;
+        warn("couldn't open repo %s", repo->name);
+        repo->db = NULL;
     } else {
         alpm_db_populate(repopath, &db);
-        repo.db = &db;
+        repo->db = &db;
     }
 
     switch (cfg.action) {
     case ACTION_VERIFY:
-        rc = verify_db(&repo);
+        rc = verify_db(repo);
         break;
     case ACTION_UPDATE:
-        rc = update_db(&repo, argc - 1, argv + 1, cfg.clean);
+        rc = update_db(repo, argc - 1, argv + 1, cfg.clean);
         break;
     case ACTION_REMOVE:
-        rc = remove_db(&repo, argc - 1, argv + 1, cfg.clean);
+        rc = remove_db(repo, argc - 1, argv + 1, cfg.clean);
         break;
     case ACTION_QUERY:
-        rc = query_db(&repo, argc - 1, argv + 1);
+        rc = query_db(repo, argc - 1, argv + 1);
         break;
     default:
         break;
