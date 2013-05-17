@@ -351,7 +351,7 @@ static int unlink_pkg_files(/*repo_t *r, */const alpm_pkg_meta_t *metadata)
 {
     char rmpath[PATH_MAX];
 
-    printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+    printf("DELETING: %s-%s\n", metadata->name, metadata->version);
     unlink(metadata->filename);
 
     snprintf(rmpath, PATH_MAX, "%s.sig", metadata->filename);
