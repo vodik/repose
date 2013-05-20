@@ -356,7 +356,7 @@ static alpm_list_t *find_all_packages(repo_t *r)
     }
 
     closedir(dir);
-    return 0;
+    return pkgs;
 }
 
 static alpm_list_t *find_packages(repo_t *r, char *pkg_list[], int count)
