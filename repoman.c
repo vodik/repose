@@ -290,6 +290,14 @@ static repo_t *find_repo(char *path)
     return r;
 }
 
+static inline void pkg_real_filename(repo_t *r, const char *pkgname, char *pkgpath, char *sigpath)
+{
+    if (pkgpath)
+        snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkgname);
+    if (sigpath)
+        snprintf(sigpath, PATH_MAX, "%s/%s", r->root, sigpath);
+}
+
 static inline bool repo_dir_valid(char *dirpath, char *rootpath)
 {
     char root[PATH_MAX];
@@ -382,7 +390,7 @@ static int verify_pkg(repo_t *r, const alpm_pkg_meta_t *pkg, bool deep)
 {
     char pkgpath[PATH_MAX];
 
-    snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkg->filename);
+    pkg_real_filename(r, pkg->filename, pkgpath, NULL);
     if (access(pkgpath, F_OK) < 0) {
         warn("couldn't find pkg %s", pkgpath);
         return 1;
