@@ -300,30 +300,22 @@ static repo_t *find_repo(char *path)
     return r;
 }
 
-static inline bool repo_dir_valid(const char *dirpath, const char *rootpath)
-{
-    char realdir[PATH_MAX];
-    realpath(dirpath, realdir);
-    return strcmp(realdir, rootpath) == 0;
-}
-
 static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *filepath)
 {
     alpm_pkg_meta_t *metadata;
     char *basename = strrchr(filepath, '/');
-    bool rc = false;
+    char realpath[PATH_MAX];
 
     if (basename) {
         *basename = '\0';
-        rc = repo_dir_valid(filepath, r->root);
+        if (strcmp(filepath, r->root) != 0) {
+            warnx("%s is not in the same path as the database", filepath);
+            return list;
+        }
         *basename = '/';
     } else {
-        rc = repo_dir_valid(".", r->root);
-    }
-
-    if (!rc) {
-        warnx("%s is not in the same path as the database", filepath);
-        return list;
+        pkg_real_filename(r, filepath, realpath, NULL);
+        filepath = realpath;
     }
 
     alpm_pkg_load_metadata(filepath, &metadata);
