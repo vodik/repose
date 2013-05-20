@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <err.h>
 #include <errno.h>
-#include <fts.h>
+#include <dirent.h>
 #include <fnmatch.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -314,56 +314,41 @@ static inline bool repo_file_valid(char *filepath, char *rootpath)
     return rc;
 }
 
-static alpm_list_t *find_packages(repo_t *r, char **paths)
+static inline alpm_list_t *load_pkg(alpm_list_t *list, const char *root, const char *pkg)
 {
-    FTS *tree;
-    FTSENT *entry;
-    int fts_options = FTS_COMFOLLOW | FTS_LOGICAL | FTS_NOCHDIR;
+    alpm_pkg_meta_t *metadata;
+    char pkgpath[PATH_MAX];
+
+    snprintf(pkgpath, PATH_MAX, "%s/%s", root, pkg);
+    alpm_pkg_load_metadata(pkgpath, &metadata);
+    if (metadata)
+        list = alpm_list_add(list, metadata);
+    return list;
+}
+
+static alpm_list_t *find_all_packages(repo_t *r)
+{
+    struct dirent *dp;
+    DIR *dir = opendir(r->root);
     alpm_list_t *pkgs = NULL;
 
-    tree = fts_open(paths, fts_options, NULL);
-    if (tree == NULL)
-        err(EXIT_FAILURE, "fts_open");
+    if (dir == NULL)
+        err(EXIT_FAILURE, "failed to open directory");
 
-    while ((entry = fts_read(tree)) != NULL) {
-        alpm_pkg_meta_t *metadata;
-        char *pkgpath = entry->fts_path;
+    while ((dp = readdir(dir))) {
+        if (!(dp->d_type & DT_REG))
+            continue;
 
-        switch (entry->fts_info) {
-        case FTS_D:
-            /* don't search recursively */
-            if (entry->fts_level > 0) {
-                fts_set(tree, entry, FTS_SKIP);
-                continue;
-            }
+        if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
+            fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
+            continue;
 
-            if (!repo_dir_valid(entry->fts_path, r->root)) {
-                warnx("dir and repo aren't in the same directory");
-                fts_set(tree, entry, FTS_SKIP);
-                continue;
-            }
-            break;
-        case FTS_F:
-            if (fnmatch("*.pkg.tar*", pkgpath, FNM_CASEFOLD) != 0 ||
-                fnmatch("*.sig",      pkgpath, FNM_CASEFOLD) == 0)
-                continue;
-
-            if (entry->fts_level > 0 && !repo_file_valid(entry->fts_path, r->root)) {
-                warnx("pkg and repo aren't in the same directory");
-                continue;
-            }
-
-            alpm_pkg_load_metadata(pkgpath, &metadata);
-            if (metadata)
-                pkgs = alpm_list_add(pkgs, metadata);
-            break;
-        default:
-            break;
-        }
+        /* printf("LOADING: %s\n", dp->d_name); */
+        pkgs = load_pkg(pkgs, r->root, dp->d_name);
     }
 
-    fts_close(tree);
-    return pkgs;
+    closedir(dir);
+    return 0;
 }
 
 static int unlink_pkg_files(/*repo_t *r, */const alpm_pkg_meta_t *metadata)
@@ -482,10 +467,12 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
 
     alpm_list_t *pkg, *pkgs;
     if (argc > 0) {
-        pkgs = find_packages(r, argv);
+        /* pkgs = find_packages(r, argv); */
+        pkgs = find_all_packages(r);
     } else {
-        char *default_path[] = { r->root, NULL };
-        pkgs = find_packages(r, default_path);
+        pkgs = find_all_packages(r);
+        /* char *default_path[] = { r->root, NULL }; */
+        /* pkgs = find_packages(r, default_path); */
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
