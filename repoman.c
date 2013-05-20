@@ -560,7 +560,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
                 dirty = true;
                 continue;
             }
-            warnx("didn't find entry: %s\n", argv[0]);
+            warnx("didn't find entry: %s", argv[0]);
         }
     }
 
