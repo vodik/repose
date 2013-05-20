@@ -359,6 +359,17 @@ static alpm_list_t *find_all_packages(repo_t *r)
     return 0;
 }
 
+static alpm_list_t *find_packages(repo_t *r, char *pkg_list[], int count)
+{
+    int i;
+    alpm_list_t *pkgs = NULL;
+
+    for (i = 0; i < count; ++i)
+        pkgs = load_pkg(pkgs, r, pkg_list[i]);
+
+    return pkgs;
+}
+
 static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
 {
     char pkgpath[PATH_MAX];
@@ -476,8 +487,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
 
     alpm_list_t *pkg, *pkgs;
     if (argc > 0) {
-        /* pkgs = find_packages(r, argv, argc); */
-        pkgs = find_all_packages(r);
+        pkgs = find_packages(r, argv, argc);
     } else {
         pkgs = find_all_packages(r);
     }
