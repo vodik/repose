@@ -42,7 +42,7 @@
 #define BOLDBLUE    "\033[1;34m"
 #define BOLDMAGENTA "\033[1;35m"
 #define BOLDCYAN    "\033[1;36m"
-#define BOLDWHITE   "\033[1;m"
+#define BOLDWHITE   "\033[1m"
 
 enum action {
     ACTION_VERIFY,
