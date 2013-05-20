@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <err.h>
 #include <errno.h>
-#include <fts.h>
+#include <dirent.h>
 #include <fnmatch.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -63,6 +63,14 @@ static struct {
     int sign : 1;
 } cfg = { .action = INVALID_ACTION };
 
+static inline void pkg_real_filename(repo_t *r, const char *pkgname, char *pkgpath, char *sigpath)
+{
+    if (pkgpath)
+        snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkgname);
+    if (sigpath)
+        snprintf(sigpath, PATH_MAX, "%s/%s", r->root, sigpath);
+}
+
 /* {{{ WRITING REPOS */
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
@@ -93,11 +101,12 @@ static void write_depends_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     write_list(buf, "MAKEDEPENDS", pkg->makedepends);
 }
 
-static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
+static void write_desc_file(repo_t *r, const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
-    const char *filename = strrchr(pkg->filename, '/');
+    char pkgpath[PATH_MAX];
 
-    write_string(buf, "FILENAME",  filename ? &filename[1] : pkg->filename);
+    pkg_real_filename(r, pkg->filename, pkgpath, NULL);
+    write_string(buf, "FILENAME",  pkg->filename);
     write_string(buf, "NAME",      pkg->name);
     write_string(buf, "VERSION",   pkg->version);
     write_string(buf, "DESC",      pkg->desc);
@@ -107,7 +116,7 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     if (pkg->md5sum) {
         write_string(buf, "MD5SUM", pkg->md5sum);
     } else {
-        char *md5sum = alpm_compute_md5sum(pkg->filename);
+        char *md5sum = alpm_compute_md5sum(pkgpath);
         write_string(buf, "MD5SUM", md5sum);
         free(md5sum);
     }
@@ -115,7 +124,7 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     if (pkg->sha256sum) {
         write_string(buf, "SHA256SUM", pkg->sha256sum);
     } else {
-        char *sha256sum = alpm_compute_sha256sum(pkg->filename);
+        char *sha256sum = alpm_compute_sha256sum(pkgpath);
         write_string(buf, "SHA256SUM", sha256sum);
         free(sha256sum);
     }
@@ -178,13 +187,13 @@ static repo_writer_t *repo_write_new(const char *filename, enum compress compres
     return repo;
 }
 
-static void repo_write_pkg(repo_writer_t *repo, alpm_pkg_meta_t *pkg)
+static void repo_write_pkg(repo_t *r, repo_writer_t *repo, alpm_pkg_meta_t *pkg)
 {
     char path[PATH_MAX];
 
     archive_entry_clear(repo->entry);
     buffer_clear(&repo->buf);
-    write_desc_file(pkg, &repo->buf);
+    write_desc_file(r, pkg, &repo->buf);
 
     /* generate the 'desc' file */
     snprintf(path, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "desc");
@@ -223,7 +232,8 @@ static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
-        repo_write_pkg(repo, metadata);
+        // FIXME: really pass r? or pass r->root?
+        repo_write_pkg(r, repo, metadata);
     }
 
     repo_write_close(repo);
@@ -314,67 +324,64 @@ static inline bool repo_file_valid(char *filepath, char *rootpath)
     return rc;
 }
 
-static alpm_list_t *find_packages(repo_t *r, char **paths)
+static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *filename)
 {
-    FTS *tree;
-    FTSENT *entry;
-    int fts_options = FTS_COMFOLLOW | FTS_LOGICAL | FTS_NOCHDIR;
+    alpm_pkg_meta_t *metadata;
+    char pkgpath[PATH_MAX];
+
+    pkg_real_filename(r, filename, pkgpath, NULL);
+    alpm_pkg_load_metadata(pkgpath, &metadata);
+    if (metadata)
+        list = alpm_list_add(list, metadata);
+    return list;
+}
+
+static alpm_list_t *find_all_packages(repo_t *r)
+{
+    struct dirent *dp;
+    DIR *dir = opendir(r->root);
     alpm_list_t *pkgs = NULL;
 
-    tree = fts_open(paths, fts_options, NULL);
-    if (tree == NULL)
-        err(EXIT_FAILURE, "fts_open");
+    if (dir == NULL)
+        err(EXIT_FAILURE, "failed to open directory");
 
-    while ((entry = fts_read(tree)) != NULL) {
-        alpm_pkg_meta_t *metadata;
-        char *pkgpath = entry->fts_path;
+    while ((dp = readdir(dir))) {
+        if (!(dp->d_type & DT_REG))
+            continue;
 
-        switch (entry->fts_info) {
-        case FTS_D:
-            /* don't search recursively */
-            if (entry->fts_level > 0) {
-                fts_set(tree, entry, FTS_SKIP);
-                continue;
-            }
+        if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
+            fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
+            continue;
 
-            if (!repo_dir_valid(entry->fts_path, r->root)) {
-                warnx("dir and repo aren't in the same directory");
-                fts_set(tree, entry, FTS_SKIP);
-                continue;
-            }
-            break;
-        case FTS_F:
-            if (fnmatch("*.pkg.tar*", pkgpath, FNM_CASEFOLD) != 0 ||
-                fnmatch("*.sig",      pkgpath, FNM_CASEFOLD) == 0)
-                continue;
-
-            if (entry->fts_level > 0 && !repo_file_valid(entry->fts_path, r->root)) {
-                warnx("pkg and repo aren't in the same directory");
-                continue;
-            }
-
-            alpm_pkg_load_metadata(pkgpath, &metadata);
-            if (metadata)
-                pkgs = alpm_list_add(pkgs, metadata);
-            break;
-        default:
-            break;
-        }
+        /* printf("LOADING: %s\n", dp->d_name); */
+        pkgs = load_pkg(pkgs, r, dp->d_name);
     }
 
-    fts_close(tree);
+    closedir(dir);
     return pkgs;
 }
 
-static int unlink_pkg_files(/*repo_t *r, */const alpm_pkg_meta_t *metadata)
+static alpm_list_t *find_packages(repo_t *r, char *pkg_list[], int count)
 {
-    char rmpath[PATH_MAX];
+    int i;
+    alpm_list_t *pkgs = NULL;
 
+    for (i = 0; i < count; ++i)
+        pkgs = load_pkg(pkgs, r, pkg_list[i]);
+
+    return pkgs;
+}
+
+static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
+{
+    char pkgpath[PATH_MAX];
+    char sigpath[PATH_MAX];
+
+    pkg_real_filename(r, metadata->filename, pkgpath, sigpath);
     printf("DELETING: %s-%s\n", metadata->name, metadata->version);
-    unlink(metadata->filename);
 
-    snprintf(rmpath, PATH_MAX, "%s.sig", metadata->filename);
-    unlink(rmpath);
+    unlink(pkgpath);
+    unlink(sigpath);
     return 0;
 }
 
@@ -397,7 +404,7 @@ static int verify_pkg(repo_t *r, const alpm_pkg_meta_t *pkg, bool deep)
 {
     char pkgpath[PATH_MAX];
 
-    snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkg->filename);
+    pkg_real_filename(r, pkg->filename, pkgpath, NULL);
     if (access(pkgpath, F_OK) < 0) {
         warn("couldn't find pkg %s", pkgpath);
         return 1;
@@ -482,10 +489,9 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
 
     alpm_list_t *pkg, *pkgs;
     if (argc > 0) {
-        pkgs = find_packages(r, argv);
+        pkgs = find_packages(r, argv, argc);
     } else {
-        char *default_path[] = { r->root, NULL };
-        pkgs = find_packages(r, default_path);
+        pkgs = find_all_packages(r);
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -498,7 +504,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
             if (old) {
                 printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
                 if (clean >= 1)
-                    unlink_pkg_files(old);
+                    unlink_pkg_files(r, old);
                 cache = _alpm_pkghash_remove(cache, old, NULL);
                 alpm_pkg_free_metadata(old);
             } else  {
@@ -509,7 +515,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
         }
 
         if (vercmp == -1 && clean >= 2)
-            unlink_pkg_files(metadata);
+            unlink_pkg_files(r, metadata);
     }
 
     if (dirty) {
@@ -548,7 +554,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
                 r->db->pkgcache = _alpm_pkghash_remove(r->db->pkgcache, pkg, NULL);
                 printf("REMOVING: %s\n", pkg->name);
                 if (clean >= 1)
-                    unlink_pkg_files(pkg);
+                    unlink_pkg_files(r, pkg);
                 alpm_pkg_free_metadata(pkg);
                 dirty = true;
                 continue;
