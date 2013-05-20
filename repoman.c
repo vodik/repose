@@ -93,7 +93,8 @@ static struct {
 
     short clean;
     bool color : 1;
-    int sign : 1;
+    bool info : 1;
+    bool sign : 1;
 } cfg = { .action = INVALID_ACTION };
 
 static int colon_printf(const char *fmt, ...)
@@ -631,13 +632,17 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
 /* {{{ QUERY */
 static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
 {
-    printf("Filename     : %s\n", pkg->filename);
-    printf("Name         : %s\n", pkg->name);
-    printf("Version      : %s\n", pkg->version);
-    printf("Description  : %s\n", pkg->desc);
-    printf("Architecture : %s\n", pkg->arch);
-    printf("URL          : %s\n", pkg->url);
-    printf("Packager     : %s\n\n", pkg->packager);
+    if (cfg.info) {
+        printf("Filename     : %s\n", pkg->filename);
+        printf("Name         : %s\n", pkg->name);
+        printf("Version      : %s\n", pkg->version);
+        printf("Description  : %s\n", pkg->desc);
+        printf("Architecture : %s\n", pkg->arch);
+        printf("URL          : %s\n", pkg->url);
+        printf("Packager     : %s\n\n", pkg->packager);
+    } else {
+        printf("%s %s\n", pkg->name, pkg->version);
+    }
 }
 
 /* read the existing repo or construct a new package cache */
@@ -682,6 +687,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -R, --remove          remove an entry\n"
         " -Q, --query           query the database\n"
         " -V, --verify          verify the contents of the database\n"
+        " -i, --info            show package info\n"
         " -c, --clean           remove stuff\n"
         " -s, --sign            sign database with GnuPG after update\n"
         " -k, --key=KEY         use the specified key to sign the database\n"
@@ -710,6 +716,8 @@ void parse_repoman_args(int *argc, char **argv[])
         { "update",  no_argument,       0, 'U' },
         { "remove",  no_argument,       0, 'R' },
         { "query",   no_argument,       0, 'Q' },
+        { "info",    no_argument,       0, 'i' },
+        { "clean",   no_argument,       0, 'c' },
         { "sign",    no_argument,       0, 's' },
         { "key",     required_argument, 0, 'k' },
         { "color",   required_argument, 0, 0x100 },
@@ -719,7 +727,7 @@ void parse_repoman_args(int *argc, char **argv[])
     cfg.color = isatty(fileno(stdout)) ? true : false;
 
     while (true) {
-        int opt = getopt_long(*argc, *argv, "hvURQVcsk:", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvURQVicsk:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -741,6 +749,9 @@ void parse_repoman_args(int *argc, char **argv[])
             break;
         case 'Q':
             cfg.action = ACTION_QUERY;
+            break;
+        case 'i':
+            cfg.info = true;
             break;
         case 'c':
             ++cfg.clean;
