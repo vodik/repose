@@ -307,12 +307,10 @@ static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *fi
     char realpath[PATH_MAX];
 
     if (basename) {
-        *basename = '\0';
-        if (strcmp(filepath, r->root) != 0) {
+        if (strncmp(filepath, r->root, basename - filepath) != 0) {
             warnx("%s is not in the same path as the database", filepath);
             return list;
         }
-        *basename = '/';
     } else {
         pkg_real_filename(r, filepath, realpath, NULL);
         filepath = realpath;
