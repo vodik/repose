@@ -68,7 +68,7 @@ static inline void pkg_real_filename(repo_t *r, const char *pkgname, char *pkgpa
     if (pkgpath)
         snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkgname);
     if (sigpath)
-        snprintf(sigpath, PATH_MAX, "%s/%s", r->root, sigpath);
+        snprintf(sigpath, PATH_MAX, "%s/%s.sig", r->root, pkgname);
 }
 
 /* {{{ WRITING REPOS */
@@ -474,10 +474,14 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
                 cache = _alpm_pkghash_remove(cache, metadata, NULL);
                 alpm_pkg_free_metadata(metadata);
                 dirty = true;
+                continue;
             }
 
             /* check if a signature was added */
-            else if (metadata->base64_sig == NULL && read_pkg_signature(metadata) == 0) {
+            // FIXME: cleanup!
+            char sigpath[PATH_MAX];
+            pkg_real_filename(r, metadata->filename, NULL, sigpath);
+            if (metadata->base64_sig == NULL && read_pkg_signature(sigpath, metadata) == 0) {
                 printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
                 dirty = true;
             }
