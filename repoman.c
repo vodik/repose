@@ -63,6 +63,14 @@ static struct {
     int sign : 1;
 } cfg = { .action = INVALID_ACTION };
 
+static inline void pkg_real_filename(repo_t *r, const char *pkgname, char *pkgpath, char *sigpath)
+{
+    if (pkgpath)
+        snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkgname);
+    if (sigpath)
+        snprintf(sigpath, PATH_MAX, "%s/%s", r->root, sigpath);
+}
+
 /* {{{ WRITING REPOS */
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
@@ -93,11 +101,12 @@ static void write_depends_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     write_list(buf, "MAKEDEPENDS", pkg->makedepends);
 }
 
-static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
+static void write_desc_file(repo_t *r, const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
-    const char *filename = strrchr(pkg->filename, '/');
+    char pkgpath[PATH_MAX];
 
-    write_string(buf, "FILENAME",  filename ? &filename[1] : pkg->filename);
+    pkg_real_filename(r, pkg->filename, pkgpath, NULL);
+    write_string(buf, "FILENAME",  pkg->filename);
     write_string(buf, "NAME",      pkg->name);
     write_string(buf, "VERSION",   pkg->version);
     write_string(buf, "DESC",      pkg->desc);
@@ -107,7 +116,7 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     if (pkg->md5sum) {
         write_string(buf, "MD5SUM", pkg->md5sum);
     } else {
-        char *md5sum = alpm_compute_md5sum(pkg->filename);
+        char *md5sum = alpm_compute_md5sum(pkgpath);
         write_string(buf, "MD5SUM", md5sum);
         free(md5sum);
     }
@@ -115,7 +124,7 @@ static void write_desc_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     if (pkg->sha256sum) {
         write_string(buf, "SHA256SUM", pkg->sha256sum);
     } else {
-        char *sha256sum = alpm_compute_sha256sum(pkg->filename);
+        char *sha256sum = alpm_compute_sha256sum(pkgpath);
         write_string(buf, "SHA256SUM", sha256sum);
         free(sha256sum);
     }
@@ -178,13 +187,13 @@ static repo_writer_t *repo_write_new(const char *filename, enum compress compres
     return repo;
 }
 
-static void repo_write_pkg(repo_writer_t *repo, alpm_pkg_meta_t *pkg)
+static void repo_write_pkg(repo_t *r, repo_writer_t *repo, alpm_pkg_meta_t *pkg)
 {
     char path[PATH_MAX];
 
     archive_entry_clear(repo->entry);
     buffer_clear(&repo->buf);
-    write_desc_file(pkg, &repo->buf);
+    write_desc_file(r, pkg, &repo->buf);
 
     /* generate the 'desc' file */
     snprintf(path, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "desc");
@@ -223,7 +232,8 @@ static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
-        repo_write_pkg(repo, metadata);
+        // FIXME: really pass r? or pass r->root?
+        repo_write_pkg(r, repo, metadata);
     }
 
     repo_write_close(repo);
@@ -288,14 +298,6 @@ static repo_t *find_repo(char *path)
     }
 
     return r;
-}
-
-static inline void pkg_real_filename(repo_t *r, const char *pkgname, char *pkgpath, char *sigpath)
-{
-    if (pkgpath)
-        snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkgname);
-    if (sigpath)
-        snprintf(sigpath, PATH_MAX, "%s/%s", r->root, sigpath);
 }
 
 static inline bool repo_dir_valid(char *dirpath, char *rootpath)
