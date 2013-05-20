@@ -74,7 +74,7 @@ static void read_pkg_metadata(struct archive *archive, struct archive_entry *ent
     free(line);
 }
 
-int read_pkg_signature(alpm_pkg_meta_t *pkg)
+int read_pkg_signature(const char *path, alpm_pkg_meta_t *pkg)
 {
     char sig[PATH_MAX];
     size_t sig_len = 0;
@@ -82,7 +82,7 @@ int read_pkg_signature(alpm_pkg_meta_t *pkg)
     char *memblock = MAP_FAILED;
     int fd = 0;
 
-    snprintf(sig, PATH_MAX, "%s.sig", pkg->filename);
+    snprintf(sig, PATH_MAX, "%s.sig", path);
     fd = open(sig, O_RDONLY);
     if (fd < 0)
         return -1;
@@ -160,7 +160,7 @@ int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
     pkg->size = st.st_size;
 
-    read_pkg_signature(pkg);
+    read_pkg_signature(filepath, pkg);
 
     *_pkg = pkg;
 

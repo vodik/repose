@@ -33,7 +33,7 @@ typedef struct alpm_db_meta {
     struct __alpm_pkghash_t *pkgcache;
 } alpm_db_meta_t;
 
-int read_pkg_signature(alpm_pkg_meta_t *pkg);
+int read_pkg_signature(const char *path, alpm_pkg_meta_t *pkg);
 int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **pkg);
 void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg);
 
