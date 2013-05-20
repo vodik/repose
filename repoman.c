@@ -403,31 +403,42 @@ static void repo_sign(repo_t *r)
 static int verify_pkg(repo_t *r, const alpm_pkg_meta_t *pkg, bool deep)
 {
     char pkgpath[PATH_MAX];
+    char sigpath[PATH_MAX];
 
-    pkg_real_filename(r, pkg->filename, pkgpath, NULL);
+    pkg_real_filename(r, pkg->filename, pkgpath, deep ? sigpath : NULL);
     if (access(pkgpath, F_OK) < 0) {
-        warn("couldn't find pkg %s", pkgpath);
+        warn("couldn't find pkg %s at %s", pkg->name, pkgpath);
         return 1;
     }
 
     if (!deep)
         return 0;
 
-    char *md5sum = alpm_compute_md5sum(pkgpath);
-    if (strcmp(pkg->md5sum, md5sum) != 0) {
-        warnx("md5 sum for pkg %s is different", pkgpath);
+    /* if we have a signature, verify it */
+    if (access(sigpath, F_OK) == 0 && gpgme_verify(pkgpath, sigpath) < 0) {
+        warnx("package %s, signature is invalid or corrupt!", pkg->name);
         return 1;
     }
-    free(md5sum);
 
-    char *sha256sum = alpm_compute_sha256sum(pkgpath);
-    if (strcmp(pkg->sha256sum, sha256sum) != 0) {
-        warnx("sha256 sum for pkg %s is different", pkgpath);
-        return 1;
+    /* if we have a md5sum, verify it */
+    if (pkg->md5sum) {
+        char *md5sum = alpm_compute_md5sum(pkgpath);
+        if (strcmp(pkg->md5sum, md5sum) != 0) {
+            warnx("md5 sum for pkg %s is different", pkg->name);
+            return 1;
+        }
+        free(md5sum);
     }
-    free(sha256sum);
 
-    /* FIXME: verify the signature */
+    /* if we have a sha256sum, verify it */
+    if (pkg->sha256sum) {
+        char *sha256sum = alpm_compute_sha256sum(pkgpath);
+        if (strcmp(pkg->sha256sum, sha256sum) != 0) {
+            warnx("sha256 sum for pkg %s is different", pkg->name);
+            return 1;
+        }
+        free(sha256sum);
+    }
 
     return 0;
 }
