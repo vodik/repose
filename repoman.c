@@ -300,37 +300,33 @@ static repo_t *find_repo(char *path)
     return r;
 }
 
-static inline bool repo_dir_valid(char *dirpath, char *rootpath)
+static inline bool repo_dir_valid(const char *dirpath, const char *rootpath)
 {
-    char root[PATH_MAX];
-    realpath(dirpath, root);
-
-    return strcmp(root, rootpath) == 0;
+    char realdir[PATH_MAX];
+    realpath(dirpath, realdir);
+    return strcmp(realdir, rootpath) == 0;
 }
 
-static inline bool repo_file_valid(char *filepath, char *rootpath)
-{
-    char *base = strrchr(filepath, '/');
-    bool rc = false;
-
-    if (base) {
-        *base = '\0';
-        rc = repo_dir_valid(filepath, rootpath);
-        *base = '/';
-    } else {
-        rc = repo_dir_valid(".", rootpath);
-    }
-
-    return rc;
-}
-
-static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *filename)
+static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *filepath)
 {
     alpm_pkg_meta_t *metadata;
-    char pkgpath[PATH_MAX];
+    char *basename = strrchr(filepath, '/');
+    bool rc = false;
 
-    pkg_real_filename(r, filename, pkgpath, NULL);
-    alpm_pkg_load_metadata(pkgpath, &metadata);
+    if (basename) {
+        *basename = '\0';
+        rc = repo_dir_valid(filepath, r->root);
+        *basename = '/';
+    } else {
+        rc = repo_dir_valid(".", r->root);
+    }
+
+    if (!rc) {
+        warnx("%s is not in the same path as the database", filepath);
+        return list;
+    }
+
+    alpm_pkg_load_metadata(filepath, &metadata);
     if (metadata)
         list = alpm_list_add(list, metadata);
     return list;
