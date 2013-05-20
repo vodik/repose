@@ -245,14 +245,15 @@ static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
 
 static repo_t *find_repo(char *path)
 {
-    char real[PATH_MAX];
+    char dbpath[PATH_MAX];
+    char sigpath[PATH_MAX];
 
-    if (realpath(path, real) == NULL && errno != ENOENT)
+    if (realpath(path, dbpath) == NULL && errno != ENOENT)
         err(EXIT_FAILURE, "failed to find repo");
 
-    size_t len = strlen(real);
-    char *dot = memchr(real, '.', len);
-    char *div = memrchr(real, '/', len);
+    size_t len = strlen(dbpath);
+    char *dot = memchr(dbpath, '.', len);
+    char *div = memrchr(dbpath, '/', len);
 
     repo_t *r = calloc(1, sizeof(repo_t));
 
@@ -278,8 +279,8 @@ static repo_t *find_repo(char *path)
     /* skip '.db' */
     dot += 3;
 
-    strncpy(r->root, real, div - real);
-    strncpy(r->name, div + 1, dot - div - 1);
+    memcpy(r->root, dbpath, div - dbpath);
+    memcpy(r->name, div + 1, dot - div - 1);
 
     if (*dot == '\0') {
         snprintf(r->file, PATH_MAX, "%s.tar.gz", r->name);
@@ -288,10 +289,9 @@ static repo_t *find_repo(char *path)
     }
 
     /* check for a signature */
-    char sig[PATH_MAX];
-    snprintf(sig, PATH_MAX, "%s.sig", real);
-    if (access(sig, F_OK) == 0) {
-        if (gpgme_verify(real, sig) < 0)
+    snprintf(sigpath, PATH_MAX, "%s.sig", dbpath);
+    if (access(sigpath, F_OK) == 0) {
+        if (gpgme_verify(dbpath, sigpath) < 0)
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
 
         r->db_signed = true;
@@ -307,7 +307,7 @@ static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *fi
     char realpath[PATH_MAX];
 
     if (basename) {
-        if (strncmp(filepath, r->root, basename - filepath) != 0) {
+        if (memcmp(filepath, r->root, basename - filepath) != 0) {
             warnx("%s is not in the same path as the database", filepath);
             return list;
         }
