@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
@@ -22,6 +23,26 @@
 #include "buffer.h"
 #include "pkghash.h"
 #include "signing.h"
+
+#define NOCOLOR     "\033[0m"
+
+#define BLACK       "\033[0;30m"
+#define RED         "\033[0;31m"
+#define GREEN       "\033[0;32m"
+#define YELLOW      "\033[0;33m"
+#define BLUE        "\033[0;34m"
+#define MAGENTA     "\033[0;35m"
+#define CYAN        "\033[0;36m"
+#define WHITE       "\033[0;37m"
+
+#define BOLDBLACK   "\033[1;30m"
+#define BOLDRED     "\033[1;31m"
+#define BOLDGREEN   "\033[1;32m"
+#define BOLDYELLOW  "\033[1;33m"
+#define BOLDBLUE    "\033[1;34m"
+#define BOLDMAGENTA "\033[1;35m"
+#define BOLDCYAN    "\033[1;36m"
+#define BOLDWHITE   "\033[1;37m"
 
 enum action {
     ACTION_VERIFY,
@@ -55,13 +76,40 @@ typedef struct repo_writer {
 } repo_writer_t;
 
 static struct {
+    const char *colon;
+    const char *warn;
+    const char *error;
+    const char *nocolor;
+} colstr = {
+    .colon   = ":: ",
+    .warn    = "",
+    .error   = "",
+    .nocolor = ""
+};
+
+static struct {
     const char *key;
     enum action action;
 
     short clean;
-    int color : 1;
+    bool color : 1;
     int sign : 1;
 } cfg = { .action = INVALID_ACTION };
+
+static int colon_printf(const char *fmt, ...)
+{
+    int ret;
+    va_list args;
+
+    va_start(args, fmt);
+    fputs(colstr.colon, stdout);
+    ret = vprintf(fmt, args);
+    fputs(colstr.nocolor, stdout);
+    va_end(args);
+
+    fflush(stdout);
+    return ret;
+}
 
 static inline void pkg_real_filename(repo_t *r, const char *pkgname, char *pkgpath, char *sigpath)
 {
@@ -189,23 +237,23 @@ static repo_writer_t *repo_write_new(const char *filename, enum compress compres
 
 static void repo_write_pkg(repo_t *r, repo_writer_t *repo, alpm_pkg_meta_t *pkg)
 {
-    char path[PATH_MAX];
+    char entry[PATH_MAX];
 
     archive_entry_clear(repo->entry);
     buffer_clear(&repo->buf);
     write_desc_file(r, pkg, &repo->buf);
 
     /* generate the 'desc' file */
-    snprintf(path, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "desc");
-    archive_write_buffer(repo->archive, repo->entry, path, &repo->buf);
+    snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "desc");
+    archive_write_buffer(repo->archive, repo->entry, entry, &repo->buf);
 
     archive_entry_clear(repo->entry);
     buffer_clear(&repo->buf);
     write_depends_file(pkg, &repo->buf);
 
     /* generate the 'depends' file */
-    snprintf(path, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "depends");
-    archive_write_buffer(repo->archive, repo->entry, path, &repo->buf);
+    snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "depends");
+    archive_write_buffer(repo->archive, repo->entry, entry, &repo->buf);
 }
 
 static void repo_write_close(repo_writer_t *repo)
@@ -457,7 +505,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
         warnx("repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
     } else {
-        printf(":: Reading existing database...\n");
+        colon_printf("Reading existing database...\n");
 
         cache = r->db->pkgcache;
         alpm_list_t *pkg, *db_pkgs = cache->list;
@@ -486,7 +534,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
     }
 
     /* if some file paths were specified, find all packages */
-    printf(":: Scanning for new packages...\n");
+    colon_printf("Scanning for new packages...\n");
 
     alpm_list_t *pkg, *pkgs;
     if (argc > 0) {
@@ -520,7 +568,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
     }
 
     if (dirty) {
-        printf(":: Writing database to disk...\n");
+        colon_printf("Writing database to disk...\n");
         repo_compile(r, cache);
         printf("repo %s updated successfully\n", r->name);
     } else {
@@ -546,7 +594,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
         warnx("repo doesn't exist...");
         return 1;
     } else if (argc > 0) {
-        printf(":: Reading existing database...\n");
+        colon_printf("Reading existing database...\n");
 
         int i;
         for (i = 0; i < argc; ++i) {
@@ -565,7 +613,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
     }
 
     if (dirty) {
-        printf(":: Writing database to disk...\n");
+        colon_printf("Writing database to disk...\n");
         repo_compile(r, r->db->pkgcache);
         printf("repo %s updated successfully\n", r->name);
     } else {
@@ -636,9 +684,21 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -V, --verify          verify the contents of the database\n"
         " -c, --clean           remove stuff\n"
         " -s, --sign            sign database with GnuPG after update\n"
-        " -k, --key=KEY         use the specified key to sign the database\n", out);
+        " -k, --key=KEY         use the specified key to sign the database\n"
+        "     --color=MODE      enable colour support\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
+}
+
+static void enable_colors(bool on)
+{
+    if (!on)
+        return;
+
+    colstr.colon   = BOLDBLUE "::" BOLDWHITE " ";
+    colstr.warn    = BOLDYELLOW;
+    colstr.error   = BOLDRED;
+    colstr.nocolor = NOCOLOR;
 }
 
 void parse_repoman_args(int *argc, char **argv[])
@@ -652,8 +712,11 @@ void parse_repoman_args(int *argc, char **argv[])
         { "query",   no_argument,       0, 'Q' },
         { "sign",    no_argument,       0, 's' },
         { "key",     required_argument, 0, 'k' },
+        { "color",   required_argument, 0, 0x100 },
         { 0, 0, 0, 0 }
     };
+
+    cfg.color = isatty(fileno(stdout)) ? true : false;
 
     while (true) {
         int opt = getopt_long(*argc, *argv, "hvURQVcsk:", opts, NULL);
@@ -688,6 +751,14 @@ void parse_repoman_args(int *argc, char **argv[])
         case 'k':
             cfg.key = optarg;
             break;
+        case 0x100:
+            if (strcmp("never", optarg) == 0)
+                cfg.color = false;
+            else if (strcmp("always", optarg) == 0)
+                cfg.color = true;
+            else if (strcmp("auto", optarg) != 0)
+                errx(EXIT_FAILURE, "invalid argument '%s' for --color", optarg);
+            break;
         default:
             usage(stderr);
         }
@@ -714,6 +785,9 @@ int main(int argc, char *argv[])
 
     if (argc == 0)
         errx(EXIT_FAILURE, "not enough arguments");
+
+    /* enable colors if necessary */
+    enable_colors(cfg.color);
 
     // FIXME: should be a function
     repo = find_repo(argv[0]);
