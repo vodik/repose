@@ -366,14 +366,15 @@ static alpm_list_t *find_packages(repo_t *r, char **paths)
     return pkgs;
 }
 
-static int unlink_pkg_files(/*repo_t *r, */const alpm_pkg_meta_t *metadata)
+static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
 {
     char rmpath[PATH_MAX];
 
     printf("DELETING: %s-%s\n", metadata->name, metadata->version);
-    unlink(metadata->filename);
+    snprintf(rmpath, PATH_MAX, "%s/%s.sig", r->root, metadata->filename);
+    unlink(rmpath);
 
-    snprintf(rmpath, PATH_MAX, "%s.sig", metadata->filename);
+    snprintf(rmpath, PATH_MAX, "%s/%s.sig", r->root, metadata->filename);
     unlink(rmpath);
     return 0;
 }
@@ -498,7 +499,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
             if (old) {
                 printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
                 if (clean >= 1)
-                    unlink_pkg_files(old);
+                    unlink_pkg_files(r, old);
                 cache = _alpm_pkghash_remove(cache, old, NULL);
                 alpm_pkg_free_metadata(old);
             } else  {
@@ -509,7 +510,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
         }
 
         if (vercmp == -1 && clean >= 2)
-            unlink_pkg_files(metadata);
+            unlink_pkg_files(r, metadata);
     }
 
     if (dirty) {
@@ -548,7 +549,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
                 r->db->pkgcache = _alpm_pkghash_remove(r->db->pkgcache, pkg, NULL);
                 printf("REMOVING: %s\n", pkg->name);
                 if (clean >= 1)
-                    unlink_pkg_files(pkg);
+                    unlink_pkg_files(r, pkg);
                 alpm_pkg_free_metadata(pkg);
                 dirty = true;
                 continue;
