@@ -74,27 +74,32 @@ typedef struct repo_writer {
     struct buffer buf;
 } repo_writer_t;
 
-static struct {
+typedef struct colstr {
     const char *colon;
     const char *warn;
     const char *error;
     const char *nocolor;
-} colstr = {
-    .colon   = ":: ",
-    .warn    = "",
-    .error   = "",
-    .nocolor = ""
-};
+} colstr_t;
 
 static struct {
     const char *key;
     enum action action;
 
     short clean;
-    bool color : 1;
-    bool info : 1;
-    bool sign : 1;
-} cfg = { .action = INVALID_ACTION };
+    bool info;
+    bool sign;
+
+    bool color;
+    colstr_t colstr;
+} cfg = {
+    .action = INVALID_ACTION,
+    .colstr = {
+        .colon   = ":: ",
+        .warn    = "",
+        .error   = "",
+        .nocolor = ""
+    }
+};
 
 static int colon_printf(const char *fmt, ...)
 {
@@ -102,9 +107,9 @@ static int colon_printf(const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    fputs(colstr.colon, stdout);
+    fputs(cfg.colstr.colon, stdout);
     ret = vprintf(fmt, args);
-    fputs(colstr.nocolor, stdout);
+    fputs(cfg.colstr.nocolor, stdout);
     va_end(args);
 
     fflush(stdout);
@@ -700,10 +705,12 @@ static void enable_colors(bool on)
     if (!on)
         return;
 
-    colstr.colon   = BOLDBLUE "::" NOCOLOR BOLD " ";
-    colstr.warn    = BOLDYELLOW;
-    colstr.error   = BOLDRED;
-    colstr.nocolor = NOCOLOR;
+    cfg.colstr = (colstr_t){
+        .colon   = BOLDBLUE "::" NOCOLOR BOLD " ",
+        .warn    = BOLDYELLOW,
+        .error   = BOLDRED,
+        .nocolor = NOCOLOR
+    };
 }
 
 void parse_repoman_args(int *argc, char **argv[])
