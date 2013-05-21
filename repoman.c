@@ -25,6 +25,7 @@
 #include "signing.h"
 
 #define NOCOLOR     "\033[0m"
+#define BOLD        "\033[1m"
 
 #define BLACK       "\033[0;30m"
 #define RED         "\033[0;31m"
@@ -33,7 +34,6 @@
 #define BLUE        "\033[0;34m"
 #define MAGENTA     "\033[0;35m"
 #define CYAN        "\033[0;36m"
-#define WHITE       "\033[0;37m"
 
 #define BOLDBLACK   "\033[1;30m"
 #define BOLDRED     "\033[1;31m"
@@ -42,7 +42,6 @@
 #define BOLDBLUE    "\033[1;34m"
 #define BOLDMAGENTA "\033[1;35m"
 #define BOLDCYAN    "\033[1;36m"
-#define BOLDWHITE   "\033[1m"
 
 enum action {
     ACTION_VERIFY,
@@ -701,7 +700,7 @@ static void enable_colors(bool on)
     if (!on)
         return;
 
-    colstr.colon   = BOLDBLUE "::" BOLDWHITE " ";
+    colstr.colon   = BOLDBLUE "::" NOCOLOR BOLD " ";
     colstr.warn    = BOLDYELLOW;
     colstr.error   = BOLDRED;
     colstr.nocolor = NOCOLOR;
