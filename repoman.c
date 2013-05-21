@@ -19,10 +19,10 @@
 #include <alpm.h>
 #include <alpm_list.h>
 
-#include "alpm_metadata.h"
+#include "alpm/alpm_metadata.h"
+#include "alpm/pkghash.h"
+#include "alpm/signing.h"
 #include "buffer.h"
-#include "pkghash.h"
-#include "signing.h"
 
 #define NOCOLOR     "\033[0m"
 #define BOLD        "\033[1m"
