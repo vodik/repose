@@ -341,6 +341,12 @@ static repo_t *find_repo(char *path)
         strcpy(r->file, div + 1);
     }
 
+    /* check if the repo actually exists */
+    if (access(dbpath, F_OK) < 0) {
+        warn("repo %s doesn't exist", r->name);
+        return r;
+    }
+
     /* check for a signature */
     snprintf(sigpath, PATH_MAX, "%s.sig", dbpath);
     if (access(sigpath, F_OK) == 0) {
@@ -350,6 +356,9 @@ static repo_t *find_repo(char *path)
         r->db_signed = true;
     }
 
+    /* load the database into memory */
+    r->db = malloc(sizeof(alpm_db_meta_t));
+    alpm_db_populate(dbpath, r->db);
     return r;
 }
 
@@ -787,9 +796,7 @@ void parse_repoman_args(int *argc, char **argv[])
 
 int main(int argc, char *argv[])
 {
-    char repopath[PATH_MAX];
     repo_t *repo;
-    alpm_db_meta_t db;
     int rc = 0;
 
     if (strcmp(program_invocation_short_name, "repo-add") == 0) {
@@ -810,15 +817,6 @@ int main(int argc, char *argv[])
     repo = find_repo(argv[0]);
     if (!repo)
         return 1;
-
-    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, repo->file);
-    if (access(repopath, F_OK) < 0) {
-        warn("couldn't open repo %s", repo->name);
-        repo->db = NULL;
-    } else {
-        alpm_db_populate(repopath, &db);
-        repo->db = &db;
-    }
 
     switch (cfg.action) {
     case ACTION_VERIFY:
