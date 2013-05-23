@@ -89,6 +89,7 @@ static struct {
     short clean;
     bool info;
     bool sign;
+    bool files;
 
     bool color;
     colstr_t colstr;
@@ -193,6 +194,17 @@ static void write_desc_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buf
     write_string(buf, "PACKAGER",  pkg->packager);
 }
 
+static void write_files_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
+{
+    alpm_list_t *files;
+    char pkgpath[PATH_MAX];
+
+    pkg_real_filename(repo, pkg->filename, pkgpath, NULL);
+    files = alpm_pkg_files(pkgpath);
+
+    write_list(buf, "FILES", files);
+}
+
 static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
                                  const char *path, struct buffer *buf)
 {
@@ -260,6 +272,16 @@ static void repo_write_pkg(repo_t *repo, repo_writer_t *writer, alpm_pkg_meta_t 
     /* generate the 'depends' file */
     snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "depends");
     archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
+
+    if (cfg.files) {
+        archive_entry_clear(writer->entry);
+        buffer_clear(&writer->buf);
+        write_files_file(repo, pkg, &writer->buf);
+
+        /* generate the 'depends' file */
+        snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "files");
+        archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
+    }
 }
 
 static void repo_write_close(repo_writer_t *writer)
@@ -751,6 +773,7 @@ void parse_repoman_args(int *argc, char **argv[])
         { "query",   no_argument,       0, 'Q' },
         { "info",    no_argument,       0, 'i' },
         { "clean",   no_argument,       0, 'c' },
+        { "files",   no_argument,       0, 'f' },
         { "sign",    no_argument,       0, 's' },
         { "key",     required_argument, 0, 'k' },
         { "color",   required_argument, 0, 0x100 },
@@ -760,7 +783,7 @@ void parse_repoman_args(int *argc, char **argv[])
     cfg.color = isatty(fileno(stdout)) ? true : false;
 
     while (true) {
-        int opt = getopt_long(*argc, *argv, "hvURQVicsk:", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvURQVicfsk:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -788,6 +811,9 @@ void parse_repoman_args(int *argc, char **argv[])
             break;
         case 'c':
             ++cfg.clean;
+            break;
+        case 'f':
+            cfg.files = true;
             break;
         case 's':
             cfg.sign = true;
