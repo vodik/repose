@@ -65,6 +65,7 @@ typedef struct repo {
     char name[PATH_MAX];
     char file[PATH_MAX];
     bool db_signed;
+    bool dirty;
     enum compress compression;
 } repo_t;
 
@@ -309,6 +310,7 @@ static repo_t *find_repo(char *path)
     char *div = memrchr(dbpath, '/', len);
 
     repo_t *r = calloc(1, sizeof(repo_t));
+    r->dirty = false;
 
     /* FIXME: figure this out on compression */
     if (!dot) {
@@ -508,6 +510,33 @@ static int verify_db(repo_t *r)
 }
 /* }}} */
 
+static void reduce_db(repo_t *r)
+{
+    if (r->db) {
+        colon_printf("Reading existing database...\n");
+
+        alpm_pkghash_t *cache = r->db->pkgcache;
+        alpm_list_t *pkg, *db_pkgs = cache->list;
+
+        for (pkg = db_pkgs; pkg; pkg = pkg->next) {
+            alpm_pkg_meta_t *metadata = pkg->data;
+
+            /* find packages that have been removed from the cache */
+            if (verify_pkg(r, metadata, false) == 1) {
+                printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
+                if (cfg.clean >= 1)
+                    unlink_pkg_files(r, metadata);
+                cache = _alpm_pkghash_remove(cache, metadata, NULL);
+                alpm_pkg_free_metadata(metadata);
+                r->dirty = true;
+                continue;
+            }
+        }
+
+        r->db->pkgcache = cache;
+    }
+}
+
 /* {{{ UPDATE */
 static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_pkg_meta_t *new,
                                                     alpm_pkg_meta_t *old)
@@ -519,34 +548,18 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_
 /* read the existing repo or construct a new package cache */
 static int update_db(repo_t *r, int argc, char *argv[])
 {
-    bool dirty = false;
     alpm_pkghash_t *cache = NULL;
-
-    if (r->db == NULL) {
-        warnx("repo doesn't exist, creating...");
-        cache = _alpm_pkghash_create(23);
-    } else {
-        colon_printf("Reading existing database...\n");
-
-        cache = r->db->pkgcache;
-        alpm_list_t *pkg, *db_pkgs = cache->list;
-
-        for (pkg = db_pkgs; pkg; pkg = pkg->next) {
-            alpm_pkg_meta_t *metadata = pkg->data;
-
-            /* find packages that have been removed from the cache */
-            if (verify_pkg(r, metadata, false) == 1) {
-                printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
-                cache = _alpm_pkghash_remove(cache, metadata, NULL);
-                alpm_pkg_free_metadata(metadata);
-                dirty = true;
-                continue;
-            }
-        }
-    }
 
     /* if some file paths were specified, find all packages */
     colon_printf("Scanning for new packages...\n");
+
+    if (!r->db) {
+        warnx("repo doesn't exist, creating...");
+        cache = _alpm_pkghash_create(23);
+    } else {
+        reduce_db(r);
+        cache = r->db->pkgcache;
+    }
 
     alpm_list_t *pkg, *pkgs;
     bool force = false;
@@ -566,7 +579,7 @@ static int update_db(repo_t *r, int argc, char *argv[])
         if (!old) {
             printf("ADDING: %s-%s\n", metadata->name, metadata->version);
             cache = _alpm_pkghash_add(cache, metadata);
-            dirty = true;
+            r->dirty = true;
             continue;
         }
 
@@ -578,7 +591,7 @@ static int update_db(repo_t *r, int argc, char *argv[])
             if (cfg.clean >= 2)
                 unlink_pkg_files(r, old);
             alpm_pkg_free_metadata(old);
-            dirty = true;
+            r->dirty = true;
             continue;
         }
 
@@ -593,14 +606,14 @@ static int update_db(repo_t *r, int argc, char *argv[])
             if (cfg.clean >= 1)
                 unlink_pkg_files(r, old);
             alpm_pkg_free_metadata(old);
-            dirty = true;
+            r->dirty = true;
             break;
         case 0:
             /* check to see if the package now has a signature */
             pkg_real_filename(r, metadata->filename, NULL, sigpath);
             if (metadata->base64_sig == NULL && read_pkg_signature(sigpath, metadata) == 0) {
                 printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
-                dirty = true;
+                r->dirty = true;
             }
             break;
         case -1:
@@ -610,7 +623,7 @@ static int update_db(repo_t *r, int argc, char *argv[])
 
     }
 
-    if (dirty) {
+    if (r->dirty) {
         colon_printf("Writing database to disk...\n");
         repo_compile(r, cache);
         printf("repo %s updated successfully\n", r->name);
@@ -620,7 +633,7 @@ static int update_db(repo_t *r, int argc, char *argv[])
 
     /* FIXME: repo.db.sig symlink needs to be validated seperately it
      * appears */
-    if ((cfg.sign && dirty) || (cfg.sign && !r->db_signed))
+    if ((cfg.sign && r->dirty) || (cfg.sign && !r->db_signed))
         repo_sign(r);
 
     return 0;
@@ -631,31 +644,29 @@ static int update_db(repo_t *r, int argc, char *argv[])
 /* read the existing repo or construct a new package cache */
 static int remove_db(repo_t *r, int argc, char *argv[])
 {
-    bool dirty = false;
-
     if (r->db == NULL) {
         warnx("repo doesn't exist...");
         return 1;
-    } else if (argc > 0) {
-        colon_printf("Reading existing database...\n");
-
-        int i;
-        for (i = 0; i < argc; ++i) {
-            alpm_pkg_meta_t *pkg = _alpm_pkghash_find(r->db->pkgcache, argv[i]);
-            if (pkg != NULL) {
-                r->db->pkgcache = _alpm_pkghash_remove(r->db->pkgcache, pkg, NULL);
-                printf("REMOVING: %s\n", pkg->name);
-                if (cfg.clean >= 1)
-                    unlink_pkg_files(r, pkg);
-                alpm_pkg_free_metadata(pkg);
-                dirty = true;
-                continue;
-            }
-            warnx("didn't find entry: %s", argv[0]);
-        }
+    } else {
+        reduce_db(r);
     }
 
-    if (dirty) {
+    int i;
+    for (i = 0; i < argc; ++i) {
+        alpm_pkg_meta_t *pkg = _alpm_pkghash_find(r->db->pkgcache, argv[i]);
+        if (pkg != NULL) {
+            r->db->pkgcache = _alpm_pkghash_remove(r->db->pkgcache, pkg, NULL);
+            printf("REMOVING: %s\n", pkg->name);
+            if (cfg.clean >= 1)
+                unlink_pkg_files(r, pkg);
+            alpm_pkg_free_metadata(pkg);
+            r->dirty = true;
+            continue;
+        }
+        warnx("didn't find entry: %s", argv[0]);
+    }
+
+    if (r->dirty) {
         colon_printf("Writing database to disk...\n");
         repo_compile(r, r->db->pkgcache);
         printf("repo %s updated successfully\n", r->name);
@@ -663,7 +674,7 @@ static int remove_db(repo_t *r, int argc, char *argv[])
         printf("repo %s does not need updating\n", r->name);
     }
 
-    if ((cfg.sign && dirty) || (cfg.sign && !r->db_signed))
+    if ((cfg.sign && r->dirty) || (cfg.sign && !r->db_signed))
         repo_sign(r);
 
     return 0;
