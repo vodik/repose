@@ -38,6 +38,9 @@ static void parse_repo_add_args(int *argc, char **argv[])
         case 'h':
             repo_add_usage(stdout);
             break;
+        case 'f':
+            cfg.files = true;
+            break;
         case 's':
             cfg.sign = true;
             break;
