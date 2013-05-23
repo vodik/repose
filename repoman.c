@@ -648,7 +648,7 @@ static int remove_db(repo_t *repo, int argc, char *argv[])
         alpm_pkg_meta_t *pkg = _alpm_pkghash_find(repo->db->pkgcache, argv[i]);
         if (pkg != NULL) {
             repo->db->pkgcache = _alpm_pkghash_remove(repo->db->pkgcache, pkg, NULL);
-            printf("REMOVING: %s\n", pkg->name);
+            printf("REMOVING: %s-%s\n", pkg->name, pkg->version);
             if (cfg.clean >= 1)
                 unlink_pkg_files(repo, pkg);
             alpm_pkg_free_metadata(pkg);
