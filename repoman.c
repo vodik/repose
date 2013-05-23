@@ -384,16 +384,19 @@ static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *fi
     return list;
 }
 
-static alpm_list_t *find_all_packages(repo_t *r)
+static alpm_pkghash_t *find_all_packages(repo_t *r)
 {
     struct dirent *dp;
     DIR *dir = opendir(r->root);
-    alpm_list_t *pkgs = NULL;
+    alpm_pkghash_t *cache = _alpm_pkghash_create(23);
 
     if (dir == NULL)
         err(EXIT_FAILURE, "failed to open directory");
 
     while ((dp = readdir(dir))) {
+        alpm_pkg_meta_t *metadata, *old;
+        char realpath[PATH_MAX];
+
         if (!(dp->d_type & DT_REG))
             continue;
 
@@ -401,12 +404,21 @@ static alpm_list_t *find_all_packages(repo_t *r)
             fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
             continue;
 
-        /* printf("LOADING: %s\n", dp->d_name); */
-        pkgs = load_pkg(pkgs, r, dp->d_name);
+        pkg_real_filename(r, dp->d_name, realpath, NULL);
+        alpm_pkg_load_metadata(realpath, &metadata);
+        if (!metadata)
+            continue;
+
+        old = _alpm_pkghash_find(cache, metadata->name);
+        if (old) {
+            cache = _alpm_pkghash_remove(cache, old, NULL);
+            alpm_pkg_free_metadata(old);
+        }
+        cache = _alpm_pkghash_add(cache, metadata);
     }
 
     closedir(dir);
-    return pkgs;
+    return cache;
 }
 
 static alpm_list_t *find_packages(repo_t *r, char *pkg_list[], int count)
@@ -554,7 +566,7 @@ static int update_db(repo_t *r, int argc, char *argv[])
         pkgs = find_packages(r, argv, argc);
         force = true;
     } else {
-        pkgs = find_all_packages(r);
+        pkgs = find_all_packages(r)->list;
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
