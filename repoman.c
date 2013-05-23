@@ -509,8 +509,15 @@ static int verify_db(repo_t *r)
 /* }}} */
 
 /* {{{ UPDATE */
+static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_pkg_meta_t *new,
+                                                    alpm_pkg_meta_t *old)
+{
+    cache = _alpm_pkghash_remove(cache, old, NULL);
+    return _alpm_pkghash_add(cache, new);
+}
+
 /* read the existing repo or construct a new package cache */
-static int update_db(repo_t *r, int argc, char *argv[], int clean)
+static int update_db(repo_t *r, int argc, char *argv[])
 {
     bool dirty = false;
     alpm_pkghash_t *cache = NULL;
@@ -535,15 +542,6 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
                 dirty = true;
                 continue;
             }
-
-            /* check if a signature was added */
-            // FIXME: cleanup!
-            char sigpath[PATH_MAX];
-            pkg_real_filename(r, metadata->filename, NULL, sigpath);
-            if (metadata->base64_sig == NULL && read_pkg_signature(sigpath, metadata) == 0) {
-                printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
-                dirty = true;
-            }
         }
     }
 
@@ -551,34 +549,65 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
     colon_printf("Scanning for new packages...\n");
 
     alpm_list_t *pkg, *pkgs;
+    bool force = false;
     if (argc > 0) {
         pkgs = find_packages(r, argv, argc);
+        force = true;
     } else {
         pkgs = find_all_packages(r);
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
+        char sigpath[PATH_MAX];
         alpm_pkg_meta_t *metadata = pkg->data;
         alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, metadata->name);
 
-        int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
-
-        if (old == NULL || vercmp == 1) {
-            if (old) {
-                printf("UPDATING: %s-%s\n", metadata->name, metadata->version);
-                if (clean >= 1)
-                    unlink_pkg_files(r, old);
-                cache = _alpm_pkghash_remove(cache, old, NULL);
-                alpm_pkg_free_metadata(old);
-            } else  {
-                printf("ADDING: %s-%s\n", metadata->name, metadata->version);
-            }
+        /* if the package isn't in the cache, add it */
+        if (!old) {
+            printf("ADDING: %s-%s\n", metadata->name, metadata->version);
             cache = _alpm_pkghash_add(cache, metadata);
             dirty = true;
+            continue;
         }
 
-        if (vercmp == -1 && clean >= 2)
-            unlink_pkg_files(r, metadata);
+        /* if the package is in the cache, but we're doing a forced
+         * update, replace it anyways */
+        if (force) {
+            printf("REPLACING: %s %s => %s\n", metadata->name, old->version, metadata->version);
+            cache = _alpm_pkghash_replace(cache, metadata, old);
+            if (cfg.clean >= 2)
+                unlink_pkg_files(r, old);
+            alpm_pkg_free_metadata(old);
+            dirty = true;
+            continue;
+        }
+
+        /* if the package is in the cache and we have a newer version,
+         * replace it */
+        int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
+
+        switch (vercmp) {
+        case 1:
+            printf("UPDATING: %s %s => %s\n", metadata->name, old->version, metadata->version);
+            cache = _alpm_pkghash_replace(cache, metadata, old);
+            if (cfg.clean >= 1)
+                unlink_pkg_files(r, old);
+            alpm_pkg_free_metadata(old);
+            dirty = true;
+            break;
+        case 0:
+            /* check to see if the package now has a signature */
+            pkg_real_filename(r, metadata->filename, NULL, sigpath);
+            if (metadata->base64_sig == NULL && read_pkg_signature(sigpath, metadata) == 0) {
+                printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
+                dirty = true;
+            }
+            break;
+        case -1:
+            if (cfg.clean >= 2)
+                unlink_pkg_files(r, metadata);
+        }
+
     }
 
     if (dirty) {
@@ -600,7 +629,7 @@ static int update_db(repo_t *r, int argc, char *argv[], int clean)
 
 /* {{{ REMOVE */
 /* read the existing repo or construct a new package cache */
-static int remove_db(repo_t *r, int argc, char *argv[], int clean)
+static int remove_db(repo_t *r, int argc, char *argv[])
 {
     bool dirty = false;
 
@@ -616,7 +645,7 @@ static int remove_db(repo_t *r, int argc, char *argv[], int clean)
             if (pkg != NULL) {
                 r->db->pkgcache = _alpm_pkghash_remove(r->db->pkgcache, pkg, NULL);
                 printf("REMOVING: %s\n", pkg->name);
-                if (clean >= 1)
+                if (cfg.clean >= 1)
                     unlink_pkg_files(r, pkg);
                 alpm_pkg_free_metadata(pkg);
                 dirty = true;
@@ -813,7 +842,6 @@ int main(int argc, char *argv[])
     /* enable colors if necessary */
     enable_colors(cfg.color);
 
-    // FIXME: should be a function
     repo = find_repo(argv[0]);
     if (!repo)
         return 1;
@@ -823,10 +851,10 @@ int main(int argc, char *argv[])
         rc = verify_db(repo);
         break;
     case ACTION_UPDATE:
-        rc = update_db(repo, argc - 1, argv + 1, cfg.clean);
+        rc = update_db(repo, argc - 1, argv + 1);
         break;
     case ACTION_REMOVE:
-        rc = remove_db(repo, argc - 1, argv + 1, cfg.clean);
+        rc = remove_db(repo, argc - 1, argv + 1);
         break;
     case ACTION_QUERY:
         rc = query_db(repo, argc - 1, argv + 1);
