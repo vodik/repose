@@ -556,6 +556,10 @@ static int update_db(repo_t *r, int argc, char *argv[])
     if (!r->db) {
         warnx("repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
+
+        /* FIXME: we shouldn't allocate a db here. we should probably do
+         * away with db all together */
+        r->db = malloc(sizeof(alpm_db_meta_t));
     } else {
         reduce_db(r);
         cache = r->db->pkgcache;
@@ -623,19 +627,7 @@ static int update_db(repo_t *r, int argc, char *argv[])
 
     }
 
-    if (r->dirty) {
-        colon_printf("Writing database to disk...\n");
-        repo_compile(r, cache);
-        printf("repo %s updated successfully\n", r->name);
-    } else {
-        printf("repo %s does not need updating\n", r->name);
-    }
-
-    /* FIXME: repo.db.sig symlink needs to be validated seperately it
-     * appears */
-    if ((cfg.sign && r->dirty) || (cfg.sign && !r->db_signed))
-        repo_sign(r);
-
+    r->db->pkgcache = cache;
     return 0;
 }
 /* }}} */
@@ -665,17 +657,6 @@ static int remove_db(repo_t *r, int argc, char *argv[])
         }
         warnx("didn't find entry: %s", argv[0]);
     }
-
-    if (r->dirty) {
-        colon_printf("Writing database to disk...\n");
-        repo_compile(r, r->db->pkgcache);
-        printf("repo %s updated successfully\n", r->name);
-    } else {
-        printf("repo %s does not need updating\n", r->name);
-    }
-
-    if ((cfg.sign && r->dirty) || (cfg.sign && !r->db_signed))
-        repo_sign(r);
 
     return 0;
 }
@@ -873,6 +854,18 @@ int main(int argc, char *argv[])
     default:
         break;
     };
+
+    /* if the database is dirty, rewrite it */
+    if (repo->dirty) {
+        colon_printf("Writing database to disk...\n");
+        repo_compile(repo, repo->db->pkgcache);
+        printf("repo %s updated successfully\n", repo->name);
+    } else {
+        printf("repo %s does not need updating\n", repo->name);
+    }
+
+    if ((cfg.sign && repo->dirty) || (cfg.sign && !repo->db_signed))
+        repo_sign(repo);
 
     return rc;
 }
