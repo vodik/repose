@@ -531,8 +531,9 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_
 /* read the existing repo or construct a new package cache */
 static int update_db(repo_t *r, int argc, char *argv[])
 {
-    bool dirty = false;
+    bool dirty = false, force = false;
     alpm_pkghash_t *cache = NULL;
+    alpm_list_t *pkg, *pkgs;
 
     if (r->db == NULL) {
         warnx("repo doesn't exist, creating...");
@@ -560,13 +561,12 @@ static int update_db(repo_t *r, int argc, char *argv[])
     /* if some file paths were specified, find all packages */
     colon_printf("Scanning for new packages...\n");
 
-    alpm_list_t *pkg, *pkgs;
-    bool force = false;
     if (argc > 0) {
         pkgs = find_packages(r, argv, argc);
         force = true;
     } else {
-        pkgs = find_all_packages(r)->list;
+        alpm_pkghash_t *filecache = find_all_packages(r);
+        pkgs = filecache->list;
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
