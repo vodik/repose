@@ -516,20 +516,17 @@ static void reduce_db(repo_t *repo)
         colon_printf("Reading existing database...\n");
 
         alpm_pkghash_t *cache = repo->db->pkgcache;
-        alpm_list_t *pkg, *db_pkgs = cache->list;
+        alpm_list_t *pkg, *pkgs = cache->list;
 
-        for (pkg = db_pkgs; pkg; pkg = pkg->next) {
+        for (pkg = pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
 
             /* find packages that have been removed from the cache */
             if (verify_pkg(repo, metadata, false) == 1) {
                 printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
-                if (cfg.clean >= 1)
-                    unlink_pkg_files(repo, metadata);
                 cache = _alpm_pkghash_remove(cache, metadata, NULL);
                 alpm_pkg_free_metadata(metadata);
                 repo->dirty = true;
-                continue;
             }
         }
 
