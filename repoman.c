@@ -362,6 +362,19 @@ static repo_t *find_repo(char *path)
     return r;
 }
 
+static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
+{
+    char pkgpath[PATH_MAX];
+    char sigpath[PATH_MAX];
+
+    pkg_real_filename(r, metadata->filename, pkgpath, sigpath);
+    printf("DELETING: %s-%s\n", metadata->name, metadata->version);
+
+    unlink(pkgpath);
+    unlink(sigpath);
+    return 0;
+}
+
 static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *filepath)
 {
     alpm_pkg_meta_t *metadata;
@@ -412,6 +425,8 @@ static alpm_pkghash_t *find_all_packages(repo_t *r)
         old = _alpm_pkghash_find(cache, metadata->name);
         if (old) {
             cache = _alpm_pkghash_remove(cache, old, NULL);
+            if (cfg.clean >= 2)
+                unlink_pkg_files(r, old);
             alpm_pkg_free_metadata(old);
         }
         cache = _alpm_pkghash_add(cache, metadata);
@@ -430,19 +445,6 @@ static alpm_list_t *find_packages(repo_t *r, char *pkg_list[], int count)
         pkgs = load_pkg(pkgs, r, pkg_list[i]);
 
     return pkgs;
-}
-
-static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
-{
-    char pkgpath[PATH_MAX];
-    char sigpath[PATH_MAX];
-
-    pkg_real_filename(r, metadata->filename, pkgpath, sigpath);
-    printf("DELETING: %s-%s\n", metadata->name, metadata->version);
-
-    unlink(pkgpath);
-    unlink(sigpath);
-    return 0;
 }
 
 static void repo_sign(repo_t *r)
