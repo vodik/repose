@@ -203,6 +203,9 @@ static void write_files_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct bu
     files = alpm_pkg_files(pkgpath);
 
     write_list(buf, "FILES", files);
+
+    alpm_list_free_inner(files, free);
+    alpm_list_free(files);
 }
 
 static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
@@ -367,7 +370,6 @@ static repo_t *find_repo(char *path)
 
     /* check if the repo actually exists */
     if (access(dbpath, F_OK) < 0) {
-        warn("repo %s doesn't exist", repo->name);
         return repo;
     }
 
