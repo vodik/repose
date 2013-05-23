@@ -117,12 +117,12 @@ static int colon_printf(const char *fmt, ...)
     return ret;
 }
 
-static inline void pkg_real_filename(repo_t *r, const char *pkgname, char *pkgpath, char *sigpath)
+static inline void pkg_real_filename(repo_t *repo, const char *pkgname, char *pkgpath, char *sigpath)
 {
     if (pkgpath)
-        snprintf(pkgpath, PATH_MAX, "%s/%s", r->root, pkgname);
+        snprintf(pkgpath, PATH_MAX, "%s/%s", repo->root, pkgname);
     if (sigpath)
-        snprintf(sigpath, PATH_MAX, "%s/%s.sig", r->root, pkgname);
+        snprintf(sigpath, PATH_MAX, "%s/%s.sig", repo->root, pkgname);
 }
 
 /* {{{ WRITING REPOS */
@@ -155,11 +155,11 @@ static void write_depends_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
     write_list(buf, "MAKEDEPENDS", pkg->makedepends);
 }
 
-static void write_desc_file(repo_t *r, const alpm_pkg_meta_t *pkg, struct buffer *buf)
+static void write_desc_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
     char pkgpath[PATH_MAX];
 
-    pkg_real_filename(r, pkg->filename, pkgpath, NULL);
+    pkg_real_filename(repo, pkg->filename, pkgpath, NULL);
     write_string(buf, "FILENAME",  pkg->filename);
     write_string(buf, "NAME",      pkg->name);
     write_string(buf, "VERSION",   pkg->version);
@@ -212,87 +212,87 @@ static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
 
 static repo_writer_t *repo_write_new(const char *filename, enum compress compression)
 {
-    repo_writer_t *repo = malloc(sizeof(repo_writer_t));
-    repo->archive = archive_write_new();
-    repo->entry = archive_entry_new();
+    repo_writer_t *writer = malloc(sizeof(repo_writer_t));
+    writer->archive = archive_write_new();
+    writer->entry = archive_entry_new();
 
     switch (compression) {
     case COMPRESS_NONE:
-        archive_write_add_filter_none(repo->archive);
+        archive_write_add_filter_none(writer->archive);
         break;
     case COMPRESS_GZIP:
-        archive_write_add_filter_gzip(repo->archive);
+        archive_write_add_filter_gzip(writer->archive);
         break;
     case COMPRESS_BZIP2:
-        archive_write_add_filter_bzip2(repo->archive);
+        archive_write_add_filter_bzip2(writer->archive);
         break;
     case COMPRESS_XZ:
-        archive_write_add_filter_xz(repo->archive);
+        archive_write_add_filter_xz(writer->archive);
         break;
     case COMPRESS_COMPRESS:
-        archive_write_add_filter_compress(repo->archive);
+        archive_write_add_filter_compress(writer->archive);
         break;
     }
-    archive_write_set_format_pax_restricted(repo->archive);
-    archive_write_open_filename(repo->archive, filename);
+    archive_write_set_format_pax_restricted(writer->archive);
+    archive_write_open_filename(writer->archive, filename);
 
-    buffer_init(&repo->buf, 1024);
+    buffer_init(&writer->buf, 1024);
 
-    return repo;
+    return writer;
 }
 
-static void repo_write_pkg(repo_t *r, repo_writer_t *repo, alpm_pkg_meta_t *pkg)
+static void repo_write_pkg(repo_t *repo, repo_writer_t *writer, alpm_pkg_meta_t *pkg)
 {
     char entry[PATH_MAX];
 
-    archive_entry_clear(repo->entry);
-    buffer_clear(&repo->buf);
-    write_desc_file(r, pkg, &repo->buf);
+    archive_entry_clear(writer->entry);
+    buffer_clear(&writer->buf);
+    write_desc_file(repo, pkg, &writer->buf);
 
     /* generate the 'desc' file */
     snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "desc");
-    archive_write_buffer(repo->archive, repo->entry, entry, &repo->buf);
+    archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
 
-    archive_entry_clear(repo->entry);
-    buffer_clear(&repo->buf);
-    write_depends_file(pkg, &repo->buf);
+    archive_entry_clear(writer->entry);
+    buffer_clear(&writer->buf);
+    write_depends_file(pkg, &writer->buf);
 
     /* generate the 'depends' file */
     snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "depends");
-    archive_write_buffer(repo->archive, repo->entry, entry, &repo->buf);
+    archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
 }
 
-static void repo_write_close(repo_writer_t *repo)
+static void repo_write_close(repo_writer_t *writer)
 {
-    archive_write_close(repo->archive);
+    archive_write_close(writer->archive);
 
-    buffer_free(&repo->buf);
-    archive_entry_free(repo->entry);
-    archive_write_free(repo->archive);
-    free(repo);
+    buffer_free(&writer->buf);
+    archive_entry_free(writer->entry);
+    archive_write_free(writer->archive);
+    free(writer);
 }
 
 /* TODO: compy as much data as possible from the existing repo */
-static void repo_compile(repo_t *r, alpm_pkghash_t *cache)
+static void repo_compile(repo_t *repo, alpm_pkghash_t *cache)
 {
     char repopath[PATH_MAX];
     char linkpath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", r->root, r->file);
-    snprintf(linkpath, PATH_MAX, "%s/%s", r->root, r->name);
+    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, repo->file);
+    snprintf(linkpath, PATH_MAX, "%s/%s", repo->root, repo->name);
 
-    repo_writer_t *repo = repo_write_new(repopath, r->compression);
+    repo_writer_t *writer = repo_write_new(repopath, repo->compression);
     alpm_list_t *pkg, *pkgs = cache->list;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
-        // FIXME: really pass r? or pass r->root?
-        repo_write_pkg(r, repo, metadata);
+        // FIXME: really pass r? or pass repo->root?
+        repo_write_pkg(repo, writer, metadata);
     }
 
-    repo_write_close(repo);
+    repo_write_close(writer);
 
-    if (symlink(r->file, linkpath) < 0 && errno != EEXIST)
+    if (symlink(repo->file, linkpath) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", linkpath);
 }
 /* }}} */
@@ -309,24 +309,24 @@ static repo_t *find_repo(char *path)
     char *dot = memchr(dbpath, '.', len);
     char *div = memrchr(dbpath, '/', len);
 
-    repo_t *r = calloc(1, sizeof(repo_t));
-    r->dirty = false;
+    repo_t *repo = calloc(1, sizeof(repo_t));
+    repo->dirty = false;
 
     /* FIXME: figure this out on compression */
     if (!dot) {
         errx(EXIT_FAILURE, "no file extension");
     } else if (strcmp(dot, ".db") == 0) {
-        r->compression = COMPRESS_GZIP;
+        repo->compression = COMPRESS_GZIP;
     } else if (strcmp(dot, ".db.tar") == 0) {
-        r->compression = COMPRESS_NONE;
+        repo->compression = COMPRESS_NONE;
     } else if (strcmp(dot, ".db.tar.gz") == 0) {
-        r->compression = COMPRESS_GZIP;
+        repo->compression = COMPRESS_GZIP;
     } else if (strcmp(dot, ".db.tar.bz2") == 0) {
-        r->compression = COMPRESS_BZIP2;
+        repo->compression = COMPRESS_BZIP2;
     } else if (strcmp(dot, ".db.tar.xz") == 0) {
-        r->compression = COMPRESS_XZ;
+        repo->compression = COMPRESS_XZ;
     } else if (strcmp(dot, ".db.tar.Z") == 0) {
-        r->compression = COMPRESS_COMPRESS;
+        repo->compression = COMPRESS_COMPRESS;
     } else {
         errx(EXIT_FAILURE, "%s invalid repo type", dot);
     }
@@ -334,19 +334,19 @@ static repo_t *find_repo(char *path)
     /* skip '.db' */
     dot += 3;
 
-    memcpy(r->root, dbpath, div - dbpath);
-    memcpy(r->name, div + 1, dot - div - 1);
+    memcpy(repo->root, dbpath, div - dbpath);
+    memcpy(repo->name, div + 1, dot - div - 1);
 
     if (*dot == '\0') {
-        snprintf(r->file, PATH_MAX, "%s.tar.gz", r->name);
+        snprintf(repo->file, PATH_MAX, "%s.tar.gz", repo->name);
     } else {
-        strcpy(r->file, div + 1);
+        strcpy(repo->file, div + 1);
     }
 
     /* check if the repo actually exists */
     if (access(dbpath, F_OK) < 0) {
-        warn("repo %s doesn't exist", r->name);
-        return r;
+        warn("repo %s doesn't exist", repo->name);
+        return repo;
     }
 
     /* check for a signature */
@@ -355,28 +355,28 @@ static repo_t *find_repo(char *path)
         if (gpgme_verify(dbpath, sigpath) < 0)
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
 
-        r->db_signed = true;
+        repo->db_signed = true;
     }
 
     /* load the database into memory */
-    r->db = malloc(sizeof(alpm_db_meta_t));
-    alpm_db_populate(dbpath, r->db);
-    return r;
+    repo->db = malloc(sizeof(alpm_db_meta_t));
+    alpm_db_populate(dbpath, repo->db);
+    return repo;
 }
 
-static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *filepath)
+static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *repo, const char *filepath)
 {
     alpm_pkg_meta_t *metadata;
     char *basename = strrchr(filepath, '/');
     char realpath[PATH_MAX];
 
     if (basename) {
-        if (memcmp(filepath, r->root, basename - filepath) != 0) {
+        if (memcmp(filepath, repo->root, basename - filepath) != 0) {
             warnx("%s is not in the same path as the database", filepath);
             return list;
         }
     } else {
-        pkg_real_filename(r, filepath, realpath, NULL);
+        pkg_real_filename(repo, filepath, realpath, NULL);
         filepath = realpath;
     }
 
@@ -386,10 +386,10 @@ static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *r, const char *fi
     return list;
 }
 
-static alpm_list_t *find_all_packages(repo_t *r)
+static alpm_list_t *find_all_packages(repo_t *repo)
 {
     struct dirent *dp;
-    DIR *dir = opendir(r->root);
+    DIR *dir = opendir(repo->root);
     alpm_list_t *pkgs = NULL;
 
     if (dir == NULL)
@@ -404,30 +404,30 @@ static alpm_list_t *find_all_packages(repo_t *r)
             continue;
 
         /* printf("LOADING: %s\n", dp->d_name); */
-        pkgs = load_pkg(pkgs, r, dp->d_name);
+        pkgs = load_pkg(pkgs, repo, dp->d_name);
     }
 
     closedir(dir);
     return pkgs;
 }
 
-static alpm_list_t *find_packages(repo_t *r, char *pkg_list[], int count)
+static alpm_list_t *find_packages(repo_t *repo, char *pkg_list[], int count)
 {
     int i;
     alpm_list_t *pkgs = NULL;
 
     for (i = 0; i < count; ++i)
-        pkgs = load_pkg(pkgs, r, pkg_list[i]);
+        pkgs = load_pkg(pkgs, repo, pkg_list[i]);
 
     return pkgs;
 }
 
-static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
+static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
 {
     char pkgpath[PATH_MAX];
     char sigpath[PATH_MAX];
 
-    pkg_real_filename(r, metadata->filename, pkgpath, sigpath);
+    pkg_real_filename(repo, metadata->filename, pkgpath, sigpath);
     printf("DELETING: %s-%s\n", metadata->name, metadata->version);
 
     unlink(pkgpath);
@@ -435,27 +435,27 @@ static int unlink_pkg_files(repo_t *r, const alpm_pkg_meta_t *metadata)
     return 0;
 }
 
-static void repo_sign(repo_t *r)
+static void repo_sign(repo_t *repo)
 {
     char link[PATH_MAX];
     char signature[PATH_MAX];
 
     /* XXX: check return type */
-    gpgme_sign(r->root, r->file, cfg.key);
+    gpgme_sign(repo->root, repo->file, cfg.key);
 
-    snprintf(signature, PATH_MAX, "%s.sig", r->file);
-    snprintf(link, PATH_MAX, "%s/%s.sig", r->root, r->name);
+    snprintf(signature, PATH_MAX, "%s.sig", repo->file);
+    snprintf(link, PATH_MAX, "%s/%s.sig", repo->root, repo->name);
     if (symlink(signature, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 }
 
 /* {{{ VERIFY */
-static int verify_pkg(repo_t *r, const alpm_pkg_meta_t *pkg, bool deep)
+static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 {
     char pkgpath[PATH_MAX];
     char sigpath[PATH_MAX];
 
-    pkg_real_filename(r, pkg->filename, pkgpath, deep ? sigpath : NULL);
+    pkg_real_filename(repo, pkg->filename, pkgpath, deep ? sigpath : NULL);
     if (access(pkgpath, F_OK) < 0) {
         warn("couldn't find pkg %s at %s", pkg->name, pkgpath);
         return 1;
@@ -493,14 +493,14 @@ static int verify_pkg(repo_t *r, const alpm_pkg_meta_t *pkg, bool deep)
     return 0;
 }
 
-static int verify_db(repo_t *r)
+static int verify_db(repo_t *repo)
 {
-    alpm_list_t *pkg, *pkgs = r->db->pkgcache->list;
+    alpm_list_t *pkg, *pkgs = repo->db->pkgcache->list;
     int rc = 0;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
-        rc |= verify_pkg(r, metadata, true);
+        rc |= verify_pkg(repo, metadata, true);
     }
 
     if (rc == 0)
@@ -510,30 +510,30 @@ static int verify_db(repo_t *r)
 }
 /* }}} */
 
-static void reduce_db(repo_t *r)
+static void reduce_db(repo_t *repo)
 {
-    if (r->db) {
+    if (repo->db) {
         colon_printf("Reading existing database...\n");
 
-        alpm_pkghash_t *cache = r->db->pkgcache;
+        alpm_pkghash_t *cache = repo->db->pkgcache;
         alpm_list_t *pkg, *db_pkgs = cache->list;
 
         for (pkg = db_pkgs; pkg; pkg = pkg->next) {
             alpm_pkg_meta_t *metadata = pkg->data;
 
             /* find packages that have been removed from the cache */
-            if (verify_pkg(r, metadata, false) == 1) {
+            if (verify_pkg(repo, metadata, false) == 1) {
                 printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
                 if (cfg.clean >= 1)
-                    unlink_pkg_files(r, metadata);
+                    unlink_pkg_files(repo, metadata);
                 cache = _alpm_pkghash_remove(cache, metadata, NULL);
                 alpm_pkg_free_metadata(metadata);
-                r->dirty = true;
+                repo->dirty = true;
                 continue;
             }
         }
 
-        r->db->pkgcache = cache;
+        repo->db->pkgcache = cache;
     }
 }
 
@@ -546,32 +546,32 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_
 }
 
 /* read the existing repo or construct a new package cache */
-static int update_db(repo_t *r, int argc, char *argv[])
+static int update_db(repo_t *repo, int argc, char *argv[])
 {
     alpm_pkghash_t *cache = NULL;
 
     /* if some file paths were specified, find all packages */
     colon_printf("Scanning for new packages...\n");
 
-    if (!r->db) {
+    if (!repo->db) {
         warnx("repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
 
         /* FIXME: we shouldn't allocate a db here. we should probably do
          * away with db all together */
-        r->db = malloc(sizeof(alpm_db_meta_t));
+        repo->db = malloc(sizeof(alpm_db_meta_t));
     } else {
-        reduce_db(r);
-        cache = r->db->pkgcache;
+        reduce_db(repo);
+        cache = repo->db->pkgcache;
     }
 
     alpm_list_t *pkg, *pkgs;
     bool force = false;
     if (argc > 0) {
-        pkgs = find_packages(r, argv, argc);
+        pkgs = find_packages(repo, argv, argc);
         force = true;
     } else {
-        pkgs = find_all_packages(r);
+        pkgs = find_all_packages(repo);
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -583,7 +583,7 @@ static int update_db(repo_t *r, int argc, char *argv[])
         if (!old) {
             printf("ADDING: %s-%s\n", metadata->name, metadata->version);
             cache = _alpm_pkghash_add(cache, metadata);
-            r->dirty = true;
+            repo->dirty = true;
             continue;
         }
 
@@ -593,9 +593,9 @@ static int update_db(repo_t *r, int argc, char *argv[])
             printf("REPLACING: %s %s => %s\n", metadata->name, old->version, metadata->version);
             cache = _alpm_pkghash_replace(cache, metadata, old);
             if (cfg.clean >= 2)
-                unlink_pkg_files(r, old);
+                unlink_pkg_files(repo, old);
             alpm_pkg_free_metadata(old);
-            r->dirty = true;
+            repo->dirty = true;
             continue;
         }
 
@@ -608,51 +608,51 @@ static int update_db(repo_t *r, int argc, char *argv[])
             printf("UPDATING: %s %s => %s\n", metadata->name, old->version, metadata->version);
             cache = _alpm_pkghash_replace(cache, metadata, old);
             if (cfg.clean >= 1)
-                unlink_pkg_files(r, old);
+                unlink_pkg_files(repo, old);
             alpm_pkg_free_metadata(old);
-            r->dirty = true;
+            repo->dirty = true;
             break;
         case 0:
             /* check to see if the package now has a signature */
-            pkg_real_filename(r, metadata->filename, NULL, sigpath);
+            pkg_real_filename(repo, metadata->filename, NULL, sigpath);
             if (metadata->base64_sig == NULL && read_pkg_signature(sigpath, metadata) == 0) {
                 printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
-                r->dirty = true;
+                repo->dirty = true;
             }
             break;
         case -1:
             if (cfg.clean >= 2)
-                unlink_pkg_files(r, metadata);
+                unlink_pkg_files(repo, metadata);
         }
 
     }
 
-    r->db->pkgcache = cache;
+    repo->db->pkgcache = cache;
     return 0;
 }
 /* }}} */
 
 /* {{{ REMOVE */
 /* read the existing repo or construct a new package cache */
-static int remove_db(repo_t *r, int argc, char *argv[])
+static int remove_db(repo_t *repo, int argc, char *argv[])
 {
-    if (r->db == NULL) {
+    if (repo->db == NULL) {
         warnx("repo doesn't exist...");
         return 1;
     } else {
-        reduce_db(r);
+        reduce_db(repo);
     }
 
     int i;
     for (i = 0; i < argc; ++i) {
-        alpm_pkg_meta_t *pkg = _alpm_pkghash_find(r->db->pkgcache, argv[i]);
+        alpm_pkg_meta_t *pkg = _alpm_pkghash_find(repo->db->pkgcache, argv[i]);
         if (pkg != NULL) {
-            r->db->pkgcache = _alpm_pkghash_remove(r->db->pkgcache, pkg, NULL);
+            repo->db->pkgcache = _alpm_pkghash_remove(repo->db->pkgcache, pkg, NULL);
             printf("REMOVING: %s\n", pkg->name);
             if (cfg.clean >= 1)
-                unlink_pkg_files(r, pkg);
+                unlink_pkg_files(repo, pkg);
             alpm_pkg_free_metadata(pkg);
-            r->dirty = true;
+            repo->dirty = true;
             continue;
         }
         warnx("didn't find entry: %s", argv[0]);
@@ -680,9 +680,9 @@ static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
 }
 
 /* read the existing repo or construct a new package cache */
-static int query_db(repo_t *r, int argc, char *argv[])
+static int query_db(repo_t *repo, int argc, char *argv[])
 {
-    if (r->db == NULL) {
+    if (repo->db == NULL) {
         warnx("repo doesn't exist");
         return 1;
     }
@@ -690,7 +690,7 @@ static int query_db(repo_t *r, int argc, char *argv[])
     if (argc > 0) {
         int i;
         for (i = 0; i < argc; ++i) {
-            const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(r->db->pkgcache, argv[i]);
+            const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(repo->db->pkgcache, argv[i]);
             if (pkg == NULL) {
                 warnx("pkg not found");
                 return 1;
@@ -698,7 +698,7 @@ static int query_db(repo_t *r, int argc, char *argv[])
             print_pkg_metadata(pkg);
         }
     } else {
-        alpm_list_t *pkg, *pkgs = r->db->pkgcache->list;
+        alpm_list_t *pkg, *pkgs = repo->db->pkgcache->list;
         for (pkg = pkgs; pkg; pkg = pkg->next)
             print_pkg_metadata(pkg->data);
     }
