@@ -45,7 +45,7 @@ struct __alpm_pkghash_t {
 	unsigned int limit;
 };
 
-typedef struct __alpm_pkghash_t alpm_pkghash_t;
+/* typedef struct __alpm_pkghash_t alpm_pkghash_t; */
 
 unsigned long _alpm_hash_sdbm(const char *str);
 

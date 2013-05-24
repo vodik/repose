@@ -103,13 +103,12 @@ int gpgme_verify(const char *filepath, const char *sigpath)
     return rc;
 }
 
-void gpgme_sign(const char *root, const char *file, const char *key)
+void gpgme_sign(const char *filepath, const char *sigpath, const char *key)
 {
     gpgme_error_t err;
     gpgme_ctx_t ctx;
     gpgme_data_t in, out;
     gpgme_sign_result_t result;
-    char filepath[PATH_MAX];
 
     if (init_gpgme() < 0)
         return;
@@ -135,10 +134,9 @@ void gpgme_sign(const char *root, const char *file, const char *key)
         gpgme_key_unref(akey);
     }
 
-    snprintf(filepath, PATH_MAX, "%s/%s", root, file);
     err = gpgme_data_new_from_file(&in, filepath, 1);
     if (err)
-        errx(EXIT_FAILURE, "error reading `%s': %s\n", file, gpgme_strerror(err));
+        errx(EXIT_FAILURE, "error reading `%s': %s\n", filepath, gpgme_strerror(err));
 
     err = gpgme_data_new(&out);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
@@ -158,8 +156,7 @@ void gpgme_sign(const char *root, const char *file, const char *key)
     /* print_data(out); */
     /* fputs("End Output.\n", stdout); */
 
-    snprintf(filepath, PATH_MAX, "%s/%s.sig", root, file);
-    FILE *fp = fopen(filepath, "w");
+    FILE *fp = fopen(sigpath, "w");
 
     char buf[BUFSIZ];
     int ret;
