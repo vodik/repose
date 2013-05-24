@@ -65,13 +65,17 @@ enum contents {
     DB_FILES   = 1 << 3
 };
 
+typedef struct file {
+    char name[PATH_MAX];
+    char link[PATH_MAX];
+} file_t;
+
 typedef struct repo {
     alpm_pkghash_t *pkgcache;
     char root[PATH_MAX];
     char name[PATH_MAX];
-    char db[PATH_MAX];
-    char files[PATH_MAX];
-    bool db_signed;
+    file_t db;
+    file_t files;
     bool dirty;
     enum compress compression;
 } repo_t;
@@ -313,16 +317,37 @@ static void repo_write_close(repo_writer_t *writer)
     archive_write_free(writer->archive);
     free(writer);
 }
+/* }}} */
 
-/* TODO: compy as much data as possible from the existing repo */
-static void repo_compile(repo_t *repo, alpm_pkghash_t *cache, int files, int contents)
+static void symlink_database(repo_t *repo, file_t *db)
 {
-    char repopath[PATH_MAX];
     char linkpath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, files ? repo->files : repo->db);
-    snprintf(linkpath, PATH_MAX, "%s/%s.%s", repo->root, repo->name, files ? "files" : "db");
+    snprintf(linkpath, PATH_MAX, "%s/%s", repo->root, db->link);
+    if (symlink(db->name, linkpath) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink to %s failed", linkpath);
+}
 
+static void sign_database(repo_t *repo, file_t *db)
+{
+    char link[PATH_MAX];
+    char signature[PATH_MAX];
+
+    /* XXX: check return type */
+    gpgme_sign(repo->root, db->name, cfg.key);
+
+    snprintf(signature, PATH_MAX, "%s.sig", db->name);
+    snprintf(link, PATH_MAX, "%s/%s.db.sig", repo->root, db->name);
+    if (symlink(signature, link) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink to %s failed", link);
+}
+
+/* TODO: compy as much data as possible from the existing repo */
+static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, int contents)
+{
+    char repopath[PATH_MAX];
+
+    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, db->name);
     repo_writer_t *writer = repo_write_new(repopath, repo->compression);
     alpm_list_t *pkg, *pkgs = cache->list;
 
@@ -334,10 +359,9 @@ static void repo_compile(repo_t *repo, alpm_pkghash_t *cache, int files, int con
 
     repo_write_close(writer);
 
-    if (symlink(repo->db, linkpath) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink to %s failed", linkpath);
+    symlink_database(repo, db);
+    sign_database(repo, db);
 }
-/* }}} */
 
 static repo_t *find_repo(char *path)
 {
@@ -373,8 +397,8 @@ static repo_t *find_repo(char *path)
         errx(EXIT_FAILURE, "%s invalid repo type", dot);
     }
 
-    memcpy(repo->name, div + 1, dot - div - 1);
     memcpy(repo->root, dbpath, div - dbpath);
+    memcpy(repo->name, div + 1, dot - div - 1);
 
     /* skip '.db.' */
     dot += 4;
@@ -383,8 +407,11 @@ static repo_t *find_repo(char *path)
         dot = "tar.gz";
     }
 
-    snprintf(repo->db, PATH_MAX, "%s.db.%s", repo->name, dot);
-    snprintf(repo->files, PATH_MAX, "%s.files.%s", repo->name, dot);
+    snprintf(repo->db.name, PATH_MAX, "%s.db.%s", repo->name, dot);
+    snprintf(repo->db.link, PATH_MAX, "%s.db", repo->name);
+
+    snprintf(repo->files.name, PATH_MAX, "%s.files.%s", repo->name, dot);
+    snprintf(repo->files.link, PATH_MAX, "%s.files", repo->name);
 
     /* check if the repo actually exists */
     if (access(dbpath, F_OK) < 0) {
@@ -396,8 +423,6 @@ static repo_t *find_repo(char *path)
     if (access(sigpath, F_OK) == 0) {
         if (gpgme_verify(dbpath, sigpath) < 0)
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
-
-        repo->db_signed = true;
     }
 
     /* load the database into memory */
@@ -474,20 +499,6 @@ static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
     unlink(pkgpath);
     unlink(sigpath);
     return 0;
-}
-
-static void repo_sign(repo_t *repo)
-{
-    char link[PATH_MAX];
-    char signature[PATH_MAX];
-
-    /* XXX: check return type */
-    gpgme_sign(repo->root, repo->db, cfg.key);
-
-    snprintf(signature, PATH_MAX, "%s.sig", repo->db);
-    snprintf(link, PATH_MAX, "%s/%s.db.sig", repo->root, repo->name);
-    if (symlink(signature, link) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink to %s failed", link);
 }
 
 /* {{{ VERIFY */
@@ -876,11 +887,6 @@ int main(int argc, char *argv[])
     if (!repo)
         return 1;
 
-    printf("root: %s\n", repo->root);
-    printf("name: %s\n", repo->name);
-    printf("db: %s\n", repo->db);
-    printf("files: %s\n", repo->files);
-
     switch (cfg.action) {
     case ACTION_VERIFY:
         rc = verify_db(repo);
@@ -901,18 +907,15 @@ int main(int argc, char *argv[])
     /* if the database is dirty, rewrite it */
     if (repo->dirty) {
         colon_printf("Writing database to disk...\n");
-        repo_compile(repo, repo->pkgcache, false, DB_DESC | DB_DEPENDS);
+        compile_database(repo, &repo->db, repo->pkgcache, DB_DESC | DB_DEPENDS);
         if (cfg.files) {
             colon_printf("Writing file database to disk...\n");
-            repo_compile(repo, repo->pkgcache, true, DB_FILES);
+            compile_database(repo, &repo->files, repo->pkgcache, DB_FILES);
         }
         printf("repo %s updated successfully\n", repo->name);
     } else {
         printf("repo %s does not need updating\n", repo->name);
     }
-
-    if ((cfg.sign && repo->dirty) || (cfg.sign && !repo->db_signed))
-        repo_sign(repo);
 
     return rc;
 }
