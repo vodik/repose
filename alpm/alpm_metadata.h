@@ -3,6 +3,8 @@
 
 #include <alpm_list.h>
 
+typedef struct __alpm_pkghash_t alpm_pkghash_t;
+
 typedef struct alpm_pkg_meta {
     unsigned long name_hash;
     char *filename;
@@ -26,19 +28,12 @@ typedef struct alpm_pkg_meta {
     alpm_list_t *makedepends;
 } alpm_pkg_meta_t;
 
-typedef struct alpm_db_meta {
-    char *treename;
-    /* do not access directly, use _alpm_db_path(db) for lazy access */
-    char *_path;
-    struct __alpm_pkghash_t *pkgcache;
-} alpm_db_meta_t;
-
 int read_pkg_signature(const char *path, alpm_pkg_meta_t *pkg);
 int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **pkg);
 void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg);
 
 alpm_list_t *alpm_pkg_files(const char *filename);
 
-int alpm_db_populate(const char *filename, alpm_db_meta_t *db);
+int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache);
 
 #endif

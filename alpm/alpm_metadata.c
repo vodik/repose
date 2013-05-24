@@ -148,7 +148,6 @@ int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
 
         const mode_t mode = archive_entry_mode(entry);
         const char *entry_name = archive_entry_pathname(entry);
-
         if (S_ISREG(mode) && strcmp(entry_name, ".PKGINFO") == 0) {
             read_pkg_metadata(archive, entry, pkg);
             break;
@@ -248,11 +247,9 @@ alpm_list_t *alpm_pkg_files(const char *filename)
             errx(EXIT_FAILURE, "failed to read header: %s", archive_error_string(archive));
         }
 
-        const mode_t mode = archive_entry_mode(entry);
-        const char *path  = archive_entry_pathname(entry);
-
-        if (path[0] != '.') {
-            files = alpm_list_add(files, strdup(path));
+        const char *entry_name = archive_entry_pathname(entry);
+        if (entry_name[0] != '.') {
+            files = alpm_list_add(files, strdup(entry_name));
         }
     }
 
@@ -431,7 +428,7 @@ static int _alpm_splitname(const char *target, char **name, char **version,
 	return 0;
 }
 
-static alpm_pkg_meta_t *load_pkg_for_entry(alpm_db_meta_t *db, const char *entryname,
+static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t *pkgcache, const char *entryname,
 		const char **entry_filename, alpm_pkg_meta_t *likely_pkg)
 {
 	char *pkgname = NULL, *pkgver = NULL;
@@ -457,7 +454,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_db_meta_t *db, const char *entry
 			&& strcmp(likely_pkg->name, pkgname) == 0) {
 		pkg = likely_pkg;
 	} else {
-		pkg = _alpm_pkghash_find(db->pkgcache, pkgname);
+		pkg = _alpm_pkghash_find(pkgcache, pkgname);
 	}
 	if(pkg == NULL) {
 		pkg = calloc(1, sizeof(alpm_pkg_meta_t));
@@ -480,7 +477,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_db_meta_t *db, const char *entry
 		/* add to the collection */
 		/* _alpm_log(db->handle, ALPM_LOG_FUNCTION, "adding '%s' to package cache for db '%s'\n", */
 		/* 		pkg->name, db->treename); */
-		db->pkgcache = _alpm_pkghash_add_sorted(db->pkgcache, pkg);
+		pkgcache = _alpm_pkghash_add_sorted(pkgcache, pkg);
 	} else {
 		free(pkgname);
 		free(pkgver);
@@ -489,7 +486,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_db_meta_t *db, const char *entry
     return pkg;
 }
 
-static void db_read_pkg(alpm_db_meta_t *db, struct archive_reader *reader,
+static void db_read_pkg(alpm_pkghash_t *pkgcache, struct archive_reader *reader,
                         struct archive_entry *entry)
 {
     const char *entryname = archive_entry_pathname(entry);
@@ -497,7 +494,7 @@ static void db_read_pkg(alpm_db_meta_t *db, struct archive_reader *reader,
     /* if (entryname == NULL) */
     /*     return; */
 
-    alpm_pkg_meta_t *pkg = load_pkg_for_entry(db, entryname, (const char **)&filename, NULL);
+    alpm_pkg_meta_t *pkg = load_pkg_for_entry(pkgcache, entryname, (const char **)&filename, NULL);
 
     if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0) {
         read_desc(reader, entry, pkg);
@@ -506,7 +503,7 @@ static void db_read_pkg(alpm_db_meta_t *db, struct archive_reader *reader,
     /* free(filename); */
 }
 
-int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
+int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache)
 {
     struct archive *archive = NULL;
     struct archive_reader* reader = NULL;
@@ -541,8 +538,8 @@ int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
         goto cleanup;
     }
 
-    db->pkgcache = _alpm_pkghash_create(23);
-    if (db->pkgcache == NULL) {
+    *pkgcache = _alpm_pkghash_create(23);
+    if (*pkgcache == NULL) {
         rc = -1;
         goto cleanup;
     }
@@ -564,7 +561,7 @@ int alpm_db_populate(const char *filename, alpm_db_meta_t *db)
         /* we have desc, depends, or deltas - parse it */
         /* alpm_pkg_meta_t *pkg = NULL; */
         reader->ret = ARCHIVE_OK;
-        db_read_pkg(db, reader, entry);
+        db_read_pkg(*pkgcache, reader, entry);
     }
 
 cleanup:

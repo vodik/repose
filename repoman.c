@@ -60,7 +60,7 @@ enum compress {
 };
 
 typedef struct repo {
-    alpm_db_meta_t *db;
+    alpm_pkghash_t *pkgcache;
     char root[PATH_MAX];
     char name[PATH_MAX];
     char file[PATH_MAX];
@@ -383,8 +383,7 @@ static repo_t *find_repo(char *path)
     }
 
     /* load the database into memory */
-    repo->db = malloc(sizeof(alpm_db_meta_t));
-    alpm_db_populate(dbpath, repo->db);
+    alpm_db_populate(dbpath, &repo->pkgcache);
     return repo;
 }
 
@@ -519,7 +518,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 
 static int verify_db(repo_t *repo)
 {
-    alpm_list_t *pkg, *pkgs = repo->db->pkgcache->list;
+    alpm_list_t *pkg, *pkgs = repo->pkgcache->list;
     int rc = 0;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -536,10 +535,10 @@ static int verify_db(repo_t *repo)
 
 static void reduce_db(repo_t *repo)
 {
-    if (repo->db) {
+    if (repo->pkgcache) {
         colon_printf("Reading existing database...\n");
 
-        alpm_pkghash_t *cache = repo->db->pkgcache;
+        alpm_pkghash_t *cache = repo->pkgcache;
         alpm_list_t *pkg, *pkgs = cache->list;
 
         for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -554,7 +553,7 @@ static void reduce_db(repo_t *repo)
             }
         }
 
-        repo->db->pkgcache = cache;
+        repo->pkgcache = cache;
     }
 }
 
@@ -574,16 +573,12 @@ static int update_db(repo_t *repo, int argc, char *argv[])
     /* if some file paths were specified, find all packages */
     colon_printf("Scanning for new packages...\n");
 
-    if (!repo->db) {
+    if (!repo->pkgcache) {
         warnx("repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
-
-        /* FIXME: we shouldn't allocate a db here. we should probably do
-         * away with db all together */
-        repo->db = malloc(sizeof(alpm_db_meta_t));
     } else {
         reduce_db(repo);
-        cache = repo->db->pkgcache;
+        cache = repo->pkgcache;
     }
 
     alpm_list_t *pkg, *pkgs;
@@ -648,7 +643,7 @@ static int update_db(repo_t *repo, int argc, char *argv[])
 
     }
 
-    repo->db->pkgcache = cache;
+    repo->pkgcache = cache;
     return 0;
 }
 /* }}} */
@@ -657,7 +652,7 @@ static int update_db(repo_t *repo, int argc, char *argv[])
 /* read the existing repo or construct a new package cache */
 static int remove_db(repo_t *repo, int argc, char *argv[])
 {
-    if (repo->db == NULL) {
+    if (!repo->pkgcache) {
         warnx("repo doesn't exist...");
         return 1;
     } else {
@@ -666,9 +661,9 @@ static int remove_db(repo_t *repo, int argc, char *argv[])
 
     int i;
     for (i = 0; i < argc; ++i) {
-        alpm_pkg_meta_t *pkg = _alpm_pkghash_find(repo->db->pkgcache, argv[i]);
+        alpm_pkg_meta_t *pkg = _alpm_pkghash_find(repo->pkgcache, argv[i]);
         if (pkg != NULL) {
-            repo->db->pkgcache = _alpm_pkghash_remove(repo->db->pkgcache, pkg, NULL);
+            repo->pkgcache = _alpm_pkghash_remove(repo->pkgcache, pkg, NULL);
             printf("REMOVING: %s-%s\n", pkg->name, pkg->version);
             if (cfg.clean >= 1)
                 unlink_pkg_files(repo, pkg);
@@ -703,7 +698,7 @@ static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
 /* read the existing repo or construct a new package cache */
 static int query_db(repo_t *repo, int argc, char *argv[])
 {
-    if (repo->db == NULL) {
+    if (!repo->pkgcache) {
         warnx("repo doesn't exist");
         return 1;
     }
@@ -711,7 +706,7 @@ static int query_db(repo_t *repo, int argc, char *argv[])
     if (argc > 0) {
         int i;
         for (i = 0; i < argc; ++i) {
-            const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(repo->db->pkgcache, argv[i]);
+            const alpm_pkg_meta_t *pkg = _alpm_pkghash_find(repo->pkgcache, argv[i]);
             if (pkg == NULL) {
                 warnx("pkg not found");
                 return 1;
@@ -719,7 +714,7 @@ static int query_db(repo_t *repo, int argc, char *argv[])
             print_pkg_metadata(pkg);
         }
     } else {
-        alpm_list_t *pkg, *pkgs = repo->db->pkgcache->list;
+        alpm_list_t *pkg, *pkgs = repo->pkgcache->list;
         for (pkg = pkgs; pkg; pkg = pkg->next)
             print_pkg_metadata(pkg->data);
     }
@@ -883,7 +878,7 @@ int main(int argc, char *argv[])
     /* if the database is dirty, rewrite it */
     if (repo->dirty) {
         colon_printf("Writing database to disk...\n");
-        repo_compile(repo, repo->db->pkgcache);
+        repo_compile(repo, repo->pkgcache);
         printf("repo %s updated successfully\n", repo->name);
     } else {
         printf("repo %s does not need updating\n", repo->name);
