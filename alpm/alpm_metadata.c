@@ -251,7 +251,7 @@ alpm_list_t *alpm_pkg_files(const char *filename)
         const mode_t mode = archive_entry_mode(entry);
         const char *path  = archive_entry_pathname(entry);
 
-        if (S_ISREG(mode) && path[0] != '.') {
+        if (path[0] != '.') {
             files = alpm_list_add(files, strdup(path));
         }
     }
