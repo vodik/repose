@@ -330,15 +330,18 @@ static void symlink_database(repo_t *repo, file_t *db)
 
 static void sign_database(repo_t *repo, file_t *db)
 {
+    char sigpath[PATH_MAX];
+    char repopath[PATH_MAX];
     char link[PATH_MAX];
-    char signature[PATH_MAX];
 
     /* XXX: check return type */
-    gpgme_sign(repo->root, db->name, cfg.key);
+    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, db->name);
+    snprintf(sigpath, PATH_MAX, "%s/%s.sig", repo->root, db->name);
+    gpgme_sign(repopath, sigpath, cfg.key);
 
-    snprintf(signature, PATH_MAX, "%s.sig", db->name);
-    snprintf(link, PATH_MAX, "%s/%s.db.sig", repo->root, db->name);
-    if (symlink(signature, link) < 0 && errno != EEXIST)
+    snprintf(link, PATH_MAX, "%s/%s.sig", repo->root, db->link);
+    snprintf(sigpath, PATH_MAX, "%s.sig", db->name);
+    if (symlink(sigpath, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 }
 
@@ -353,7 +356,6 @@ static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, in
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
-        // FIXME: really pass r? or pass repo->root?
         repo_write_pkg(repo, writer, metadata, contents);
     }
 
