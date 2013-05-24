@@ -402,17 +402,17 @@ static repo_t *find_repo(char *path)
     memcpy(repo->root, dbpath, div - dbpath);
     memcpy(repo->name, div + 1, dot - div - 1);
 
-    /* skip '.db.' */
-    dot += 4;
+    /* skip '.db' */
+    dot += 3;
 
     if (*dot == '\0') {
         dot = "tar.gz";
     }
 
-    snprintf(repo->db.name, PATH_MAX, "%s.db.%s", repo->name, dot);
+    snprintf(repo->db.name, PATH_MAX, "%s.db%s", repo->name, dot);
     snprintf(repo->db.link, PATH_MAX, "%s.db", repo->name);
 
-    snprintf(repo->files.name, PATH_MAX, "%s.files.%s", repo->name, dot);
+    snprintf(repo->files.name, PATH_MAX, "%s.files%s", repo->name, dot);
     snprintf(repo->files.link, PATH_MAX, "%s.files", repo->name);
 
     /* check if the repo actually exists */
