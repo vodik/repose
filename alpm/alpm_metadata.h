@@ -26,6 +26,7 @@ typedef struct alpm_pkg_meta {
     alpm_list_t *provides;
     alpm_list_t *optdepends;
     alpm_list_t *makedepends;
+    alpm_list_t *files;
 } alpm_pkg_meta_t;
 
 int read_pkg_signature(const char *path, alpm_pkg_meta_t *pkg);

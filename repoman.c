@@ -203,16 +203,22 @@ static void write_desc_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buf
 
 static void write_files_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
-    alpm_list_t *files;
-    char pkgpath[PATH_MAX];
+    /* TODO: try to preserve as much data as possible. this will always
+     * be NULL at the moment */
+    if (pkg->files) {
+        write_list(buf, "FILES", pkg->files);
+    } else {
+        alpm_list_t *files;
+        char pkgpath[PATH_MAX];
 
-    pkg_real_filename(repo, pkg->filename, pkgpath, NULL);
-    files = alpm_pkg_files(pkgpath);
+        pkg_real_filename(repo, pkg->filename, pkgpath, NULL);
+        files = alpm_pkg_files(pkgpath);
 
-    write_list(buf, "FILES", files);
+        write_list(buf, "FILES", files);
 
-    alpm_list_free_inner(files, free);
-    alpm_list_free(files);
+        alpm_list_free_inner(files, free);
+        alpm_list_free(files);
+    }
 }
 
 static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
