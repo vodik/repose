@@ -428,7 +428,7 @@ static int _alpm_splitname(const char *target, char **name, char **version,
 	return 0;
 }
 
-static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t *pkgcache, const char *entryname,
+static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char *entryname,
 		const char **entry_filename, alpm_pkg_meta_t *likely_pkg)
 {
 	char *pkgname = NULL, *pkgver = NULL;
@@ -454,7 +454,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t *pkgcache, const char 
 			&& strcmp(likely_pkg->name, pkgname) == 0) {
 		pkg = likely_pkg;
 	} else {
-		pkg = _alpm_pkghash_find(pkgcache, pkgname);
+		pkg = _alpm_pkghash_find(*pkgcache, pkgname);
 	}
 	if(pkg == NULL) {
 		pkg = calloc(1, sizeof(alpm_pkg_meta_t));
@@ -477,7 +477,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t *pkgcache, const char 
 		/* add to the collection */
 		/* _alpm_log(db->handle, ALPM_LOG_FUNCTION, "adding '%s' to package cache for db '%s'\n", */
 		/* 		pkg->name, db->treename); */
-		pkgcache = _alpm_pkghash_add_sorted(pkgcache, pkg);
+		*pkgcache = _alpm_pkghash_add_sorted(*pkgcache, pkg);
 	} else {
 		free(pkgname);
 		free(pkgver);
@@ -486,7 +486,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t *pkgcache, const char 
     return pkg;
 }
 
-static void db_read_pkg(alpm_pkghash_t *pkgcache, struct archive_reader *reader,
+static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader,
                         struct archive_entry *entry)
 {
     const char *entryname = archive_entry_pathname(entry);
@@ -561,7 +561,7 @@ int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache)
         /* we have desc, depends, or deltas - parse it */
         /* alpm_pkg_meta_t *pkg = NULL; */
         reader->ret = ARCHIVE_OK;
-        db_read_pkg(*pkgcache, reader, entry);
+        db_read_pkg(pkgcache, reader, entry);
     }
 
 cleanup:
