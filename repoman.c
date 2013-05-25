@@ -406,7 +406,7 @@ static repo_t *find_repo(char *path)
     dot += 3;
 
     if (*dot == '\0') {
-        dot = "tar.gz";
+        dot = ".tar.gz";
     }
 
     snprintf(repo->db.name, PATH_MAX, "%s.db%s", repo->name, dot);
