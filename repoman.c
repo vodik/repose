@@ -415,20 +415,36 @@ static repo_t *find_repo(char *path)
     snprintf(repo->files.name, PATH_MAX, "%s.files%s", repo->name, dot);
     snprintf(repo->files.link, PATH_MAX, "%s.files", repo->name);
 
-    /* check if the repo actually exists */
-    if (access(dbpath, F_OK) < 0) {
-        return repo;
+    /* check if the package database exists */
+    if (access(dbpath, F_OK) == 0) {
+        /* check for a signature */
+        snprintf(sigpath, PATH_MAX, "%s.sig", dbpath);
+        if (access(sigpath, F_OK) == 0) {
+            if (gpgme_verify(dbpath, sigpath) < 0)
+                errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
+        }
+
+        /* load the database into memory */
+        alpm_db_populate(dbpath, &repo->pkgcache);
     }
 
-    /* check for a signature */
-    snprintf(sigpath, PATH_MAX, "%s.sig", dbpath);
-    if (access(sigpath, F_OK) == 0) {
-        if (gpgme_verify(dbpath, sigpath) < 0)
-            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
+    /* check if the file database exists */
+    char filespath[PATH_MAX];
+    snprintf(filespath, PATH_MAX, "%s/%s", repo->root, repo->files.name);
+
+    if (access(filespath, F_OK) == 0) {
+
+        /* check for a signature */
+        snprintf(sigpath, PATH_MAX, "%s.sig", filespath);
+        if (access(sigpath, F_OK) == 0) {
+            if (gpgme_verify(filespath, sigpath) < 0)
+                errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
+        }
+
+        /* load the database into memory */
+        alpm_db_populate(filespath, &repo->pkgcache);
     }
 
-    /* load the database into memory */
-    alpm_db_populate(dbpath, &repo->pkgcache);
     return repo;
 }
 
