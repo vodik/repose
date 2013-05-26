@@ -406,7 +406,7 @@ static repo_t *find_repo(char *path)
     dot += 3;
 
     if (*dot == '\0') {
-        dot = "tar.gz";
+        dot = ".tar.gz";
     }
 
     snprintf(repo->db.name, PATH_MAX, "%s.db%s", repo->name, dot);
@@ -637,7 +637,6 @@ static int update_db(repo_t *repo, int argc, char *argv[])
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
-        char sigpath[PATH_MAX];
         alpm_pkg_meta_t *metadata = pkg->data;
         alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, metadata->name);
 
@@ -676,9 +675,9 @@ static int update_db(repo_t *repo, int argc, char *argv[])
             break;
         case 0:
             /* check to see if the package now has a signature */
-            pkg_real_filename(repo, metadata->filename, NULL, sigpath);
-            if (metadata->base64_sig == NULL && read_pkg_signature(sigpath, metadata) == 0) {
+            if (old->base64_sig == NULL && metadata->base64_sig) {
                 printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
+                old->base64_sig = strdup(metadata->base64_sig);
                 repo->dirty = true;
             }
             break;
