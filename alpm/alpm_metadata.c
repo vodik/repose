@@ -366,6 +366,8 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
             read_desc_list(reader, buf, entry_size, &pkg->optdepends);
         } else if (strcmp(buf, "%MAKEDEPENDS%") == 0) {
             read_desc_list(reader, buf, entry_size, &pkg->makedepends);
+        } else if (strcmp(buf, "%FILES%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->files);
         }
     }
 
@@ -496,7 +498,7 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
 
     alpm_pkg_meta_t *pkg = load_pkg_for_entry(pkgcache, entryname, (const char **)&filename, NULL);
 
-    if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0) {
+    if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0 || strcmp(filename, "files") == 0) {
         read_desc(reader, entry, pkg);
     }
 
@@ -538,10 +540,12 @@ int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache)
         goto cleanup;
     }
 
-    *pkgcache = _alpm_pkghash_create(23);
     if (*pkgcache == NULL) {
-        rc = -1;
-        goto cleanup;
+        *pkgcache = _alpm_pkghash_create(23);
+        if (*pkgcache == NULL) {
+            rc = -1;
+            goto cleanup;
+        }
     }
 
     for (;;) {

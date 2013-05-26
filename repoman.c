@@ -297,12 +297,12 @@ static void repo_write_pkg(repo_t *repo, repo_writer_t *writer, alpm_pkg_meta_t 
         archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
     }
 
+    /* generate the 'files' file */
     if (contents & DB_FILES) {
         archive_entry_clear(writer->entry);
         buffer_clear(&writer->buf);
         write_files_file(repo, pkg, &writer->buf);
 
-        /* generate the 'depends' file */
         snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "files");
         archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
     }
@@ -331,13 +331,13 @@ static void symlink_database(repo_t *repo, file_t *db)
 static void sign_database(repo_t *repo, file_t *db)
 {
     char sigpath[PATH_MAX];
-    char repopath[PATH_MAX];
+    char dbpath[PATH_MAX];
     char link[PATH_MAX];
 
     /* XXX: check return type */
-    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, db->name);
+    snprintf(dbpath, PATH_MAX, "%s/%s", repo->root, db->name);
     snprintf(sigpath, PATH_MAX, "%s/%s.sig", repo->root, db->name);
-    gpgme_sign(repopath, sigpath, cfg.key);
+    gpgme_sign(dbpath, sigpath, cfg.key);
 
     snprintf(link, PATH_MAX, "%s/%s.sig", repo->root, db->link);
     snprintf(sigpath, PATH_MAX, "%s.sig", db->name);
@@ -348,10 +348,10 @@ static void sign_database(repo_t *repo, file_t *db)
 /* TODO: compy as much data as possible from the existing repo */
 static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, int contents)
 {
-    char repopath[PATH_MAX];
+    char dbpath[PATH_MAX];
 
-    snprintf(repopath, PATH_MAX, "%s/%s", repo->root, db->name);
-    repo_writer_t *writer = repo_write_new(repopath, repo->compression);
+    snprintf(dbpath, PATH_MAX, "%s/%s", repo->root, db->name);
+    repo_writer_t *writer = repo_write_new(dbpath, repo->compression);
     alpm_list_t *pkg, *pkgs = cache->list;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -365,10 +365,28 @@ static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, in
     sign_database(repo, db);
 }
 
-static repo_t *find_repo(char *path)
+static void load_database(repo_t *repo, file_t *db, alpm_pkghash_t **cache)
 {
     char dbpath[PATH_MAX];
     char sigpath[PATH_MAX];
+
+    snprintf(dbpath, PATH_MAX, "%s/%s", repo->root, db->name);
+    if (access(dbpath, F_OK) == 0) {
+        /* check for a signature */
+        snprintf(sigpath, PATH_MAX, "%s.sig", dbpath);
+        if (access(sigpath, F_OK) == 0) {
+            if (gpgme_verify(dbpath, sigpath) < 0)
+                errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
+        }
+
+        /* load the database into memory */
+        alpm_db_populate(dbpath, cache);
+    }
+}
+
+static repo_t *find_repo(char *path)
+{
+    char dbpath[PATH_MAX];
 
     if (realpath(path, dbpath) == NULL && errno != ENOENT)
         err(EXIT_FAILURE, "failed to find repo");
@@ -409,85 +427,19 @@ static repo_t *find_repo(char *path)
         dot = ".tar.gz";
     }
 
+    /* populate the package database paths */
     snprintf(repo->db.name, PATH_MAX, "%s.db%s", repo->name, dot);
     snprintf(repo->db.link, PATH_MAX, "%s.db", repo->name);
 
+    /* populate the files database paths */
     snprintf(repo->files.name, PATH_MAX, "%s.files%s", repo->name, dot);
     snprintf(repo->files.link, PATH_MAX, "%s.files", repo->name);
 
-    /* check if the repo actually exists */
-    if (access(dbpath, F_OK) < 0) {
-        return repo;
-    }
+    /* load the databases if possible */
+    load_database(repo, &repo->db, &repo->pkgcache);
+    load_database(repo, &repo->files, &repo->pkgcache);
 
-    /* check for a signature */
-    snprintf(sigpath, PATH_MAX, "%s.sig", dbpath);
-    if (access(sigpath, F_OK) == 0) {
-        if (gpgme_verify(dbpath, sigpath) < 0)
-            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
-    }
-
-    /* load the database into memory */
-    alpm_db_populate(dbpath, &repo->pkgcache);
     return repo;
-}
-
-static inline alpm_list_t *load_pkg(alpm_list_t *list, repo_t *repo, const char *filepath)
-{
-    alpm_pkg_meta_t *metadata;
-    char *basename = strrchr(filepath, '/');
-    char realpath[PATH_MAX];
-
-    if (basename) {
-        if (memcmp(filepath, repo->root, basename - filepath) != 0) {
-            warnx("%s is not in the same path as the database", filepath);
-            return list;
-        }
-    } else {
-        pkg_real_filename(repo, filepath, realpath, NULL);
-        filepath = realpath;
-    }
-
-    alpm_pkg_load_metadata(filepath, &metadata);
-    if (metadata)
-        list = alpm_list_add(list, metadata);
-    return list;
-}
-
-static alpm_list_t *find_all_packages(repo_t *repo)
-{
-    struct dirent *dp;
-    DIR *dir = opendir(repo->root);
-    alpm_list_t *pkgs = NULL;
-
-    if (dir == NULL)
-        err(EXIT_FAILURE, "failed to open directory");
-
-    while ((dp = readdir(dir))) {
-        if (!(dp->d_type & DT_REG))
-            continue;
-
-        if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
-            fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
-            continue;
-
-        /* printf("LOADING: %s\n", dp->d_name); */
-        pkgs = load_pkg(pkgs, repo, dp->d_name);
-    }
-
-    closedir(dir);
-    return pkgs;
-}
-
-static alpm_list_t *find_packages(repo_t *repo, char *pkg_list[], int count)
-{
-    int i;
-    alpm_list_t *pkgs = NULL;
-
-    for (i = 0; i < count; ++i)
-        pkgs = load_pkg(pkgs, repo, pkg_list[i]);
-
-    return pkgs;
 }
 
 static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
@@ -501,6 +453,71 @@ static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
     unlink(pkgpath);
     unlink(sigpath);
     return 0;
+}
+
+static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, const char *filepath)
+{
+    alpm_pkg_meta_t *metadata, *old;
+    char *basename = strrchr(filepath, '/');
+    char realpath[PATH_MAX];
+
+    if (basename) {
+        if (memcmp(filepath, repo->root, basename - filepath) != 0) {
+            warnx("%s is not in the same path as the database", filepath);
+            return cache;
+        }
+    } else {
+        pkg_real_filename(repo, filepath, realpath, NULL);
+        filepath = realpath;
+    }
+
+    alpm_pkg_load_metadata(realpath, &metadata);
+    if (!metadata)
+        return cache;
+
+    old = _alpm_pkghash_find(cache, metadata->name);
+    if (old) {
+        cache = _alpm_pkghash_remove(cache, old, NULL);
+        if (cfg.clean >= 2)
+            unlink_pkg_files(repo, old);
+        alpm_pkg_free_metadata(old);
+    }
+    return _alpm_pkghash_add(cache, metadata);
+}
+
+static alpm_pkghash_t *find_all_packages(repo_t *repo)
+{
+    struct dirent *dp;
+    DIR *dir = opendir(repo->root);
+    alpm_pkghash_t *cache = _alpm_pkghash_create(23);
+
+    if (dir == NULL)
+        err(EXIT_FAILURE, "failed to open directory");
+
+    while ((dp = readdir(dir))) {
+        if (!(dp->d_type & DT_REG))
+            continue;
+
+        if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
+            fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
+            continue;
+
+        cache = load_pkg(cache, repo, dp->d_name);
+    }
+
+    closedir(dir);
+    return cache;
+}
+
+static alpm_pkghash_t *find_packages(repo_t *repo, char *pkg_list[], int count)
+{
+    int i;
+    alpm_pkghash_t *cache = _alpm_pkghash_create(23);
+
+    for (i = 0; i < count; ++i)
+        cache = load_pkg(cache, repo, pkg_list[i]);
+
+    return cache;
 }
 
 /* {{{ VERIFY */
@@ -615,10 +632,12 @@ static int update_db(repo_t *repo, int argc, char *argv[])
     alpm_list_t *pkg, *pkgs;
     bool force = false;
     if (argc > 0) {
-        pkgs = find_packages(repo, argv, argc);
+        alpm_pkghash_t *filecache = find_packages(repo, argv, argc);
+        pkgs = filecache->list;
         force = true;
     } else {
-        pkgs = find_all_packages(repo);
+        alpm_pkghash_t *filecache = find_all_packages(repo);
+        pkgs = filecache->list;
     }
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
