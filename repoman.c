@@ -476,13 +476,20 @@ static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, cons
         return cache;
 
     old = _alpm_pkghash_find(cache, metadata->name);
-    if (old) {
-        cache = _alpm_pkghash_remove(cache, old, NULL);
-        if (cfg.clean >= 2)
-            unlink_pkg_files(repo, old);
-        alpm_pkg_free_metadata(old);
+    int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
+
+    if (vercmp == 0 && vercmp == 1) {
+        if (old) {
+            cache = _alpm_pkghash_remove(cache, old, NULL);
+            if (cfg.clean >= 2)
+                unlink_pkg_files(repo, old);
+            alpm_pkg_free_metadata(old);
+        }
+        return _alpm_pkghash_add(cache, metadata);
+    } else {
+        alpm_pkg_free_metadata(metadata);
+        return cache;
     }
-    return _alpm_pkghash_add(cache, metadata);
 }
 
 static alpm_pkghash_t *find_all_packages(repo_t *repo)
