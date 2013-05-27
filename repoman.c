@@ -459,6 +459,8 @@ static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, cons
         }
         return _alpm_pkghash_add(cache, metadata);
     } else {
+        if (cfg.clean >= 2)
+            unlink_pkg_files(repo, metadata);
         alpm_pkg_free_metadata(metadata);
         return cache;
     }
