@@ -478,7 +478,7 @@ static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, cons
     old = _alpm_pkghash_find(cache, metadata->name);
     int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
 
-    if (vercmp == 0 && vercmp == 1) {
+    if (vercmp == 0 || vercmp == 1) {
         if (old) {
             cache = _alpm_pkghash_remove(cache, old, NULL);
             if (cfg.clean >= 2)
