@@ -215,14 +215,8 @@ static void write_files_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct bu
     if (pkg->files) {
         write_list(buf, "FILES", pkg->files);
     } else {
-        alpm_list_t *files;
-        char pkgpath[PATH_MAX];
-
-        pkg_real_filename(repo, pkg->filename, pkgpath, NULL);
-        files = alpm_pkg_files(pkgpath);
-
+        alpm_list_t *files = alpm_pkg_files(repo->dirfd, pkg->filename);
         write_list(buf, "FILES", files);
-
         alpm_list_free_inner(files, free);
         alpm_list_free(files);
     }
