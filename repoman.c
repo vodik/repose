@@ -334,16 +334,13 @@ static void symlink_database(repo_t *repo, file_t *db)
 static void sign_database(repo_t *repo, file_t *db)
 {
     char sigpath[PATH_MAX];
-    char dbpath[PATH_MAX];
     char link[PATH_MAX];
 
     /* XXX: check return type */
-    snprintf(dbpath, PATH_MAX, "%s/%s", repo->root, db->name);
-    snprintf(sigpath, PATH_MAX, "%s/%s.sig", repo->root, db->name);
-    gpgme_sign(dbpath, sigpath, cfg.key);
+    snprintf(sigpath, PATH_MAX, "%s.sig", db->name);
+    gpgme_sign(repo->dirfd, db->name, sigpath, cfg.key);
 
     snprintf(link, PATH_MAX, "%s/%s.sig", repo->root, db->link);
-    snprintf(sigpath, PATH_MAX, "%s.sig", db->name);
     if (symlink(sigpath, link) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink to %s failed", link);
 }
