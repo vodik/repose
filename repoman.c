@@ -173,6 +173,8 @@ static void write_depends_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 
 static void write_desc_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
+    /* TODO: port alpm_compute_sha256sum / alpm_compute_sha256sum to
+     * something that takes a dirfd */
     char pkgpath[PATH_MAX];
 
     pkg_real_filename(repo, pkg->filename, pkgpath, NULL);
@@ -323,15 +325,6 @@ static void repo_write_close(repo_writer_t *writer)
 }
 /* }}} */
 
-static void symlink_database(repo_t *repo, file_t *db)
-{
-    char linkpath[PATH_MAX];
-
-    snprintf(linkpath, PATH_MAX, "%s/%s", repo->root, db->link);
-    if (symlink(db->name, linkpath) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink to %s failed", linkpath);
-}
-
 static void sign_database(repo_t *repo, file_t *db)
 {
     char sigpath[PATH_MAX];
@@ -339,8 +332,9 @@ static void sign_database(repo_t *repo, file_t *db)
     /* XXX: check return type */
     gpgme_sign(repo->dirfd, db->name, db->sig, cfg.key);
 
-    snprintf(sigpath, PATH_MAX, "%s.sig", db->name);
-    if (symlinkat(sigpath, repo->dirfd, sigpath) < 0 && errno != EEXIST)
+    snprintf(sigpath, PATH_MAX, "%s.sig", db->link);
+    printf("SIGNING %s -> %s\n", db->sig, sigpath);
+    if (symlinkat(db->sig, repo->dirfd, sigpath) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink for %s failed", sigpath);
 }
 
@@ -357,7 +351,10 @@ static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, in
 
     repo_write_close(writer);
 
-    symlink_database(repo, db);
+    /* make the appropriate symlink for the database */
+    if (symlinkat(db->name, repo->dirfd, db->link) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink for %s failed", db->link);
+
     sign_database(repo, db);
 }
 
