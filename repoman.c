@@ -67,9 +67,8 @@ enum contents {
 };
 
 typedef struct file {
-    char name[PATH_MAX];
-    char link[PATH_MAX];
-    char sig[PATH_MAX];
+    char *file, *file_link;
+    char *sig,  *sig_link;
 } file_t;
 
 typedef struct repo {
@@ -269,9 +268,9 @@ static repo_writer_t *repo_write_new(repo_t *repo, file_t *db)
     archive_write_set_format_pax_restricted(writer->archive);
 
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    writer->fd = openat(repo->dirfd, db->name, O_CREAT | O_WRONLY | O_TRUNC, mode);
+    writer->fd = openat(repo->dirfd, db->file, O_CREAT | O_WRONLY | O_TRUNC, mode);
     if (writer->fd < 0)
-        err(EXIT_FAILURE, "failed to open %s for writing", db->name);
+        err(EXIT_FAILURE, "failed to open %s for writing", db->file);
     archive_write_open_fd(writer->archive, writer->fd);
 
     buffer_init(&writer->buf, 1024);
@@ -327,15 +326,11 @@ static void repo_write_close(repo_writer_t *writer)
 
 static void sign_database(repo_t *repo, file_t *db)
 {
-    char sigpath[PATH_MAX];
-
     /* XXX: check return type */
-    gpgme_sign(repo->dirfd, db->name, db->sig, cfg.key);
+    gpgme_sign(repo->dirfd, db->file, db->sig, cfg.key);
 
-    snprintf(sigpath, PATH_MAX, "%s.sig", db->link);
-    printf("SIGNING %s -> %s\n", db->sig, sigpath);
-    if (symlinkat(db->sig, repo->dirfd, sigpath) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink for %s failed", sigpath);
+    if (symlinkat(db->sig, repo->dirfd, db->sig_link) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink for %s failed", db->sig_link);
 }
 
 /* TODO: compy as much data as possible from the existing repo */
@@ -352,8 +347,8 @@ static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, in
     repo_write_close(writer);
 
     /* make the appropriate symlink for the database */
-    if (symlinkat(db->name, repo->dirfd, db->link) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink for %s failed", db->link);
+    if (symlinkat(db->file, repo->dirfd, db->file_link) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink for %s failed", db->file_link);
 
     sign_database(repo, db);
 }
@@ -361,12 +356,12 @@ static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, in
 static void load_database(repo_t *repo, file_t *db, alpm_pkghash_t **cache)
 {
     /* FIXME: error reporting should be here, not inside this funciton */
-    if (alpm_db_populate(repo->dirfd, db->name, cache) < 0)
+    if (alpm_db_populate(repo->dirfd, db->file, cache) < 0)
         return;
 
     if (faccessat(repo->dirfd, db->sig, F_OK, 0) == 0) {
         /* check for a signature */
-        if (gpgme_verify(repo->dirfd, db->name, db->sig) < 0)
+        if (gpgme_verify(repo->dirfd, db->file, db->sig) < 0)
             errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
     }
 }
@@ -418,14 +413,16 @@ static repo_t *find_repo(char *path)
     }
 
     /* populate the package database paths */
-    snprintf(repo->db.name, PATH_MAX, "%s.db%s",     repo->name, dot);
-    snprintf(repo->db.sig,  PATH_MAX, "%s.db%s.sig", repo->name, dot);
-    snprintf(repo->db.link, PATH_MAX, "%s.db",       repo->name);
+    asprintf(&repo->db.file,      "%s.db%s",     repo->name, dot);
+    asprintf(&repo->db.sig,       "%s.db%s.sig", repo->name, dot);
+    asprintf(&repo->db.file_link, "%s.db",       repo->name);
+    asprintf(&repo->db.sig_link,  "%s.db.sig",   repo->name);
 
     /* populate the files database paths */
-    snprintf(repo->files.name, PATH_MAX, "%s.files%s",     repo->name, dot);
-    snprintf(repo->files.sig,  PATH_MAX, "%s.files%s.sig", repo->name, dot);
-    snprintf(repo->files.link, PATH_MAX, "%s.files",       repo->name);
+    asprintf(&repo->files.file,      "%s.files%s",     repo->name, dot);
+    asprintf(&repo->files.sig,       "%s.files%s.sig", repo->name, dot);
+    asprintf(&repo->files.file_link, "%s.files",       repo->name);
+    asprintf(&repo->files.sig_link,  "%s.files.sig",   repo->name);
 
     /* load the databases if possible */
     load_database(repo, &repo->db, &repo->pkgcache);
