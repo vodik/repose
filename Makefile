@@ -6,11 +6,11 @@ CFLAGS := -std=c99 \
 	${CFLAGS}
 	# -DENVOY_VERSION=\"${VERSION}\" \
 
-LDLIBS = -larchive -lalpm -lgpgme
+LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
 
 all: repoman
 repoman: repoman.o buffer.o alpm/alpm_metadata.o alpm/archive_reader.o \
-	alpm/pkghash.o alpm/signing.o alpm/base64.o
+	alpm/pkghash.o alpm/signing.o alpm/base64.o alpm/util.o
 
 install: repoman
 	install -Dm755 repoman ${DESTDIR}/usr/bin/repoman

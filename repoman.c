@@ -23,6 +23,7 @@
 #include "alpm/alpm_metadata.h"
 #include "alpm/pkghash.h"
 #include "alpm/signing.h"
+#include "alpm/util.h"
 #include "buffer.h"
 
 #define NOCOLOR     "\033[0m"
@@ -172,11 +173,6 @@ static void write_depends_file(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 
 static void write_desc_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
-    /* TODO: port alpm_compute_sha256sum / alpm_compute_sha256sum to
-     * something that takes a dirfd */
-    char pkgpath[PATH_MAX];
-
-    pkg_real_filename(repo, pkg->filename, pkgpath, NULL);
     write_string(buf, "FILENAME",  pkg->filename);
     write_string(buf, "NAME",      pkg->name);
     write_string(buf, "VERSION",   pkg->version);
@@ -187,7 +183,7 @@ static void write_desc_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buf
     if (pkg->md5sum) {
         write_string(buf, "MD5SUM", pkg->md5sum);
     } else {
-        char *md5sum = alpm_compute_md5sum(pkgpath);
+        char *md5sum = _compute_md5sum(repo->dirfd, pkg->filename);
         write_string(buf, "MD5SUM", md5sum);
         free(md5sum);
     }
@@ -195,7 +191,7 @@ static void write_desc_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buf
     if (pkg->sha256sum) {
         write_string(buf, "SHA256SUM", pkg->sha256sum);
     } else {
-        char *sha256sum = alpm_compute_sha256sum(pkgpath);
+        char *sha256sum = _compute_sha256sum(repo->dirfd, pkg->filename);
         write_string(buf, "SHA256SUM", sha256sum);
         free(sha256sum);
     }
@@ -523,12 +519,10 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
     /* TODO:
      *  - signature filename for packages still has to be generated on
      *    the fly
-     *  - alpm_compute_md5sum and sha256sum still require fullpaths
      **/
     char sigpath[PATH_MAX];
-    char pkgpath[PATH_MAX];
 
-    pkg_real_filename(repo, pkg->filename, pkgpath, sigpath);
+    pkg_real_filename(repo, pkg->filename, NULL, sigpath);
 
     /* if we have a signature, verify it */
     if (faccessat(repo->dirfd, sigpath, F_OK, 0) == 0 && gpgme_verify(repo->dirfd, pkg->filename, sigpath) < 0) {
@@ -538,7 +532,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 
     /* if we have a md5sum, verify it */
     if (pkg->md5sum) {
-        char *md5sum = alpm_compute_md5sum(pkgpath);
+        char *md5sum = _compute_md5sum(repo->dirfd, pkg->filename);
         if (strcmp(pkg->md5sum, md5sum) != 0) {
             warnx("md5 sum for pkg %s is different", pkg->name);
             return 1;
@@ -548,7 +542,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 
     /* if we have a sha256sum, verify it */
     if (pkg->sha256sum) {
-        char *sha256sum = alpm_compute_sha256sum(pkgpath);
+        char *sha256sum = _compute_sha256sum(repo->dirfd, pkg->filename);
         if (strcmp(pkg->sha256sum, sha256sum) != 0) {
             warnx("sha256 sum for pkg %s is different", pkg->name);
             return 1;
