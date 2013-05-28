@@ -436,14 +436,14 @@ static repo_t *find_repo(char *path)
 
 static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
 {
-    char pkgpath[PATH_MAX];
     char sigpath[PATH_MAX];
 
-    pkg_real_filename(repo, metadata->filename, pkgpath, sigpath);
     printf("DELETING: %s-%s\n", metadata->name, metadata->version);
 
-    unlink(pkgpath);
-    unlink(sigpath);
+    /* TODO: store pkg signature filepath somewhere */
+    pkg_real_filename(repo, metadata->filename, NULL, sigpath);
+    unlinkat(repo->dirfd, metadata->filename, 0);
+    unlinkat(repo->dirfd, sigpath, 0);
     return 0;
 }
 
