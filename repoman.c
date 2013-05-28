@@ -6,6 +6,7 @@
 #include <getopt.h>
 #include <time.h>
 #include <limits.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <err.h>
 #include <errno.h>
@@ -78,12 +79,14 @@ typedef struct repo {
     file_t files;
     bool dirty;
     enum compress compression;
+    int dirfd;
 } repo_t;
 
 typedef struct repo_writer {
     struct archive *archive;
     struct archive_entry *entry;
     struct buffer buf;
+    int fd;
 } repo_writer_t;
 
 typedef struct colstr {
@@ -242,13 +245,13 @@ static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
     archive_write_data(a, buf->data, buf->len);
 }
 
-static repo_writer_t *repo_write_new(const char *filename, enum compress compression)
+static repo_writer_t *repo_write_new(repo_t *repo, file_t *db)
 {
     repo_writer_t *writer = malloc(sizeof(repo_writer_t));
     writer->archive = archive_write_new();
     writer->entry = archive_entry_new();
 
-    switch (compression) {
+    switch (repo->compression) {
     case COMPRESS_NONE:
         archive_write_add_filter_none(writer->archive);
         break;
@@ -265,8 +268,14 @@ static repo_writer_t *repo_write_new(const char *filename, enum compress compres
         archive_write_add_filter_compress(writer->archive);
         break;
     }
+
     archive_write_set_format_pax_restricted(writer->archive);
-    archive_write_open_filename(writer->archive, filename);
+
+    mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    writer->fd = openat(repo->dirfd, db->name, O_CREAT | O_WRONLY | O_TRUNC, mode);
+    if (writer->fd < 0)
+        err(EXIT_FAILURE, "failed to open %s for writing", db->name);
+    archive_write_open_fd(writer->archive, writer->fd);
 
     buffer_init(&writer->buf, 1024);
 
@@ -310,7 +319,7 @@ static void repo_write_pkg(repo_t *repo, repo_writer_t *writer, alpm_pkg_meta_t 
 
 static void repo_write_close(repo_writer_t *writer)
 {
-    archive_write_close(writer->archive);
+    /* archive_write_close(writer->archive); */
 
     buffer_free(&writer->buf);
     archive_entry_free(writer->entry);
@@ -348,10 +357,7 @@ static void sign_database(repo_t *repo, file_t *db)
 /* TODO: compy as much data as possible from the existing repo */
 static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, int contents)
 {
-    char dbpath[PATH_MAX];
-
-    snprintf(dbpath, PATH_MAX, "%s/%s", repo->root, db->name);
-    repo_writer_t *writer = repo_write_new(dbpath, repo->compression);
+    repo_writer_t *writer = repo_write_new(repo, db);
     alpm_list_t *pkg, *pkgs = cache->list;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -419,6 +425,9 @@ static repo_t *find_repo(char *path)
 
     memcpy(repo->root, dbpath, div - dbpath);
     memcpy(repo->name, div + 1, dot - div - 1);
+
+    /* open the directory so we can use openat later */
+    repo->dirfd = open(repo->root, O_RDONLY);
 
     /* skip '.db' */
     dot += 3;
