@@ -8,6 +8,7 @@ typedef struct __alpm_pkghash_t alpm_pkghash_t;
 typedef struct alpm_pkg_meta {
     unsigned long name_hash;
     char *filename;
+    char *signame;
     char *name;
     char *version;
     char *desc;
@@ -29,8 +30,8 @@ typedef struct alpm_pkg_meta {
     alpm_list_t *files;
 } alpm_pkg_meta_t;
 
-int read_pkg_signature(const char *path, alpm_pkg_meta_t *pkg);
-int alpm_pkg_load_metadata(const char *filename, alpm_pkg_meta_t **pkg);
+int read_pkg_signature(int dirfd, alpm_pkg_meta_t *pkg);
+int alpm_pkg_load_metadata(int dirfd, const char *pkgname, alpm_pkg_meta_t **_pkg);
 void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg);
 
 alpm_list_t *alpm_pkg_files(int dirfd, char *pkgname);

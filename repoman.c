@@ -133,14 +133,6 @@ static int colon_printf(const char *fmt, ...)
     return ret;
 }
 
-static inline void pkg_real_filename(repo_t *repo, const char *pkgname, char *pkgpath, char *sigpath)
-{
-    if (pkgpath)
-        snprintf(pkgpath, PATH_MAX, "%s/%s", repo->root, pkgname);
-    if (sigpath)
-        snprintf(sigpath, PATH_MAX, "%s/%s.sig", repo->root, pkgname);
-}
-
 /* {{{ WRITING REPOS */
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
@@ -429,14 +421,11 @@ static repo_t *find_repo(char *path)
 
 static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
 {
-    char sigpath[PATH_MAX];
-
     printf("DELETING: %s-%s\n", metadata->name, metadata->version);
 
     /* TODO: store pkg signature filepath somewhere */
-    pkg_real_filename(repo, metadata->filename, NULL, sigpath);
     unlinkat(repo->dirfd, metadata->filename, 0);
-    unlinkat(repo->dirfd, sigpath, 0);
+    unlinkat(repo->dirfd, metadata->signame, 0);
     return 0;
 }
 
@@ -444,19 +433,15 @@ static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, cons
 {
     alpm_pkg_meta_t *metadata, *old;
     char *basename = strrchr(filepath, '/');
-    char realpath[PATH_MAX];
 
     if (basename) {
         if (memcmp(filepath, repo->root, basename - filepath) != 0) {
             warnx("%s is not in the same path as the database", filepath);
             return cache;
         }
-    } else {
-        pkg_real_filename(repo, filepath, realpath, NULL);
-        filepath = realpath;
     }
 
-    alpm_pkg_load_metadata(realpath, &metadata);
+    alpm_pkg_load_metadata(repo->dirfd, filepath, &metadata);
     if (!metadata)
         return cache;
 
@@ -520,12 +505,9 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
      *  - signature filename for packages still has to be generated on
      *    the fly
      **/
-    char sigpath[PATH_MAX];
-
-    pkg_real_filename(repo, pkg->filename, NULL, sigpath);
-
     /* if we have a signature, verify it */
-    if (faccessat(repo->dirfd, sigpath, F_OK, 0) == 0 && gpgme_verify(repo->dirfd, pkg->filename, sigpath) < 0) {
+    if (faccessat(repo->dirfd, pkg->signame, F_OK, 0) == 0 &&
+        gpgme_verify(repo->dirfd, pkg->filename, pkg->signame) < 0) {
         warnx("package %s, signature is invalid or corrupt!", pkg->name);
         return 1;
     }

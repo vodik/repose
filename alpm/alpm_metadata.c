@@ -74,23 +74,24 @@ static void read_pkg_metadata(struct archive *archive, struct archive_entry *ent
     free(line);
 }
 
-int read_pkg_signature(const char *path, alpm_pkg_meta_t *pkg)
+int read_pkg_signature(int dirfd, alpm_pkg_meta_t *pkg)
 {
-    char sig[PATH_MAX];
     size_t sig_len = 0;
     struct stat st;
     char *memblock = MAP_FAILED;
     int fd = 0;
 
-    snprintf(sig, PATH_MAX, "%s.sig", path);
-    fd = open(sig, O_RDONLY);
+    if (!pkg->signame)
+        asprintf(&pkg->signame, "%s.sig", pkg->filename);
+
+    fd = openat(dirfd, pkg->signame, O_RDONLY);
     if (fd < 0)
         return -1;
 
     fstat(fd, &st);
     memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (memblock == MAP_FAILED)
-        err(EXIT_FAILURE, "failed to mmap package signature %s", sig);
+        err(EXIT_FAILURE, "failed to mmap package signature %s", pkg->signame);
 
     sig_len = st.st_size * 4 / 3 + 3;
     pkg->base64_sig = malloc(sig_len);
@@ -103,7 +104,7 @@ int read_pkg_signature(const char *path, alpm_pkg_meta_t *pkg)
     return 0;
 }
 
-int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
+int alpm_pkg_load_metadata(int dirfd, const char *pkgname, alpm_pkg_meta_t **_pkg)
 {
     struct archive *archive = NULL;
     alpm_pkg_meta_t *pkg;
@@ -111,10 +112,10 @@ int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
     char *memblock = MAP_FAILED;
     int fd = 0, rc = 0;
 
-    fd = open(filepath, O_RDONLY);
+    fd = openat(dirfd, pkgname, O_RDONLY);
     if (fd < 0) {
         if(errno != ENOENT)
-            err(EXIT_FAILURE, "failed to open %s", filepath);
+            err(EXIT_FAILURE, "failed to open %s", pkgname);
         rc = -errno;
         goto cleanup;
     }
@@ -122,7 +123,7 @@ int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
     fstat(fd, &st);
     memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (memblock == MAP_FAILED)
-        err(EXIT_FAILURE, "failed to mmap package %s", filepath);
+        err(EXIT_FAILURE, "failed to mmap package %s", pkgname);
 
     archive = archive_read_new();
     archive_read_support_filter_all(archive);
@@ -130,7 +131,7 @@ int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
 
     int r = archive_read_open_memory(archive, memblock, st.st_size);
     if (r != ARCHIVE_OK) {
-        warnx("%s is not an archive", filepath);
+        warnx("%s is not an archive", pkgname);
         rc = -1;
         goto cleanup;
     }
@@ -154,12 +155,12 @@ int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
         }
     }
 
-    const char *filename = strrchr(filepath, '/');
-    pkg->filename = strdup(filename ? filename + 1 : filepath);
+    const char *filename = strrchr(pkgname, '/');
+    pkg->filename = strdup(filename ? filename + 1 : pkgname);
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
     pkg->size = st.st_size;
 
-    read_pkg_signature(filepath, pkg);
+    read_pkg_signature(dirfd, pkg);
 
     *_pkg = pkg;
 
@@ -181,6 +182,7 @@ cleanup:
 void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
 {
     free(pkg->filename);
+    free(pkg->signame);
     free(pkg->name);
     free(pkg->version);
     free(pkg->desc);
