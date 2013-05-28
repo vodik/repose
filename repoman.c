@@ -69,6 +69,7 @@ enum contents {
 typedef struct file {
     char name[PATH_MAX];
     char link[PATH_MAX];
+    char sig[PATH_MAX];
 } file_t;
 
 typedef struct repo {
@@ -334,15 +335,13 @@ static void symlink_database(repo_t *repo, file_t *db)
 static void sign_database(repo_t *repo, file_t *db)
 {
     char sigpath[PATH_MAX];
-    char link[PATH_MAX];
 
     /* XXX: check return type */
-    snprintf(sigpath, PATH_MAX, "%s.sig", db->name);
-    gpgme_sign(repo->dirfd, db->name, sigpath, cfg.key);
+    gpgme_sign(repo->dirfd, db->name, db->sig, cfg.key);
 
-    snprintf(link, PATH_MAX, "%s/%s.sig", repo->root, db->link);
-    if (symlink(sigpath, link) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink to %s failed", link);
+    snprintf(sigpath, PATH_MAX, "%s.sig", db->name);
+    if (symlinkat(sigpath, repo->dirfd, sigpath) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink for %s failed", sigpath);
 }
 
 /* TODO: compy as much data as possible from the existing repo */
@@ -364,20 +363,14 @@ static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, in
 
 static void load_database(repo_t *repo, file_t *db, alpm_pkghash_t **cache)
 {
-    char dbpath[PATH_MAX];
-    char sigpath[PATH_MAX];
+    /* FIXME: error reporting should be here, not inside this funciton */
+    if (alpm_db_populate(repo->dirfd, db->name, cache) < 0)
+        return;
 
-    snprintf(dbpath, PATH_MAX, "%s/%s", repo->root, db->name);
-    if (access(dbpath, F_OK) == 0) {
+    if (faccessat(repo->dirfd, db->sig, F_OK, 0) == 0) {
         /* check for a signature */
-        snprintf(sigpath, PATH_MAX, "%s.sig", dbpath);
-        if (access(sigpath, F_OK) == 0) {
-            if (gpgme_verify(dbpath, sigpath) < 0)
-                errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
-        }
-
-        /* load the database into memory */
-        alpm_db_populate(dbpath, cache);
+        if (gpgme_verify(repo->dirfd, db->name, db->sig) < 0)
+            errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
     }
 }
 
@@ -428,12 +421,14 @@ static repo_t *find_repo(char *path)
     }
 
     /* populate the package database paths */
-    snprintf(repo->db.name, PATH_MAX, "%s.db%s", repo->name, dot);
-    snprintf(repo->db.link, PATH_MAX, "%s.db", repo->name);
+    snprintf(repo->db.name, PATH_MAX, "%s.db%s",     repo->name, dot);
+    snprintf(repo->db.sig,  PATH_MAX, "%s.db%s.sig", repo->name, dot);
+    snprintf(repo->db.link, PATH_MAX, "%s.db",       repo->name);
 
     /* populate the files database paths */
-    snprintf(repo->files.name, PATH_MAX, "%s.files%s", repo->name, dot);
-    snprintf(repo->files.link, PATH_MAX, "%s.files", repo->name);
+    snprintf(repo->files.name, PATH_MAX, "%s.files%s",     repo->name, dot);
+    snprintf(repo->files.sig,  PATH_MAX, "%s.files%s.sig", repo->name, dot);
+    snprintf(repo->files.link, PATH_MAX, "%s.files",       repo->name);
 
     /* load the databases if possible */
     load_database(repo, &repo->db, &repo->pkgcache);
@@ -523,20 +518,26 @@ static alpm_pkghash_t *find_packages(repo_t *repo, char *pkg_list[], int count)
 /* {{{ VERIFY */
 static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 {
-    char pkgpath[PATH_MAX];
-    char sigpath[PATH_MAX];
-
-    pkg_real_filename(repo, pkg->filename, pkgpath, deep ? sigpath : NULL);
-    if (access(pkgpath, F_OK) < 0) {
-        warn("couldn't find pkg %s at %s", pkg->name, pkgpath);
+    if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
+        warn("couldn't find pkg %s at %s", pkg->name, pkg->filename);
         return 1;
     }
 
     if (!deep)
         return 0;
 
+    /* TODO:
+     *  - signature filename for packages still has to be generated on
+     *    the fly
+     *  - alpm_compute_md5sum and sha256sum still require fullpaths
+     **/
+    char sigpath[PATH_MAX];
+    char pkgpath[PATH_MAX];
+
+    pkg_real_filename(repo, pkg->filename, pkgpath, sigpath);
+
     /* if we have a signature, verify it */
-    if (access(sigpath, F_OK) == 0 && gpgme_verify(pkgpath, sigpath) < 0) {
+    if (faccessat(repo->dirfd, sigpath, F_OK, 0) == 0 && gpgme_verify(repo->dirfd, pkg->filename, sigpath) < 0) {
         warnx("package %s, signature is invalid or corrupt!", pkg->name);
         return 1;
     }

@@ -113,7 +113,7 @@ int alpm_pkg_load_metadata(const char *filepath, alpm_pkg_meta_t **_pkg)
 
     fd = open(filepath, O_RDONLY);
     if (fd < 0) {
-        if(errno == ENOENT)
+        if(errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", filepath);
         rc = -errno;
         goto cleanup;
@@ -506,7 +506,7 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
     /* free(filename); */
 }
 
-int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache)
+int alpm_db_populate(int dirfd, const char *filename, alpm_pkghash_t **pkgcache)
 {
     struct archive *archive = NULL;
     struct archive_reader* reader = NULL;
@@ -514,9 +514,9 @@ int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache)
     char *memblock = MAP_FAILED;
     int fd = 0, rc = 0;
 
-    fd = open(filename, O_RDONLY);
+    fd = openat(dirfd, filename, O_RDONLY);
     if (fd < 0) {
-        if(errno == ENOENT)
+        if(errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", filename);
         rc = -errno;
         goto cleanup;
@@ -526,7 +526,6 @@ int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache)
     memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (memblock == MAP_FAILED)
         err(EXIT_FAILURE, "failed to mmap package %s", filename);
-
 
     archive = archive_read_new();
     reader = archive_reader_new(archive);

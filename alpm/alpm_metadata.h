@@ -35,6 +35,6 @@ void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg);
 
 alpm_list_t *alpm_pkg_files(int dirfd, char *pkgname);
 
-int alpm_db_populate(const char *filename, alpm_pkghash_t **pkgcache);
+int alpm_db_populate(int dirfd, const char *filename, alpm_pkghash_t **pkgcache);
 
 #endif
