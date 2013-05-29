@@ -74,8 +74,7 @@ typedef struct file {
 
 typedef struct repo {
     alpm_pkghash_t *pkgcache;
-    char root[PATH_MAX];
-    char name[PATH_MAX];
+    char *root;
     file_t db;
     file_t files;
     bool dirty;
@@ -351,17 +350,27 @@ static void load_database(repo_t *repo, file_t *db, alpm_pkghash_t **cache)
 
 static repo_t *find_repo(char *path)
 {
-    char dbpath[PATH_MAX];
-
-    if (realpath(path, dbpath) == NULL && errno != ENOENT)
-        err(EXIT_FAILURE, "failed to find repo");
-
-    size_t len = strlen(dbpath);
-    char *dot = memchr(dbpath, '.', len);
-    char *div = memrchr(dbpath, '/', len);
+    char *dot, *name, *dbpath = NULL;
 
     repo_t *repo = calloc(1, sizeof(repo_t));
     repo->dirty = false;
+
+    dbpath = realpath(path, NULL);
+    if (dbpath) {
+        size_t len = strlen(dbpath);
+        char *div = memrchr(dbpath, '/', len);
+
+        dot = memchr(dbpath, '.', len);
+        name = strndup(div + 1, dot - div - 1);
+        repo->root = strndup(dbpath, div - dbpath);
+    } else {
+        if (errno != ENOENT)
+            err(EXIT_FAILURE, "failed to find repo");
+
+        dot = strchr(path, '.');
+        name = strndup(path, dot - path);
+        repo->root = get_current_dir_name();
+    }
 
     /* FIXME: figure this out on compression */
     if (!dot) {
@@ -382,35 +391,33 @@ static repo_t *find_repo(char *path)
         errx(EXIT_FAILURE, "%s invalid repo type", dot);
     }
 
-    memcpy(repo->root, dbpath, div - dbpath);
-    memcpy(repo->name, div + 1, dot - div - 1);
-
     /* open the directory so we can use openat later */
     repo->dirfd = open(repo->root, O_RDONLY);
 
     /* skip '.db' */
     dot += 3;
-
     if (*dot == '\0') {
         dot = ".tar.gz";
     }
 
     /* populate the package database paths */
-    asprintf(&repo->db.file,      "%s.db%s",     repo->name, dot);
-    asprintf(&repo->db.sig,       "%s.db%s.sig", repo->name, dot);
-    asprintf(&repo->db.file_link, "%s.db",       repo->name);
-    asprintf(&repo->db.sig_link,  "%s.db.sig",   repo->name);
+    asprintf(&repo->db.file,      "%s.db%s",     name, dot);
+    asprintf(&repo->db.sig,       "%s.db%s.sig", name, dot);
+    asprintf(&repo->db.file_link, "%s.db",       name);
+    asprintf(&repo->db.sig_link,  "%s.db.sig",   name);
 
     /* populate the files database paths */
-    asprintf(&repo->files.file,      "%s.files%s",     repo->name, dot);
-    asprintf(&repo->files.sig,       "%s.files%s.sig", repo->name, dot);
-    asprintf(&repo->files.file_link, "%s.files",       repo->name);
-    asprintf(&repo->files.sig_link,  "%s.files.sig",   repo->name);
+    asprintf(&repo->files.file,      "%s.files%s",     name, dot);
+    asprintf(&repo->files.sig,       "%s.files%s.sig", name, dot);
+    asprintf(&repo->files.file_link, "%s.files",       name);
+    asprintf(&repo->files.sig_link,  "%s.files.sig",   name);
 
     /* load the databases if possible */
     load_database(repo, &repo->db, &repo->pkgcache);
     load_database(repo, &repo->files, &repo->pkgcache);
 
+    free(dbpath);
+    free(name);
     return repo;
 }
 
@@ -898,9 +905,9 @@ int main(int argc, char *argv[])
             colon_printf("Writing file database to disk...\n");
             compile_database(repo, &repo->files, repo->pkgcache, DB_FILES);
         }
-        printf("repo %s updated successfully\n", repo->name);
+        printf("repo updated successfully\n");
     } else {
-        printf("repo %s does not need updating\n", repo->name);
+        printf("repo does not need updating\n");
     }
 
     return rc;
