@@ -503,10 +503,6 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
     if (!deep)
         return 0;
 
-    /* TODO:
-     *  - signature filename for packages still has to be generated on
-     *    the fly
-     **/
     /* if we have a signature, verify it */
     if (faccessat(repo->dirfd, pkg->signame, F_OK, 0) == 0 &&
         gpgme_verify(repo->dirfd, pkg->filename, pkg->signame) < 0) {
