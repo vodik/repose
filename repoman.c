@@ -212,21 +212,26 @@ static void write_files_file(repo_t *repo, const alpm_pkg_meta_t *pkg, struct bu
     }
 }
 
-static void archive_write_buffer(struct archive *a, struct archive_entry *ae,
-                                 const char *path, struct buffer *buf)
+static void repo_write_entry(repo_writer_t *writer,
+                                 const char *root, const char *entry)
 {
     time_t now = time(NULL);
+    char entry_path[PATH_MAX];
 
-    archive_entry_set_pathname(ae, path);
-    archive_entry_set_size(ae, buf->len);
-    archive_entry_set_filetype(ae, AE_IFREG);
-    archive_entry_set_perm(ae, 0644);
-    archive_entry_set_ctime(ae, now, 0);
-    archive_entry_set_mtime(ae, now, 0);
-    archive_entry_set_atime(ae, now, 0);
+    snprintf(entry_path, PATH_MAX, "%s/%s", root, entry);
+    archive_entry_set_pathname(writer->entry, entry_path);
+    archive_entry_set_size(writer->entry, writer->buf.len);
+    archive_entry_set_filetype(writer->entry, AE_IFREG);
+    archive_entry_set_perm(writer->entry, 0644);
+    archive_entry_set_ctime(writer->entry, now, 0);
+    archive_entry_set_mtime(writer->entry, now, 0);
+    archive_entry_set_atime(writer->entry, now, 0);
 
-    archive_write_header(a, ae);
-    archive_write_data(a, buf->data, buf->len);
+    archive_write_header(writer->archive, writer->entry);
+    archive_write_data(writer->archive, writer->buf.data, writer->buf.len);
+
+    archive_entry_clear(writer->entry);
+    buffer_clear(&writer->buf);
 }
 
 static repo_writer_t *repo_write_new(repo_t *repo, file_t *db)
@@ -269,35 +274,24 @@ static repo_writer_t *repo_write_new(repo_t *repo, file_t *db)
 static void repo_write_pkg(repo_t *repo, repo_writer_t *writer, alpm_pkg_meta_t *pkg, int contents)
 {
     char entry[PATH_MAX];
+    snprintf(entry, PATH_MAX, "%s-%s", pkg->name, pkg->version);
 
     /* generate the 'desc' file */
     if (contents & DB_DESC) {
-        archive_entry_clear(writer->entry);
-        buffer_clear(&writer->buf);
         write_desc_file(repo, pkg, &writer->buf);
-
-        snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "desc");
-        archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
+        repo_write_entry(writer, entry, "desc");
     }
 
     /* generate the 'depends' file */
     if (contents & DB_DEPENDS) {
-        archive_entry_clear(writer->entry);
-        buffer_clear(&writer->buf);
         write_depends_file(pkg, &writer->buf);
-
-        snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "depends");
-        archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
+        repo_write_entry(writer, entry, "depends");
     }
 
     /* generate the 'files' file */
     if (contents & DB_FILES) {
-        archive_entry_clear(writer->entry);
-        buffer_clear(&writer->buf);
         write_files_file(repo, pkg, &writer->buf);
-
-        snprintf(entry, PATH_MAX, "%s-%s/%s", pkg->name, pkg->version, "files");
-        archive_write_buffer(writer->archive, writer->entry, entry, &writer->buf);
+        repo_write_entry(writer, entry, "files");
     }
 }
 
