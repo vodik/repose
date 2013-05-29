@@ -297,11 +297,12 @@ static void repo_write_pkg(repo_t *repo, repo_writer_t *writer, alpm_pkg_meta_t 
 
 static void repo_write_close(repo_writer_t *writer)
 {
-    /* archive_write_close(writer->archive); */
+    archive_write_close(writer->archive);
 
     buffer_free(&writer->buf);
     archive_entry_free(writer->entry);
     archive_write_free(writer->archive);
+    close(writer->fd);
     free(writer);
 }
 /* }}} */
