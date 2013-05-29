@@ -68,8 +68,8 @@ enum contents {
 };
 
 typedef struct file {
-    char *file, *file_link;
-    char *sig,  *sig_link;
+    char *file, *link_file;
+    char *sig,  *link_sig;
 } file_t;
 
 typedef struct repo {
@@ -311,8 +311,8 @@ static void sign_database(repo_t *repo, file_t *db)
     /* XXX: check return type */
     gpgme_sign(repo->dirfd, db->file, db->sig, cfg.key);
 
-    if (symlinkat(db->sig, repo->dirfd, db->sig_link) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink for %s failed", db->sig_link);
+    if (symlinkat(db->sig, repo->dirfd, db->link_sig) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink for %s failed", db->link_sig);
 }
 
 /* TODO: compy as much data as possible from the existing repo */
@@ -329,8 +329,8 @@ static void compile_database(repo_t *repo, file_t *db, alpm_pkghash_t *cache, in
     repo_write_close(writer);
 
     /* make the appropriate symlink for the database */
-    if (symlinkat(db->file, repo->dirfd, db->file_link) < 0 && errno != EEXIST)
-        err(EXIT_FAILURE, "symlink for %s failed", db->file_link);
+    if (symlinkat(db->file, repo->dirfd, db->link_file) < 0 && errno != EEXIST)
+        err(EXIT_FAILURE, "symlink for %s failed", db->link_file);
 
     sign_database(repo, db);
 }
@@ -403,14 +403,14 @@ static repo_t *find_repo(char *path)
     /* populate the package database paths */
     asprintf(&repo->db.file,      "%s.db%s",     name, dot);
     asprintf(&repo->db.sig,       "%s.db%s.sig", name, dot);
-    asprintf(&repo->db.file_link, "%s.db",       name);
-    asprintf(&repo->db.sig_link,  "%s.db.sig",   name);
+    asprintf(&repo->db.link_file, "%s.db",       name);
+    asprintf(&repo->db.link_sig,  "%s.db.sig",   name);
 
     /* populate the files database paths */
     asprintf(&repo->files.file,      "%s.files%s",     name, dot);
     asprintf(&repo->files.sig,       "%s.files%s.sig", name, dot);
-    asprintf(&repo->files.file_link, "%s.files",       name);
-    asprintf(&repo->files.sig_link,  "%s.files.sig",   name);
+    asprintf(&repo->files.link_file, "%s.files",       name);
+    asprintf(&repo->files.link_sig,  "%s.files.sig",   name);
 
     /* load the databases if possible */
     load_database(repo, &repo->db, &repo->pkgcache);
