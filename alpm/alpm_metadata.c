@@ -81,9 +81,6 @@ int read_pkg_signature(int dirfd, alpm_pkg_meta_t *pkg)
     char *memblock = MAP_FAILED;
     int fd = 0;
 
-    if (!pkg->signame)
-        asprintf(&pkg->signame, "%s.sig", pkg->filename);
-
     fd = openat(dirfd, pkg->signame, O_RDONLY);
     if (fd < 0)
         return -1;
@@ -160,6 +157,7 @@ int alpm_pkg_load_metadata(int dirfd, const char *pkgname, alpm_pkg_meta_t **_pk
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
     pkg->size = st.st_size;
 
+    asprintf(&pkg->signame, "%s.sig", pkg->filename);
     read_pkg_signature(dirfd, pkg);
 
     *_pkg = pkg;
@@ -331,6 +329,7 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
     while(archive_fgets(reader, buf, entry_size) != -1) {
         if (strcmp(buf, "%FILENAME%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->filename);
+            asprintf(&pkg->signame, "%s.sig", pkg->filename);
         } else if (strcmp(buf, "%NAME%") == 0) {
             /* FIXME: name should already be set, rather, validate it */
             read_desc_entry(reader, buf, entry_size, &pkg->name);
@@ -468,7 +467,6 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
             return NULL;
 		}
 
-        pkg->filename = strdup(entryname);
 		pkg->name = pkgname;
 		pkg->version = pkgver;
 		pkg->name_hash = pkgname_hash;
