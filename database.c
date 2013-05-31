@@ -236,9 +236,14 @@ int load_database(repo_t *repo, file_t *db)
         return -1; /* FIXME: fix (but atm this shouldn't ever run) */
 
     sigfd = openat(repo->dirfd, db->sig, O_RDONLY);
-    if (dbfd < 0 && errno != ENOENT) {
-        err(EXIT_FAILURE, "failed to open %s", db->file);
-    } else if (gpgme_verify(dbfd, sigfd) < 0) {
+    if (sigfd < 0) {
+       if (errno != ENOENT)
+            err(EXIT_FAILURE, "failed to open %s", db->file);
+        close(dbfd);
+        return 0;
+    }
+
+    if (gpgme_verify(dbfd, sigfd) < 0) {
         errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
     }
 
