@@ -237,6 +237,24 @@ static alpm_pkghash_t *find_packages(repo_t *repo, char *pkg_list[], int count)
 }
 
 /* {{{ VERIFY */
+static int verify_pkg_sig(repo_t *repo, const alpm_pkg_meta_t *pkg)
+{
+    int pkgfd, sigfd = openat(repo->dirfd, pkg->signame, O_RDONLY);
+    if (sigfd < 0 && errno != ENOENT) {
+        err(EXIT_FAILURE, "failed to open %s", pkg->signame);
+    }
+
+    pkgfd = openat(repo->dirfd, pkg->filename, O_RDONLY);
+    if (pkgfd < 0) {
+        err(EXIT_FAILURE, "failed to open %s", pkg->filename);
+    }
+
+    int rc = gpgme_verify(pkgfd, sigfd);
+    close(pkgfd);
+    close(sigfd);
+    return rc;
+}
+
 static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 {
     if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
@@ -248,8 +266,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
         return 0;
 
     /* if we have a signature, verify it */
-    if (faccessat(repo->dirfd, pkg->signame, F_OK, 0) == 0 &&
-        gpgme_verify(repo->dirfd, pkg->filename, pkg->signame) < 0) {
+    if (verify_pkg_sig(repo, pkg) < 0) {
         warnx("package %s, signature is invalid or corrupt!", pkg->name);
         return 1;
     }
