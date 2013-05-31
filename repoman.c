@@ -84,7 +84,7 @@ static int colon_printf(const char *fmt, ...)
     return ret;
 }
 
-static repo_t *find_repo(char *path)
+static repo_t *repo_new(char *path)
 {
     char *dot, *name, *dbpath = NULL;
 
@@ -155,6 +155,23 @@ static repo_t *find_repo(char *path)
     free(dbpath);
     free(name);
     return repo;
+}
+
+static void repo_write(repo_t *repo)
+{
+    colon_printf("Writing database to disk...\n");
+    compile_database(repo, &repo->db, DB_DESC | DB_DEPENDS);
+    if (cfg.sign) {
+        sign_database(repo, &repo->db, cfg.key);
+    }
+
+    if (cfg.files) {
+        colon_printf("Writing file database to disk...\n");
+        compile_database(repo, &repo->files, DB_FILES);
+        if (cfg.sign) {
+            sign_database(repo, &repo->db, cfg.key);
+        }
+    }
 }
 
 static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
@@ -294,7 +311,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
     return 0;
 }
 
-static int verify_db(repo_t *repo)
+static int repo_database_verify(repo_t *repo)
 {
     alpm_list_t *pkg, *pkgs = repo->pkgcache->list;
     int rc = 0;
@@ -311,7 +328,7 @@ static int verify_db(repo_t *repo)
 }
 /* }}} */
 
-static void reduce_db(repo_t *repo)
+static void repo_database_reduce(repo_t *repo)
 {
     if (repo->pkgcache) {
         colon_printf("Reading existing database...\n");
@@ -344,7 +361,7 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_
 }
 
 /* read the existing repo or construct a new package cache */
-static int update_db(repo_t *repo, int argc, char *argv[])
+static int repo_database_update(repo_t *repo, int argc, char *argv[])
 {
     alpm_pkghash_t *cache = NULL;
 
@@ -355,7 +372,7 @@ static int update_db(repo_t *repo, int argc, char *argv[])
         warnx("repo doesn't exist, creating...");
         cache = _alpm_pkghash_create(23);
     } else {
-        reduce_db(repo);
+        repo_database_reduce(repo);
         cache = repo->pkgcache;
     }
 
@@ -429,13 +446,13 @@ static int update_db(repo_t *repo, int argc, char *argv[])
 
 /* {{{ REMOVE */
 /* read the existing repo or construct a new package cache */
-static int remove_db(repo_t *repo, int argc, char *argv[])
+static int repo_database_remove(repo_t *repo, int argc, char *argv[])
 {
     if (!repo->pkgcache) {
         warnx("repo doesn't exist...");
         return 1;
     } else {
-        reduce_db(repo);
+        repo_database_reduce(repo);
     }
 
     int i;
@@ -475,7 +492,7 @@ static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
 }
 
 /* read the existing repo or construct a new package cache */
-static int query_db(repo_t *repo, int argc, char *argv[])
+static int repo_database_query(repo_t *repo, int argc, char *argv[])
 {
     if (!repo->pkgcache) {
         warnx("repo doesn't exist");
@@ -633,22 +650,22 @@ int main(int argc, char *argv[])
     /* enable colors if necessary */
     enable_colors(cfg.color);
 
-    repo = find_repo(argv[0]);
+    repo = repo_new(argv[0]);
     if (!repo)
         return 1;
 
     switch (cfg.action) {
     case ACTION_VERIFY:
-        rc = verify_db(repo);
+        rc = repo_database_verify(repo);
         break;
     case ACTION_UPDATE:
-        rc = update_db(repo, argc - 1, argv + 1);
+        rc = repo_database_update(repo, argc - 1, argv + 1);
         break;
     case ACTION_REMOVE:
-        rc = remove_db(repo, argc - 1, argv + 1);
+        rc = repo_database_remove(repo, argc - 1, argv + 1);
         break;
     case ACTION_QUERY:
-        rc = query_db(repo, argc - 1, argv + 1);
+        rc = repo_database_query(repo, argc - 1, argv + 1);
         break;
     default:
         break;
@@ -656,19 +673,7 @@ int main(int argc, char *argv[])
 
     /* if the database is dirty, rewrite it */
     if (repo->dirty) {
-        colon_printf("Writing database to disk...\n");
-        compile_database(repo, &repo->db, DB_DESC | DB_DEPENDS);
-        if (cfg.sign) {
-            sign_database(repo, &repo->db, cfg.key);
-        }
-
-        if (cfg.files) {
-            colon_printf("Writing file database to disk...\n");
-            compile_database(repo, &repo->files, DB_FILES);
-            if (cfg.sign) {
-                sign_database(repo, &repo->db, cfg.key);
-            }
-        }
+        repo_write(repo);
         printf("repo updated successfully\n");
     } else {
         printf("repo does not need updating\n");
