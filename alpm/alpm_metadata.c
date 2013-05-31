@@ -506,26 +506,18 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
     /* free(filename); */
 }
 
-int alpm_db_populate(int dirfd, const char *filename, alpm_pkghash_t **pkgcache)
+int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
 {
     struct archive *archive = NULL;
     struct archive_reader* reader = NULL;
     struct stat st;
     char *memblock = MAP_FAILED;
-    int fd = 0, rc = 0;
-
-    fd = openat(dirfd, filename, O_RDONLY);
-    if (fd < 0) {
-        if(errno != ENOENT)
-            err(EXIT_FAILURE, "failed to open %s", filename);
-        rc = -errno;
-        goto cleanup;
-    }
+    int rc = 0;
 
     fstat(fd, &st);
     memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (memblock == MAP_FAILED)
-        err(EXIT_FAILURE, "failed to mmap package %s", filename);
+        err(EXIT_FAILURE, "failed to mmap database");
 
     archive = archive_read_new();
     reader = archive_reader_new(archive);
@@ -535,7 +527,7 @@ int alpm_db_populate(int dirfd, const char *filename, alpm_pkghash_t **pkgcache)
 
     int r = archive_read_open_memory(archive, memblock, st.st_size);
     if (r != ARCHIVE_OK) {
-        warnx("%s is not an archive", filename);
+        warnx("file is not an archive");
         rc = -1;
         goto cleanup;
     }
@@ -569,9 +561,6 @@ int alpm_db_populate(int dirfd, const char *filename, alpm_pkghash_t **pkgcache)
     }
 
 cleanup:
-    if (fd >= 0)
-        close(fd);
-
     if (memblock != MAP_FAILED)
         munmap(memblock, st.st_size);
 

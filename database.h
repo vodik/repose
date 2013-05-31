@@ -11,7 +11,7 @@ enum contents {
 };
 
 void compile_database(repo_t *repo, file_t *db, int contents);
-void load_database(repo_t *repo, file_t *db);
+int load_database(repo_t *repo, file_t *db);
 void sign_database(repo_t *repo, file_t *db, const char *key);
 
 #endif

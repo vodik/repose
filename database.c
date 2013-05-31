@@ -211,16 +211,26 @@ void compile_database(repo_t *repo, file_t *db, int contents)
         err(EXIT_FAILURE, "symlink for %s failed", db->link_file);
 }
 
-void load_database(repo_t *repo, file_t *db)
+int load_database(repo_t *repo, file_t *db)
 {
+    int fd = openat(repo->dirfd, db->file, O_RDONLY);
+    if (fd < 0) {
+        if(errno != ENOENT)
+            err(EXIT_FAILURE, "failed to open %s", db->file);
+        return -errno;
+    }
+
     /* FIXME: error reporting should be here, not inside this funciton */
-    if (alpm_db_populate(repo->dirfd, db->file, &repo->pkgcache) < 0)
-        return;
+    if (alpm_db_populate(fd, &repo->pkgcache) < 0)
+        return -1;
 
     if (faccessat(repo->dirfd, db->sig, F_OK, 0) == 0) {
         /* check for a signature */
         if (gpgme_verify(repo->dirfd, db->file, db->sig) < 0)
             errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
     }
+
+    close(fd);
+    return 0;
 }
 
