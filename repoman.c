@@ -174,27 +174,27 @@ static void repo_write(repo_t *repo)
     }
 }
 
-static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *metadata)
+static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
-    printf("DELETING: %s-%s\n", metadata->name, metadata->version);
+    printf("DELETING: %s-%s\n", pkg->name, pkg->version);
 
-    unlinkat(repo->dirfd, metadata->filename, 0);
-    unlinkat(repo->dirfd, metadata->signame, 0);
+    unlinkat(repo->dirfd, pkg->filename, 0);
+    unlinkat(repo->dirfd, pkg->signame, 0);
     return 0;
 }
 
 static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
 {
-    alpm_pkg_meta_t *metadata = NULL;
+    alpm_pkg_meta_t *pkg = NULL;
 
     /* FIXME: don't pass in dirfd */
-    alpm_pkg_load_metadata(repo->dirfd, filename, &metadata);
-    return metadata;
+    alpm_pkg_load_metadata(repo->dirfd, filename, &pkg);
+    return pkg;
 }
 
 static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo, const char *filepath)
 {
-    alpm_pkg_meta_t *metadata, *old;
+    alpm_pkg_meta_t *pkg, *old;
     char *basename = strrchr(filepath, '/');
 
     if (basename) {
@@ -204,12 +204,12 @@ static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo,
         }
     }
 
-    metadata = load_package(repo, filepath);
-    if (!metadata)
+    pkg = load_package(repo, filepath);
+    if (!pkg)
         return cache;
 
-    old = _alpm_pkghash_find(cache, metadata->name);
-    int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
+    old = _alpm_pkghash_find(cache, pkg->name);
+    int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(pkg->version, old->version);
 
     if (vercmp == 0 || vercmp == 1) {
         if (old) {
@@ -218,11 +218,11 @@ static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo,
                 unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
         }
-        return _alpm_pkghash_add(cache, metadata);
+        return _alpm_pkghash_add(cache, pkg);
     } else {
         if (cfg.clean >= 2)
-            unlink_package(repo, metadata);
-        alpm_pkg_free_metadata(metadata);
+            unlink_package(repo, pkg);
+        alpm_pkg_free_metadata(pkg);
         return cache;
     }
 }
@@ -318,12 +318,12 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 
 static int repo_database_verify(repo_t *repo)
 {
-    alpm_list_t *pkg, *pkgs = repo->pkgcache->list;
+    alpm_list_t *node, *pkgs = repo->pkgcache->list;
     int rc = 0;
 
-    for (pkg = pkgs; pkg; pkg = pkg->next) {
-        alpm_pkg_meta_t *metadata = pkg->data;
-        rc |= verify_pkg(repo, metadata, true);
+    for (node = pkgs; node; node = node->next) {
+        alpm_pkg_meta_t *pkg = node->data;
+        rc |= verify_pkg(repo, pkg, true);
     }
 
     if (rc == 0)
@@ -339,16 +339,16 @@ static void repo_database_reduce(repo_t *repo)
         colon_printf("Reading existing database...\n");
 
         alpm_pkghash_t *cache = repo->pkgcache;
-        alpm_list_t *pkg, *pkgs = cache->list;
+        alpm_list_t *node, *pkgs = cache->list;
 
-        for (pkg = pkgs; pkg; pkg = pkg->next) {
-            alpm_pkg_meta_t *metadata = pkg->data;
+        for (node = pkgs; node; node = node->next) {
+            alpm_pkg_meta_t *pkg = node->data;
 
             /* find packages that have been removed from the cache */
-            if (verify_pkg(repo, metadata, false) == 1) {
-                printf("REMOVING: %s-%s\n", metadata->name, metadata->version);
-                cache = _alpm_pkghash_remove(cache, metadata, NULL);
-                alpm_pkg_free_metadata(metadata);
+            if (verify_pkg(repo, pkg, false) == 1) {
+                printf("REMOVING: %s-%s\n", pkg->name, pkg->version);
+                cache = _alpm_pkghash_remove(cache, pkg, NULL);
+                alpm_pkg_free_metadata(pkg);
                 repo->dirty = true;
             }
         }
@@ -381,19 +381,19 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
         cache = repo->pkgcache;
     }
 
-    alpm_list_t *pkg, *pkgs;
+    alpm_list_t *node, *pkgs;
     bool force = argc > 0 ? true : false;
     alpm_pkghash_t *filecache = get_filecache(repo, argv, argc);
     pkgs = filecache->list;
 
-    for (pkg = pkgs; pkg; pkg = pkg->next) {
-        alpm_pkg_meta_t *metadata = pkg->data;
-        alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, metadata->name);
+    for (node = pkgs; node; node = node->next) {
+        alpm_pkg_meta_t *pkg = node->data;
+        alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, pkg->name);
 
         /* if the package isn't in the cache, add it */
         if (!old) {
-            printf("ADDING: %s-%s\n", metadata->name, metadata->version);
-            cache = _alpm_pkghash_add(cache, metadata);
+            printf("ADDING: %s-%s\n", pkg->name, pkg->version);
+            cache = _alpm_pkghash_add(cache, pkg);
             repo->dirty = true;
             continue;
         }
@@ -401,8 +401,8 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
         /* if the package is in the cache, but we're doing a forced
          * update, replace it anyways */
         if (force) {
-            printf("REPLACING: %s %s => %s\n", metadata->name, old->version, metadata->version);
-            cache = _alpm_pkghash_replace(cache, metadata, old);
+            printf("REPLACING: %s %s => %s\n", pkg->name, old->version, pkg->version);
+            cache = _alpm_pkghash_replace(cache, pkg, old);
             if (cfg.clean >= 2)
                 unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
@@ -412,12 +412,10 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
 
         /* if the package is in the cache and we have a newer version,
          * replace it */
-        int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(metadata->version, old->version);
-
-        switch (vercmp) {
+        switch(alpm_pkg_vercmp(pkg->version, old->version)) {
         case 1:
-            printf("UPDATING: %s %s => %s\n", metadata->name, old->version, metadata->version);
-            cache = _alpm_pkghash_replace(cache, metadata, old);
+            printf("UPDATING: %s %s => %s\n", pkg->name, old->version, pkg->version);
+            cache = _alpm_pkghash_replace(cache, pkg, old);
             if (cfg.clean >= 1)
                 unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
@@ -425,15 +423,15 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             break;
         case 0:
             /* check to see if the package now has a signature */
-            if (old->base64_sig == NULL && metadata->base64_sig) {
-                printf("ADD SIG: %s-%s\n", metadata->name, metadata->version);
-                old->base64_sig = strdup(metadata->base64_sig);
+            if (old->base64_sig == NULL && pkg->base64_sig) {
+                printf("ADD SIG: %s-%s\n", pkg->name, pkg->version);
+                old->base64_sig = strdup(pkg->base64_sig);
                 repo->dirty = true;
             }
             break;
         case -1:
             if (cfg.clean >= 2)
-                unlink_package(repo, metadata);
+                unlink_package(repo, pkg);
         }
 
     }
@@ -475,7 +473,7 @@ static int repo_database_remove(repo_t *repo, int argc, char *argv[])
 /* }}} */
 
 /* {{{ QUERY */
-static void print_pkg_metadata(const alpm_pkg_meta_t *pkg)
+static void print_metadata(const alpm_pkg_meta_t *pkg)
 {
     if (cfg.info) {
         printf("Filename     : %s\n", pkg->filename);
@@ -506,12 +504,12 @@ static int repo_database_query(repo_t *repo, int argc, char *argv[])
                 warnx("pkg not found");
                 return 1;
             }
-            print_pkg_metadata(pkg);
+            print_metadata(pkg);
         }
     } else {
-        alpm_list_t *pkg, *pkgs = repo->pkgcache->list;
-        for (pkg = pkgs; pkg; pkg = pkg->next)
-            print_pkg_metadata(pkg->data);
+        alpm_list_t *node, *pkgs = repo->pkgcache->list;
+        for (node = pkgs; node; node = node->next)
+            print_metadata(node->data);
     }
 
     return 0;
