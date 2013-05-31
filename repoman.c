@@ -174,7 +174,7 @@ static void repo_write(repo_t *repo)
     }
 }
 
-static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
+static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *metadata)
 {
     printf("DELETING: %s-%s\n", metadata->name, metadata->version);
 
@@ -183,7 +183,16 @@ static int unlink_pkg_files(repo_t *repo, const alpm_pkg_meta_t *metadata)
     return 0;
 }
 
-static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, const char *filepath)
+static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
+{
+    alpm_pkg_meta_t *metadata = NULL;
+
+    /* FIXME: don't pass in dirfd */
+    alpm_pkg_load_metadata(repo->dirfd, filename, &metadata);
+    return metadata;
+}
+
+static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo, const char *filepath)
 {
     alpm_pkg_meta_t *metadata, *old;
     char *basename = strrchr(filepath, '/');
@@ -195,7 +204,7 @@ static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, cons
         }
     }
 
-    alpm_pkg_load_metadata(repo->dirfd, filepath, &metadata);
+    metadata = load_package(repo, filepath);
     if (!metadata)
         return cache;
 
@@ -206,50 +215,46 @@ static inline alpm_pkghash_t *load_pkg(alpm_pkghash_t *cache, repo_t *repo, cons
         if (old) {
             cache = _alpm_pkghash_remove(cache, old, NULL);
             if (cfg.clean >= 2)
-                unlink_pkg_files(repo, old);
+                unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
         }
         return _alpm_pkghash_add(cache, metadata);
     } else {
         if (cfg.clean >= 2)
-            unlink_pkg_files(repo, metadata);
+            unlink_package(repo, metadata);
         alpm_pkg_free_metadata(metadata);
         return cache;
     }
 }
 
-static alpm_pkghash_t *find_all_packages(repo_t *repo)
+static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
 {
-    struct dirent *dp;
-    DIR *dir = opendir(repo->root);
     alpm_pkghash_t *cache = _alpm_pkghash_create(23);
 
-    if (dir == NULL)
-        err(EXIT_FAILURE, "failed to open directory");
+    if (count == 0) {
+        struct dirent *dp;
+        DIR *dir = opendir(repo->root);
+        if (dir == NULL)
+            err(EXIT_FAILURE, "failed to open directory");
 
-    while ((dp = readdir(dir))) {
-        if (!(dp->d_type & DT_REG))
-            continue;
+        while ((dp = readdir(dir))) {
+            if (!(dp->d_type & DT_REG))
+                continue;
 
-        if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
-            fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
-            continue;
+            if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
+                fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
+                continue;
 
-        cache = load_pkg(cache, repo, dp->d_name);
+            cache = filecache_add(cache, repo, dp->d_name);
+        }
+
+        closedir(dir);
+    } else {
+        int i;
+
+        for (i = 0; i < count; ++i)
+            cache = filecache_add(cache, repo, pkg_list[i]);
     }
-
-    closedir(dir);
-    return cache;
-}
-
-static alpm_pkghash_t *find_packages(repo_t *repo, char *pkg_list[], int count)
-{
-    int i;
-    alpm_pkghash_t *cache = _alpm_pkghash_create(23);
-
-    for (i = 0; i < count; ++i)
-        cache = load_pkg(cache, repo, pkg_list[i]);
-
     return cache;
 }
 
@@ -377,15 +382,9 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
     }
 
     alpm_list_t *pkg, *pkgs;
-    bool force = false;
-    if (argc > 0) {
-        alpm_pkghash_t *filecache = find_packages(repo, argv, argc);
-        pkgs = filecache->list;
-        force = true;
-    } else {
-        alpm_pkghash_t *filecache = find_all_packages(repo);
-        pkgs = filecache->list;
-    }
+    bool force = argc > 0 ? true : false;
+    alpm_pkghash_t *filecache = get_filecache(repo, argv, argc);
+    pkgs = filecache->list;
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
@@ -405,7 +404,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             printf("REPLACING: %s %s => %s\n", metadata->name, old->version, metadata->version);
             cache = _alpm_pkghash_replace(cache, metadata, old);
             if (cfg.clean >= 2)
-                unlink_pkg_files(repo, old);
+                unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
             repo->dirty = true;
             continue;
@@ -420,7 +419,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             printf("UPDATING: %s %s => %s\n", metadata->name, old->version, metadata->version);
             cache = _alpm_pkghash_replace(cache, metadata, old);
             if (cfg.clean >= 1)
-                unlink_pkg_files(repo, old);
+                unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
             repo->dirty = true;
             break;
@@ -434,7 +433,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             break;
         case -1:
             if (cfg.clean >= 2)
-                unlink_pkg_files(repo, metadata);
+                unlink_package(repo, metadata);
         }
 
     }
@@ -462,7 +461,7 @@ static int repo_database_remove(repo_t *repo, int argc, char *argv[])
             repo->pkgcache = _alpm_pkghash_remove(repo->pkgcache, pkg, NULL);
             printf("REMOVING: %s-%s\n", pkg->name, pkg->version);
             if (cfg.clean >= 1)
-                unlink_pkg_files(repo, pkg);
+                unlink_package(repo, pkg);
             alpm_pkg_free_metadata(pkg);
             repo->dirty = true;
             continue;
