@@ -276,7 +276,9 @@ static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
 static int verify_pkg_sig(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
     int pkgfd, sigfd = openat(repo->dirfd, pkg->signame, O_RDONLY);
-    if (sigfd < 0 && errno != ENOENT) {
+    if (sigfd < 0) {
+        if (errno == ENOENT)
+            return -1;
         err(EXIT_FAILURE, "failed to open %s", pkg->signame);
     }
 
