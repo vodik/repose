@@ -30,11 +30,11 @@ typedef struct alpm_pkg_meta {
     alpm_list_t *files;
 } alpm_pkg_meta_t;
 
-int read_pkg_signature(int dirfd, alpm_pkg_meta_t *pkg);
-int alpm_pkg_load_metadata(int dirfd, const char *pkgname, alpm_pkg_meta_t **_pkg);
+int read_pkg_signature(int fd, alpm_pkg_meta_t *pkg);
+int alpm_pkg_load_metadata(int fd, alpm_pkg_meta_t **_pkg);
 void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg);
 
-alpm_list_t *alpm_pkg_files(int dirfd, char *pkgname);
+alpm_list_t *alpm_pkg_files(int fd, char *pkgname);
 
 int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache);
 

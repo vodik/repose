@@ -186,9 +186,23 @@ static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
 static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
 {
     alpm_pkg_meta_t *pkg = NULL;
+    int sigfd, pkgfd = openat(repo->dirfd, filename, O_RDONLY);
+    if (pkgfd < 0) {
+        err(EXIT_FAILURE, "failed to open %s", filename);
+    }
 
-    /* FIXME: don't pass in dirfd */
-    alpm_pkg_load_metadata(repo->dirfd, filename, &pkg);
+    alpm_pkg_load_metadata(pkgfd, &pkg);
+    pkg->filename = strdup(filename);
+    asprintf(&pkg->signame, "%s.sig", filename);
+
+    sigfd = openat(repo->dirfd, pkg->signame, O_RDONLY);
+    if (sigfd < 0) {
+        if (errno != ENOENT)
+            err(EXIT_FAILURE, "failed to open %s", pkg->signame);
+    } else {
+        read_pkg_signature(sigfd, pkg);
+    }
+
     return pkg;
 }
 
