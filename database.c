@@ -213,24 +213,26 @@ void compile_database(repo_t *repo, file_t *db, int contents)
 
 int load_database(repo_t *repo, file_t *db)
 {
-    int fd = openat(repo->dirfd, db->file, O_RDONLY);
-    if (fd < 0) {
+    int sigfd, dbfd = openat(repo->dirfd, db->file, O_RDONLY);
+    if (dbfd < 0) {
         if(errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", db->file);
         return -errno;
     }
 
     /* FIXME: error reporting should be here, not inside this funciton */
-    if (alpm_db_populate(fd, &repo->pkgcache) < 0)
-        return -1;
+    if (alpm_db_populate(dbfd, &repo->pkgcache) < 0)
+        return -1; /* FIXME: fix (but atm this shouldn't ever run) */
 
-    if (faccessat(repo->dirfd, db->sig, F_OK, 0) == 0) {
-        /* check for a signature */
-        if (gpgme_verify(repo->dirfd, db->file, db->sig) < 0)
-            errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
+    sigfd = openat(repo->dirfd, db->sig, O_RDONLY);
+    if (dbfd < 0 && errno != ENOENT) {
+        err(EXIT_FAILURE, "failed to open %s", db->file);
+    } else if (gpgme_verify(dbfd, sigfd) < 0) {
+        errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
     }
 
-    close(fd);
+    close(dbfd);
+    close(sigfd);
     return 0;
 }
 

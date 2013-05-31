@@ -46,7 +46,7 @@ static int init_gpgme(void)
     return 0;
 }
 
-int gpgme_verify(int dirfd, const char *filepath, const char *sigpath)
+int gpgme_verify(int fd, int sigfd)
 {
     gpgme_error_t rc;
     gpgme_ctx_t ctx;
@@ -62,21 +62,13 @@ int gpgme_verify(int dirfd, const char *filepath, const char *sigpath)
     if (gpg_err_code(rc) != GPG_ERR_NO_ERROR)
         errx(EXIT_FAILURE, "failed to call gpgme_new()");
 
-    int pkgfd = openat(dirfd, filepath, O_RDONLY);
-    if (pkgfd < 0)
-        err(EXIT_FAILURE, "failed to open %s", filepath);
-
-    int sigfd = openat(dirfd, sigpath, O_RDONLY);
-    if (sigfd < 0)
-        err(EXIT_FAILURE, "failed to open %s", filepath);
-
-    rc = gpgme_data_new_from_fd(&in, pkgfd);
+    rc = gpgme_data_new_from_fd(&in, fd);
     if (gpg_err_code(rc) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "error reading `%s': %s", filepath, gpgme_strerror(rc));
+        errx(EXIT_FAILURE, "error reading `%s': %s", "file", gpgme_strerror(rc));
 
     rc = gpgme_data_new_from_fd(&sig, sigfd);
     if (gpg_err_code(rc) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "error reading `%s': %s", filepath, gpgme_strerror(rc));
+        errx(EXIT_FAILURE, "error reading `%s': %s", "signature", gpgme_strerror(rc));
 
     rc = gpgme_op_verify(ctx, sig, in, NULL);
     if (gpg_err_code(rc) != GPG_ERR_NO_ERROR)
@@ -107,8 +99,6 @@ int gpgme_verify(int dirfd, const char *filepath, const char *sigpath)
         ret = -1;
     }
 
-    close(pkgfd);
-    close(sigfd);
     gpgme_data_release(in);
     gpgme_data_release(sig);
     gpgme_release(ctx);
