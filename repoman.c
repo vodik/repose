@@ -544,10 +544,13 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 
 static int verify_db(repo_t *repo)
 {
-    alpm_list_t *pkg, *pkgs = repo->pkgcache->list;
+    alpm_list_t *pkg;
     int rc = 0;
 
-    for (pkg = pkgs; pkg; pkg = pkg->next) {
+    if (!repo->pkgcache)
+        return 0;
+
+    for (pkg = repo->pkgcache->list; pkg; pkg = pkg->next) {
         alpm_pkg_meta_t *metadata = pkg->data;
         rc |= verify_pkg(repo, metadata, true);
     }
