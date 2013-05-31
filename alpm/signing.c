@@ -105,7 +105,7 @@ int gpgme_verify(int fd, int sigfd)
     return ret;
 }
 
-void gpgme_sign(int dirfd, const char *filepath, const char *sigpath, const char *key)
+void gpgme_sign(int fd, int sigfd, const char *key)
 {
     gpgme_error_t rc;
     gpgme_ctx_t ctx;
@@ -136,13 +136,9 @@ void gpgme_sign(int dirfd, const char *filepath, const char *sigpath, const char
         gpgme_key_unref(akey);
     }
 
-    int pkgfd = openat(dirfd, filepath, O_RDONLY);
-    if (pkgfd < 0)
-        err(EXIT_FAILURE, "failed to open %s", filepath);
-
-    rc = gpgme_data_new_from_fd(&in, pkgfd);
+    rc = gpgme_data_new_from_fd(&in, fd);
     if (rc)
-        errx(EXIT_FAILURE, "rcor reading `%s': %s", filepath, gpgme_strerror(rc));
+        errx(EXIT_FAILURE, "rcor reading `%s': %s", "file", gpgme_strerror(rc));
 
     rc = gpgme_data_new(&out);
     if (gpg_err_code(rc) != GPG_ERR_NO_ERROR)
@@ -162,11 +158,6 @@ void gpgme_sign(int dirfd, const char *filepath, const char *sigpath, const char
     /* print_data(out); */
     /* fputs("End Output.\n", stdout); */
 
-    mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    int sigfd = openat(dirfd, sigpath, O_CREAT | O_WRONLY | O_TRUNC, mode);
-    if (sigfd < 0)
-        err(EXIT_FAILURE, "failed to open %s for writing", sigpath);
-
     char buf[BUFSIZ];
     int ret;
 
@@ -179,9 +170,6 @@ void gpgme_sign(int dirfd, const char *filepath, const char *sigpath, const char
 
     /* if (ret < 0) */
     /*     return; */
-
-    close(sigfd);
-    close(pkgfd);
     gpgme_data_release(out);
     gpgme_data_release(in);
     gpgme_release(ctx);

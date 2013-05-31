@@ -187,8 +187,19 @@ static void compile_database_entry(repo_t *repo, db_writer_t *writer, alpm_pkg_m
 
 void sign_database(repo_t *repo, file_t *db, const char *key)
 {
+    int dbfd = openat(repo->dirfd, db->file, O_RDONLY);
+    if (dbfd < 0)
+        err(EXIT_FAILURE, "failed to open %s", db->file);
+
+    int sigfd = openat(repo->dirfd, db->sig, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (sigfd < 0)
+        err(EXIT_FAILURE, "failed to open %s for writing", db->sig);
+
     /* XXX: check return type */
-    gpgme_sign(repo->dirfd, db->file, db->sig, key);
+    gpgme_sign(dbfd, sigfd, key);
+
+    close(sigfd);
+    close(dbfd);
 
     if (symlinkat(db->sig, repo->dirfd, db->link_sig) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink for %s failed", db->link_sig);
