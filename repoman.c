@@ -334,10 +334,13 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
 
 static int repo_database_verify(repo_t *repo)
 {
-    alpm_list_t *node, *pkgs = repo->pkgcache->list;
+    alpm_list_t *node;
     int rc = 0;
 
-    for (node = pkgs; node; node = node->next) {
+    if (!repo->pkgcache)
+        return 0;
+
+    for (node = repo->pkgcache->list; node; node = node->next) {
         alpm_pkg_meta_t *pkg = node->data;
         rc |= verify_pkg(repo, pkg, true);
     }
