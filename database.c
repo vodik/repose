@@ -137,7 +137,14 @@ static void compile_files_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct
     if (pkg->files) {
         write_list(buf, "FILES", pkg->files);
     } else {
-        alpm_list_t *files = alpm_pkg_files(repo->dirfd, pkg->filename);
+        int pkgfd = openat(repo->dirfd, pkg->filename, O_RDONLY);
+        if (pkgfd < 0 && errno != ENOENT) {
+            err(EXIT_FAILURE, "failed to open %s", pkg->filename);
+        }
+
+        alpm_list_t *files = alpm_pkg_files(pkgfd);
+        close(pkgfd);
+
         write_list(buf, "FILES", files);
         alpm_list_free_inner(files, free);
         alpm_list_free(files);

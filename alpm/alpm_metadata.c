@@ -184,34 +184,24 @@ void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
     free(pkg);
 }
 
-alpm_list_t *alpm_pkg_files(int dirfd, char *pkgname)
+alpm_list_t *alpm_pkg_files(int fd)
 {
     struct archive *archive = archive_read_new();
     alpm_list_t *files = NULL;
     struct stat st;
     char *memblock = MAP_FAILED;
-    int pkgfd = 0, rc = 0;
 
-    /* FIXME: this check shouldn't be here */
-    pkgfd = openat(dirfd, pkgname, O_RDONLY);
-    if (pkgfd < 0) {
-        if(errno != ENOENT)
-            err(EXIT_FAILURE, "failed to open %s", pkgname);
-        goto cleanup;
-    }
-
-    fstat(pkgfd, &st);
-    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, pkgfd, 0);
+    fstat(fd, &st);
+    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (memblock == MAP_FAILED)
-        err(EXIT_FAILURE, "failed to mmap package %s", pkgname);
+        err(EXIT_FAILURE, "failed to mmap package");
 
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
     int r = archive_read_open_memory(archive, memblock, st.st_size);
     if (r != ARCHIVE_OK) {
-        warnx("%s is not an archive", pkgname);
-        rc = -1;
+        warnx("is not an archive");
         goto cleanup;
     }
 
@@ -232,9 +222,6 @@ alpm_list_t *alpm_pkg_files(int dirfd, char *pkgname)
     }
 
 cleanup:
-    if (pkgfd)
-        close(pkgfd);
-
     if (memblock != MAP_FAILED)
         munmap(memblock, st.st_size);
 
