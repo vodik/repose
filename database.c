@@ -67,7 +67,7 @@ static db_writer_t *db_writer_new(repo_t *repo, file_t *db)
 
     archive_write_set_format_pax_restricted(writer->archive);
 
-    writer->fd = openat(repo->dirfd, db->file, O_CREAT | O_WRONLY | O_TRUNC, 0755);
+    writer->fd = openat(repo->dirfd, db->file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (writer->fd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", db->file);
     archive_write_open_fd(writer->archive, writer->fd);
