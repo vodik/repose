@@ -9,7 +9,8 @@ CFLAGS := -std=c99 \
 LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
 
 all: repoman
-repoman: repoman.o buffer.o alpm/alpm_metadata.o alpm/archive_reader.o \
+repoman: repoman.o database.o buffer.o \
+	alpm/alpm_metadata.o alpm/archive_reader.o \
 	alpm/pkghash.o alpm/signing.o alpm/base64.o alpm/util.o
 
 install: repoman
