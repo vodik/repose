@@ -167,22 +167,34 @@ static repo_t *repo_new(char *path)
     return repo;
 }
 
-static void repo_write(repo_t *repo)
+static int repo_write(repo_t *repo)
 {
-    colon_printf("Writing databases to disk...\n");
-    printf(" writing %s...\n", repo->db.file);
-    compile_database(repo, &repo->db, DB_DESC | DB_DEPENDS);
-    if (cfg.sign) {
-        sign_database(repo, &repo->db, cfg.key);
-    }
-
-    if (cfg.files) {
-        printf(" writing %s...\n", repo->files.file);
-        compile_database(repo, &repo->files, DB_FILES);
+    switch (repo->state) {
+    case REPO_DIRTY:
+        colon_printf("Writing databases to disk...\n");
+        printf(" writing %s...\n", repo->db.file);
+        compile_database(repo, &repo->db, DB_DESC | DB_DEPENDS);
         if (cfg.sign) {
             sign_database(repo, &repo->db, cfg.key);
         }
+
+        if (cfg.files) {
+            printf(" writing %s...\n", repo->files.file);
+            compile_database(repo, &repo->files, DB_FILES);
+            if (cfg.sign) {
+                sign_database(repo, &repo->db, cfg.key);
+            }
+        }
+        printf("repo updated successfully\n");
+        break;
+    case REPO_CLEAN:
+        printf("repo does not need updating\n");
+        break;
+    default:
+        break;
     }
+
+    return 0;
 }
 
 static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
@@ -378,7 +390,6 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_
 static int repo_database_update(repo_t *repo, int argc, char *argv[])
 {
     alpm_list_t *node, *pkgs;
-    alpm_pkghash_t *cache = repo->pkgcache;
     bool force = argc > 0 ? true : false;
 
     if (repo->state == REPO_NEW)
@@ -391,12 +402,12 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
     colon_printf("Updating repo database...\n");
     for (node = pkgs; node; node = node->next) {
         alpm_pkg_meta_t *pkg = node->data;
-        alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, pkg->name);
+        alpm_pkg_meta_t *old = _alpm_pkghash_find(repo->pkgcache, pkg->name);
 
         /* if the package isn't in the cache, add it */
         if (!old) {
             printf(" adding %s-%s\n", pkg->name, pkg->version);
-            cache = _alpm_pkghash_add(cache, pkg);
+            repo->pkgcache = _alpm_pkghash_add(repo->pkgcache, pkg);
             repo->state = REPO_DIRTY;
             continue;
         }
@@ -406,7 +417,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
         switch(alpm_pkg_vercmp(pkg->version, old->version)) {
         case 1:
             printf(" updating %s %s => %s\n", pkg->name, old->version, pkg->version);
-            cache = _alpm_pkghash_replace(cache, pkg, old);
+            repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
             if (cfg.clean >= 1)
                 unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
@@ -425,7 +436,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
              * update, replace it anyways */
             if (force) {
                 printf(" replacing %s %s => %s\n", pkg->name, old->version, pkg->version);
-                cache = _alpm_pkghash_replace(cache, pkg, old);
+                repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
                 if (cfg.clean >= 2)
                     unlink_package(repo, old);
                 alpm_pkg_free_metadata(old);
@@ -438,8 +449,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
 
     }
 
-    repo->pkgcache = cache;
-    return 0;
+    return repo_write(repo);
 }
 /* }}} */
 
@@ -468,7 +478,7 @@ static int repo_database_remove(repo_t *repo, int argc, char *argv[])
         warnx("didn't find entry: %s", argv[0]);
     }
 
-    return 0;
+    return repo_write(repo);
 }
 
 /* }}} */
@@ -666,19 +676,6 @@ int main(int argc, char *argv[])
     default:
         break;
     };
-
-    /* if the database is dirty, rewrite it */
-    switch (repo->state) {
-    case REPO_DIRTY:
-        repo_write(repo);
-        printf("repo updated successfully\n");
-        break;
-    case REPO_CLEAN:
-        printf("repo does not need updating\n");
-        break;
-    default:
-        break;
-    }
 
     return rc;
 }
