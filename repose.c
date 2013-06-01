@@ -104,7 +104,7 @@ static repo_t *repo_new(char *path)
 
     len = strlen(dbpath);
     div = memrchr(dbpath, '/', len);
-    dot = memchr(dbpath, '.', len);
+    dot = memchr(div, '.', len - (dbpath - div));
 
     if (div) {
         name = strndup(div + 1, dot - div - 1);
@@ -135,6 +135,8 @@ static repo_t *repo_new(char *path)
 
     /* open the directory so we can use openat later */
     repo->dirfd = open(repo->root, O_RDONLY);
+    if (repo->dirfd < 0)
+        err(EXIT_FAILURE, "cannot access %s", repo->root);
 
     /* skip '.db' */
     dot += 3;
