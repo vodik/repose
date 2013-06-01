@@ -86,29 +86,28 @@ static int colon_printf(const char *fmt, ...)
 
 static repo_t *repo_new(char *path)
 {
-    char *dot, *name, *dbpath = NULL;
+    size_t len;
+    char *div, *dot, *name;
+    char *dbpath = NULL, *real = NULL;
+
+    real = realpath(path, NULL);
+    if (real) {
+        dbpath = real;
+    } else {
+        if (errno != ENOENT)
+            err(EXIT_FAILURE, "failed to find repo");
+        dbpath = path;
+    }
 
     repo_t *repo = calloc(1, sizeof(repo_t));
     repo->state = REPO_CLEAN;
 
-    dbpath = realpath(path, NULL);
-    if (dbpath) {
-        size_t len = strlen(dbpath);
-        char *div = memrchr(dbpath, '/', len);
+    len = strlen(dbpath);
+    div = memrchr(dbpath, '/', len);
+    dot = memchr(dbpath, '.', len);
 
-        dot = memchr(dbpath, '.', len);
-        name = strndup(div + 1, dot - div - 1);
-        repo->root = strndup(dbpath, div - dbpath);
-
-        free(dbpath);
-    } else {
-        if (errno != ENOENT)
-            err(EXIT_FAILURE, "failed to find repo");
-
-        dot = strchr(path, '.');
-        name = strndup(path, dot - path);
-        repo->root = get_current_dir_name();
-    }
+    name = strndup(div + 1, dot - div - 1);
+    repo->root = strndup(dbpath, div - dbpath);
 
     /* FIXME: figure this out on compression */
     if (!dot) {
@@ -150,7 +149,6 @@ static repo_t *repo_new(char *path)
     asprintf(&repo->files.sig,       "%s.files%s.sig", name, dot);
     asprintf(&repo->files.link_file, "%s.files",       name);
     asprintf(&repo->files.link_sig,  "%s.files.sig",   name);
-    free(name);
 
     if (repo->state != REPO_NEW) {
         colon_printf("Reading existing database into memory...\n");
@@ -164,6 +162,8 @@ static repo_t *repo_new(char *path)
         repo->pkgcache = _alpm_pkghash_create(23);
     }
 
+    free(name);
+    free(real);
     return repo;
 }
 
