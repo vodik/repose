@@ -4,6 +4,12 @@
 #include <stdbool.h>
 #include "alpm/pkghash.h"
 
+enum state {
+    REPO_NEW,
+    REPO_CLEAN,
+    REPO_DIRTY
+};
+
 enum compress {
     COMPRESS_NONE,
     COMPRESS_GZIP,
@@ -22,7 +28,7 @@ typedef struct repo {
     char *root;
     file_t db;
     file_t files;
-    bool dirty;
+    enum state state;
     enum compress compression;
     int dirfd;
 } repo_t;

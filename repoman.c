@@ -89,7 +89,7 @@ static repo_t *repo_new(char *path)
     char *dot, *name, *dbpath = NULL;
 
     repo_t *repo = calloc(1, sizeof(repo_t));
-    repo->dirty = false;
+    repo->state = REPO_CLEAN;
 
     dbpath = realpath(path, NULL);
     if (dbpath) {
@@ -99,6 +99,8 @@ static repo_t *repo_new(char *path)
         dot = memchr(dbpath, '.', len);
         name = strndup(div + 1, dot - div - 1);
         repo->root = strndup(dbpath, div - dbpath);
+
+        free(dbpath);
     } else {
         if (errno != ENOENT)
             err(EXIT_FAILURE, "failed to find repo");
@@ -133,6 +135,7 @@ static repo_t *repo_new(char *path)
     /* skip '.db' */
     dot += 3;
     if (*dot == '\0') {
+        repo->state = REPO_NEW;
         dot = ".tar.gz";
     }
 
@@ -147,13 +150,20 @@ static repo_t *repo_new(char *path)
     asprintf(&repo->files.sig,       "%s.files%s.sig", name, dot);
     asprintf(&repo->files.link_file, "%s.files",       name);
     asprintf(&repo->files.link_sig,  "%s.files.sig",   name);
-
-    /* load the databases if possible */
-    load_database(repo, &repo->db);
-    load_database(repo, &repo->files);
-
-    free(dbpath);
     free(name);
+
+    if (repo->state != REPO_NEW) {
+        colon_printf("Reading existing database...\n");
+
+        /* load the databases if possible */
+        load_database(repo, &repo->db);
+        load_database(repo, &repo->files);
+
+        repo_database_reduce(repo);
+    } else {
+        repo->pkgcache = _alpm_pkghash_create(23);
+    }
+
     return repo;
 }
 
@@ -337,7 +347,7 @@ static int repo_database_verify(repo_t *repo)
     alpm_list_t *node;
     int rc = 0;
 
-    if (!repo->pkgcache)
+    if (repo->state != REPO_NEW)
         return 0;
 
     for (node = repo->pkgcache->list; node; node = node->next) {
@@ -351,30 +361,6 @@ static int repo_database_verify(repo_t *repo)
     return rc;
 }
 /* }}} */
-
-static void repo_database_reduce(repo_t *repo)
-{
-    if (repo->pkgcache) {
-        colon_printf("Reading existing database...\n");
-
-        alpm_pkghash_t *cache = repo->pkgcache;
-        alpm_list_t *node, *pkgs = cache->list;
-
-        for (node = pkgs; node; node = node->next) {
-            alpm_pkg_meta_t *pkg = node->data;
-
-            /* find packages that have been removed from the cache */
-            if (verify_pkg(repo, pkg, false) == 1) {
-                printf("REMOVING: %s-%s\n", pkg->name, pkg->version);
-                cache = _alpm_pkghash_remove(cache, pkg, NULL);
-                alpm_pkg_free_metadata(pkg);
-                repo->dirty = true;
-            }
-        }
-
-        repo->pkgcache = cache;
-    }
-}
 
 /* {{{ UPDATE */
 static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, alpm_pkg_meta_t *new,
@@ -392,13 +378,10 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
     /* if some file paths were specified, find all packages */
     colon_printf("Scanning for new packages...\n");
 
-    if (!repo->pkgcache) {
+    if (repo->state == REPO_NEW)
         warnx("repo doesn't exist, creating...");
-        cache = _alpm_pkghash_create(23);
-    } else {
-        repo_database_reduce(repo);
-        cache = repo->pkgcache;
-    }
+
+    cache = repo->pkgcache;
 
     alpm_list_t *node, *pkgs;
     bool force = argc > 0 ? true : false;
@@ -413,7 +396,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
         if (!old) {
             printf("ADDING: %s-%s\n", pkg->name, pkg->version);
             cache = _alpm_pkghash_add(cache, pkg);
-            repo->dirty = true;
+            repo->state = REPO_DIRTY;
             continue;
         }
 
@@ -425,7 +408,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             if (cfg.clean >= 2)
                 unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
-            repo->dirty = true;
+            repo->state = REPO_DIRTY;
             continue;
         }
 
@@ -438,14 +421,14 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             if (cfg.clean >= 1)
                 unlink_package(repo, old);
             alpm_pkg_free_metadata(old);
-            repo->dirty = true;
+            repo->state = REPO_DIRTY;
             break;
         case 0:
             /* check to see if the package now has a signature */
             if (old->base64_sig == NULL && pkg->base64_sig) {
                 printf("ADD SIG: %s-%s\n", pkg->name, pkg->version);
                 old->base64_sig = strdup(pkg->base64_sig);
-                repo->dirty = true;
+                repo->state = REPO_DIRTY;
             }
             break;
         case -1:
@@ -464,11 +447,11 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
 /* read the existing repo or construct a new package cache */
 static int repo_database_remove(repo_t *repo, int argc, char *argv[])
 {
-    if (!repo->pkgcache) {
+    if (repo->state == REPO_NEW) {
         warnx("repo doesn't exist...");
         return 1;
-    } else {
-        repo_database_reduce(repo);
+    } else if (argc == 0) {
+        return 0;
     }
 
     int i;
@@ -480,7 +463,7 @@ static int repo_database_remove(repo_t *repo, int argc, char *argv[])
             if (cfg.clean >= 1)
                 unlink_package(repo, pkg);
             alpm_pkg_free_metadata(pkg);
-            repo->dirty = true;
+            repo->state = REPO_DIRTY;
             continue;
         }
         warnx("didn't find entry: %s", argv[0]);
@@ -510,10 +493,8 @@ static void print_metadata(const alpm_pkg_meta_t *pkg)
 /* read the existing repo or construct a new package cache */
 static int repo_database_query(repo_t *repo, int argc, char *argv[])
 {
-    if (!repo->pkgcache) {
-        warnx("repo doesn't exist");
-        return 1;
-    }
+    if (repo->state == REPO_NEW)
+        return 0;
 
     if (argc > 0) {
         int i;
@@ -688,11 +669,16 @@ int main(int argc, char *argv[])
     };
 
     /* if the database is dirty, rewrite it */
-    if (repo->dirty) {
+    switch (repo->state) {
+    case REPO_DIRTY:
         repo_write(repo);
         printf("repo updated successfully\n");
-    } else {
+        break;
+    case REPO_CLEAN:
         printf("repo does not need updating\n");
+        break;
+    default:
+        break;
     }
 
     return rc;
