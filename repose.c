@@ -106,8 +106,13 @@ static repo_t *repo_new(char *path)
     div = memrchr(dbpath, '/', len);
     dot = memchr(dbpath, '.', len);
 
-    name = strndup(div + 1, dot - div - 1);
-    repo->root = strndup(dbpath, div - dbpath);
+    if (div) {
+        name = strndup(div + 1, dot - div - 1);
+        repo->root = strndup(dbpath, div - dbpath);
+    } else {
+        name = strndup(dbpath, dot - dbpath);
+        repo->root = get_current_dir_name();
+    }
 
     /* FIXME: figure this out on compression */
     if (!dot) {
