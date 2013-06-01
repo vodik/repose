@@ -271,8 +271,6 @@ void repo_database_reduce(repo_t *repo)
             if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
                 if (errno != ENOENT)
                     err(EXIT_FAILURE, "couldn't access %s", pkg->filename);
-
-                printf("REMOVING: %s-%s\n", pkg->name, pkg->version);
                 cache = _alpm_pkghash_remove(cache, pkg, NULL);
                 alpm_pkg_free_metadata(pkg);
                 repo->state = REPO_DIRTY;
