@@ -180,6 +180,8 @@ void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
     alpm_list_free(pkg->optdepends);
     alpm_list_free_inner(pkg->makedepends, free);
     alpm_list_free(pkg->makedepends);
+    alpm_list_free_inner(pkg->files, free);
+    alpm_list_free(pkg->files);
 
     free(pkg);
 }
