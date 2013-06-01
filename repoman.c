@@ -303,15 +303,12 @@ static int verify_pkg_sig(repo_t *repo, const alpm_pkg_meta_t *pkg)
     return rc;
 }
 
-static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg, bool deep)
+static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
     if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
         warn("couldn't find pkg %s at %s", pkg->name, pkg->filename);
         return 1;
     }
-
-    if (!deep)
-        return 0;
 
     /* if we have a signature, verify it */
     if (verify_pkg_sig(repo, pkg) < 0) {
@@ -352,7 +349,7 @@ static int repo_database_verify(repo_t *repo)
 
     for (node = repo->pkgcache->list; node; node = node->next) {
         alpm_pkg_meta_t *pkg = node->data;
-        rc |= verify_pkg(repo, pkg, true);
+        rc |= verify_pkg(repo, pkg);
     }
 
     if (rc == 0)
