@@ -1,4 +1,4 @@
-## repoman
+## repose
 
 An archlinux repo poking tool.
 
@@ -6,7 +6,7 @@ At the moment, a half baked and hacked together alternative to repo-add.
 
 ### Usage
 
-    repoman -U --sign foo.db.tar.gz
+    repose -U --sign foo.db.tar.gz
 
 Add all packages in the current directory to foo.db.tar.gz and then sign
 the database with gnupg.
@@ -14,28 +14,28 @@ the database with gnupg.
 Add a `-c` flag to also delete and files removed from the db and a
 second `-c` to also remove any other outdated packages in the cache.
 
-    repoman -V foo.db.tar.gz
+    repose -V foo.db.tar.gz
 
 Verify the packages foo.db.tar.gz refers to can be accessed and the
 md5sum and sha256sum match.
 
-    repoman -R foo.db.tar.gz pkg ...
+    repose -R foo.db.tar.gz pkg ...
 
 Remove a package from the database. Add `-c` to also remove the files
 from disk.
 
-    repoman -Q foo.db.tar.gz pkg ...
+    repose -Q foo.db.tar.gz pkg ...
 
 Print information about `pkg` much like how `pacman -Qi pkg` works
 
 ### Compatability
 
 Backwards compatibility to the original repo tools is provided. Simply
-make symlinks against `repoman`
+make symlinks against `repose`
 
-    ln -s /usr/bin/repoman /usr/bin/repo-add
-    ln -s /usr/bin/repoman /usr/bin/repo-remove
-    ln -s /usr/bin/repoman /usr/bin/repo-elephant
+    ln -s /usr/bin/repose /usr/bin/repo-add
+    ln -s /usr/bin/repose /usr/bin/repo-remove
+    ln -s /usr/bin/repose /usr/bin/repo-elephant
 
 Note only `repo-add` and `repo-remove` are implemented at the moment.
 

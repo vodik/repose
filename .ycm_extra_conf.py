@@ -18,6 +18,7 @@ flags = [
   '-DNDEBUG',
   '-DUSE_CLANG_COMPLETER',
   '-D_GNU_SOURCE',
+  '-DREPOSE_VERSION=devel',
   '-std=c99',
   '-x', 'c',
 ]

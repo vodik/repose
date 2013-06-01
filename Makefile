@@ -1,23 +1,23 @@
-# VERSION = $(shell git describe --tags)
+VERSION = $(shell git describe --tags)
 
 CFLAGS := -std=c99 \
 	-Wall -Wextra -pedantic \
 	-D_GNU_SOURCE \
+	-DREPOSE_VERSION=\"${VERSION}\" \
 	${CFLAGS}
-	# -DENVOY_VERSION=\"${VERSION}\" \
 
 LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
 
-all: repoman
-repoman: repoman.o database.o buffer.o \
+all: repose
+repose: repose.o database.o buffer.o \
 	alpm/alpm_metadata.o alpm/archive_reader.o \
 	alpm/pkghash.o alpm/signing.o alpm/base64.o alpm/util.o
 
-install: repoman
-	install -Dm755 repoman ${DESTDIR}/usr/bin/repoman
-	# install -Dm644 repoman.1 $(DESTDIR)/usr/share/man/man1/repoman.1
+install: repose
+	install -Dm755 repose ${DESTDIR}/usr/bin/repose
+	# install -Dm644 repose.1 $(DESTDIR)/usr/share/man/man1/repose.1
 
 clean:
-	${RM} repoman *.o alpm/*.o
+	${RM} repose *.o alpm/*.o
 
 .PHONY: clean install uninstall

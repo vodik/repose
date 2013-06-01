@@ -1,4 +1,4 @@
-#include "repoman.h"
+#include "repose.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -561,7 +561,7 @@ static void enable_colors(bool on)
     };
 }
 
-void parse_repoman_args(int *argc, char **argv[])
+void parse_repose_args(int *argc, char **argv[])
 {
     static const struct option opts[] = {
         { "help",    no_argument,       0, 'h' },
@@ -591,7 +591,7 @@ void parse_repoman_args(int *argc, char **argv[])
             usage(stdout);
             break;
         case 'v':
-            printf("%s %s\n", program_invocation_short_name, "devel");
+            printf("%s %s\n", program_invocation_short_name, REPOSE_VERSION);
             exit(EXIT_SUCCESS);
         case 'V':
             cfg.action = ACTION_VERIFY;
@@ -647,7 +647,7 @@ int main(int argc, char *argv[])
     } else if (strcmp(program_invocation_short_name, "repo-remove") == 0) {
         parse_repo_remove_args(&argc, &argv);
     } else {
-        parse_repoman_args(&argc, &argv);
+        parse_repose_args(&argc, &argv);
     }
 
     if (argc == 0)

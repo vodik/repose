@@ -11,7 +11,7 @@
 
 #include "alpm/signing.h"
 #include "alpm/util.h"
-#include "repoman.h"
+#include "repose.h"
 #include "buffer.h"
 
 typedef struct db_writer {
