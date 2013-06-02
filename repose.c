@@ -104,12 +104,13 @@ static repo_t *repo_new(char *path)
 
     len = strlen(dbpath);
     div = memrchr(dbpath, '/', len);
-    dot = memchr(div, '.', len - (dbpath - div));
 
     if (div) {
+        dot = memchr(div, '.', len - (dbpath - div));
         name = strndup(div + 1, dot - div - 1);
         repo->root = strndup(dbpath, div - dbpath);
     } else {
+        dot = memchr(dbpath, '.', len);
         name = strndup(dbpath, dot - dbpath);
         repo->root = get_current_dir_name();
     }
@@ -141,7 +142,6 @@ static repo_t *repo_new(char *path)
     /* skip '.db' */
     dot += 3;
     if (*dot == '\0') {
-        repo->state = REPO_NEW;
         dot = ".tar.gz";
     }
 
@@ -157,7 +157,13 @@ static repo_t *repo_new(char *path)
     asprintf(&repo->files.link_file, "%s.files",       name);
     asprintf(&repo->files.link_sig,  "%s.files.sig",   name);
 
-    if (repo->state != REPO_NEW) {
+    if (faccessat(repo->dirfd, repo->db.file, F_OK, 0) < 0) {
+        if (errno != ENOENT) {
+            err(EXIT_FAILURE, "couldn't access %s", repo->db.file);
+        }
+        repo->state = REPO_NEW;
+        repo->pkgcache = _alpm_pkghash_create(23);
+    } else {
         colon_printf("Reading existing database into memory...\n");
 
         /* load the databases if possible */
@@ -165,8 +171,6 @@ static repo_t *repo_new(char *path)
         load_database(repo, &repo->files);
 
         repo_database_reduce(repo);
-    } else {
-        repo->pkgcache = _alpm_pkghash_create(23);
     }
 
     free(name);
