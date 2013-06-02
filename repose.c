@@ -548,7 +548,8 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -V, --verify          verify the contents of the database\n"
         " -i, --info            show package info\n"
         " -c, --clean           remove stuff\n"
-        " -s, --sign            sign database with GnuPG after update\n"
+        " -f, --files           generate a complementing files database\n"
+        " -s, --sign            sign database(s) with GnuPG after update\n"
         " -k, --key=KEY         use the specified key to sign the database\n"
         "     --color=MODE      enable colour support\n", out);
 
