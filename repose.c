@@ -159,7 +159,7 @@ static repo_t *repo_new(char *path)
 
     if (faccessat(repo->dirfd, repo->db.file, F_OK, 0) < 0) {
         if (errno != ENOENT) {
-            err(EXIT_FAILURE, "couldn't access %s", repo->db.file);
+            err(EXIT_FAILURE, "couldn't access database %s", repo->db.file);
         }
         repo->state = REPO_NEW;
         repo->pkgcache = _alpm_pkghash_create(23);
@@ -212,7 +212,7 @@ static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
     if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
         if (errno != ENOENT) {
-            err(EXIT_FAILURE, "couldn't access %s", pkg->filename);
+            err(EXIT_FAILURE, "couldn't access package %s to unlink", pkg->filename);
         }
         return 0;
     }

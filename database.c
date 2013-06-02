@@ -270,7 +270,7 @@ void repo_database_reduce(repo_t *repo)
 
             if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
                 if (errno != ENOENT)
-                    err(EXIT_FAILURE, "couldn't access %s", pkg->filename);
+                    err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
                 cache = _alpm_pkghash_remove(cache, pkg, NULL);
                 alpm_pkg_free_metadata(pkg);
                 repo->state = REPO_DIRTY;
