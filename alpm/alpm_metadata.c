@@ -398,13 +398,12 @@ static int _alpm_splitname(const char *target, char **name, char **version,
 	return 0;
 }
 
-/* TODO: port cleanup code to libalpm */
 static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char *entryname,
 		const char **entry_filename, alpm_pkg_meta_t *likely_pkg)
 {
 	char *pkgname = NULL, *pkgver = NULL;
 	unsigned long pkgname_hash;
-	alpm_pkg_meta_t *pkg = NULL;
+	alpm_pkg_meta_t *pkg;
 
 	/* get package and db file names */
 	if(entry_filename) {
@@ -418,7 +417,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 	if(_alpm_splitname(entryname, &pkgname, &pkgver, &pkgname_hash) != 0) {
 		/* _alpm_log(db->handle, ALPM_LOG_ERROR, */
 		/* 		_("invalid name for database entry '%s'\n"), entryname); */
-        goto cleanup;
+		return NULL;
 	}
 
 	if(likely_pkg && pkgname_hash == likely_pkg->name_hash
@@ -427,11 +426,12 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 	} else {
 		pkg = _alpm_pkghash_find(*pkgcache, pkgname);
 	}
+
 	if(pkg == NULL) {
 		pkg = calloc(1, sizeof(alpm_pkg_meta_t));
 		if(pkg == NULL) {
 			/* RET_ERR(db->handle, ALPM_ERR_MEMORY, NULL); */
-            goto cleanup;
+            return NULL;
 		}
 
 		pkg->name = pkgname;
@@ -448,11 +448,11 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 		/* _alpm_log(db->handle, ALPM_LOG_FUNCTION, "adding '%s' to package cache for db '%s'\n", */
 		/* 		pkg->name, db->treename); */
 		*pkgcache = _alpm_pkghash_add_sorted(*pkgcache, pkg);
+	} else {
+		free(pkgname);
+		free(pkgver);
 	}
 
-cleanup:
-    free(pkgname);
-    free(pkgver);
     return pkg;
 }
 
@@ -460,16 +460,17 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
                         struct archive_entry *entry)
 {
     const char *entryname = archive_entry_pathname(entry);
-    const char *filename = NULL;
+    const char *filename;  //= strsep(&entryname, "/");
+    /* if (entryname == NULL) */
+    /*     return; */
 
     alpm_pkg_meta_t *pkg = load_pkg_for_entry(pkgcache, entryname, (const char **)&filename, NULL);
-
-    if (filename == NULL)
-        return;
 
     if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0 || strcmp(filename, "files") == 0) {
         read_desc(reader, entry, pkg);
     }
+
+    /* free(filename); */
 }
 
 int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
