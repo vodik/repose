@@ -213,7 +213,7 @@ static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
         return 0;
     }
 
-    printf(" deleting %s-%s\n", pkg->name, pkg->version);
+    printf(" deleting %s %s\n", pkg->name, pkg->version);
     unlinkat(repo->dirfd, pkg->filename, 0);
     unlinkat(repo->dirfd, pkg->signame, 0);
     return 0;
@@ -413,7 +413,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
 
         /* if the package isn't in the cache, add it */
         if (!old) {
-            printf(" adding %s-%s\n", pkg->name, pkg->version);
+            printf(" adding %s %s\n", pkg->name, pkg->version);
             repo->pkgcache = _alpm_pkghash_add(repo->pkgcache, pkg);
             repo->state = REPO_DIRTY;
             continue;
