@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <err.h>
 #include <errno.h>
+#include <sys/file.h>
 #include <archive.h>
 #include <archive_entry.h>
 
@@ -70,8 +71,10 @@ static db_writer_t *db_writer_new(repo_t *repo, file_t *db)
     writer->fd = openat(repo->dirfd, db->file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (writer->fd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", db->file);
-    archive_write_open_fd(writer->archive, writer->fd);
+    if (flock(writer->fd, LOCK_EX) < 0)
+        err(EXIT_FAILURE, "failed to lock %s", db->file);
 
+    archive_write_open_fd(writer->archive, writer->fd);
     buffer_init(&writer->buf, 1024);
 
     return writer;
@@ -236,6 +239,11 @@ int load_database(repo_t *repo, file_t *db)
         if(errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", db->file);
         return -errno;
+    }
+
+    if (flock(dbfd, LOCK_EX | LOCK_NB) < 0) {
+        fprintf(stderr, "error: %s is locked by another processes\n", db->file);
+        exit(EXIT_FAILURE);
     }
 
     /* FIXME: error reporting should be here, not inside this funciton */
