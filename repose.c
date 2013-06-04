@@ -84,6 +84,22 @@ static int colon_printf(const char *fmt, ...)
     return ret;
 }
 
+static void alloc_pkghash(repo_t *repo)
+{
+    int files = 0;
+    DIR *dirp = opendir(repo->root);
+    struct dirent *entry;
+
+    while ((entry = readdir(dirp)) != NULL) {
+        if (entry->d_type == DT_REG)
+            files++;
+    }
+
+    repo->pkgcache = _alpm_pkghash_create(files);
+    closedir(dirp);
+}
+
+
 static repo_t *repo_new(char *path)
 {
     size_t len;
@@ -138,6 +154,7 @@ static repo_t *repo_new(char *path)
     repo->dirfd = open(repo->root, O_RDONLY);
     if (repo->dirfd < 0)
         err(EXIT_FAILURE, "cannot access %s", repo->root);
+    alloc_pkghash(repo);
 
     /* skip '.db' */
     dot += 3;
@@ -162,7 +179,6 @@ static repo_t *repo_new(char *path)
             err(EXIT_FAILURE, "couldn't access database %s", repo->db.file);
         }
         repo->state = REPO_NEW;
-        repo->pkgcache = _alpm_pkghash_create(23);
     } else {
         colon_printf("Reading existing database into memory...\n");
 

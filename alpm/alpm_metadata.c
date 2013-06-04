@@ -499,14 +499,6 @@ int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
         goto cleanup;
     }
 
-    if (*pkgcache == NULL) {
-        *pkgcache = _alpm_pkghash_create(23);
-        if (*pkgcache == NULL) {
-            rc = -1;
-            goto cleanup;
-        }
-    }
-
     for (;;) {
         struct archive_entry *entry;
 
