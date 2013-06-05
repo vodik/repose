@@ -582,11 +582,11 @@ static void __attribute__((__noreturn__)) elephant(void)
 
     size_t len = strlen(base64_data[i]);
     unsigned char *usline = (unsigned char *)base64_data[i];
-    /* reasonable allocation of expected length is 3/4 of encoded length */
-    size_t destlen = len * 3 / 4;
-    unsigned char *data = malloc(destlen);
-    if(base64_decode(data, &destlen, usline, len) == 0)
+    unsigned char *data;
+
+    if (base64_decode(&data, usline, len) == 0)
         puts((char *)data);
+
     exit(EXIT_SUCCESS);
 }
 

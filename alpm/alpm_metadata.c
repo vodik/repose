@@ -84,7 +84,6 @@ static void read_pkg_metadata(struct archive *archive, struct archive_entry *ent
 
 int read_pkg_signature(int fd, alpm_pkg_meta_t *pkg)
 {
-    size_t sig_len = 0;
     struct stat st;
     char *memblock = MAP_FAILED;
 
@@ -93,11 +92,7 @@ int read_pkg_signature(int fd, alpm_pkg_meta_t *pkg)
     if (memblock == MAP_FAILED)
         err(EXIT_FAILURE, "failed to mmap package signature %s", pkg->signame);
 
-    sig_len = st.st_size * 4 / 3 + 3;
-    pkg->base64_sig = malloc(sig_len);
-
-    base64_encode((unsigned char *)pkg->base64_sig, &sig_len,
-                  (const unsigned char *)memblock, st.st_size);
+    base64_encode((unsigned char **)&pkg->base64_sig, (const unsigned char *)memblock, st.st_size);
 
     munmap(memblock, st.st_size);
     return 0;
