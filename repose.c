@@ -12,6 +12,7 @@
 
 #include "alpm/signing.h"
 #include "alpm/util.h"
+#include "alpm/base64.h"
 #include "database.h"
 
 #define NOCOLOR     "\033[0m"
@@ -422,7 +423,6 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
     if (repo->state == REPO_NEW)
         warnx("repo doesn't exist, creating...");
 
-    colon_printf("Scanning for new packages...\n");
     alpm_pkghash_t *filecache = get_filecache(repo, argv, argc);
     pkgs = filecache->list;
 
@@ -561,6 +561,35 @@ static int repo_database_query(repo_t *repo, int argc, char *argv[])
 #include "repo-compat.c"
 /* }}} */
 
+static void __attribute__((__noreturn__)) elephant(void)
+{
+    static char *base64_data[2] = {
+        "ICAgICBfXwogICAgJy4gXAogICAgICctIFwKICAgICAgLyAvXyAgICAgICAgIC4tLS0uCiAgICAg"
+        "LyB8IFxcLC5cLy0tLi8vICAgICkKICAgICB8ICBcLy8gICAgICAgICkvICAvCiAgICAgIFwgICcg"
+        "XiBeICAgIC8gICAgKV9fX18uLS0tLS4uICA2CiAgICAgICAnLl9fX18uICAgIC5fX18vICAgICAg"
+        "ICAgICAgXC5fKQogICAgICAgICAgLlwvLiAgICAgICAgICAgICAgICAgICAgICApCiAgICAgICAg"
+        "ICAgJ1wgICAgICAgICAgICAgICAgICAgICAgIC8KICAgICAgICAgICBfLyBcLyAgICApLiAgICAg"
+        "ICAgKSAgICAoCiAgICAgICAgICAvIyAgLiEgICAgfCAgICAgICAgL1wgICAgLwogICAgICAgICAg"
+        "XCAgQy8vICMgIC8nLS0tLS0nJy8gIyAgLwogICAgICAgLiAgICdDLyB8ICAgIHwgICAgfCAgIHwg"
+        "ICAgfG1yZiAgLAogICAgICAgXCksIC4uIC4nT09PLScuIC4uJ09PTydPT08tJy4gLi5cKCwK",
+        "ICAgIF8gICAgXwogICAvIFxfXy8gXF9fX19fCiAgLyAgLyAgXCAgXCAgICBgXAogICkgIFwnJy8g"
+        "ICggICAgIHxcCiAgYFxfXykvX18vJ19cICAvIGAKICAgICAvL198X3x+fF98X3wKICAgICBeIiIn"
+        "IicgIiInIicK"
+    };
+
+    srand(time(NULL));
+    int i = rand() % 2;
+
+    size_t len = strlen(base64_data[i]);
+    unsigned char *usline = (unsigned char *)base64_data[i];
+    /* reasonable allocation of expected length is 3/4 of encoded length */
+    size_t destlen = len * 3 / 4;
+    unsigned char *data = malloc(destlen);
+    if(base64_decode(data, &destlen, usline, len) == 0)
+        puts((char *)data);
+    exit(EXIT_SUCCESS);
+}
+
 static void __attribute__((__noreturn__)) usage(FILE *out)
 {
     fprintf(out, "usage: %s [options] <path-to-db> [pkgs|deltas ...]\n", program_invocation_short_name);
@@ -597,18 +626,19 @@ static void enable_colors(bool on)
 void parse_repose_args(int *argc, char **argv[])
 {
     static const struct option opts[] = {
-        { "help",    no_argument,       0, 'h' },
-        { "version", no_argument,       0, 'v' },
-        { "verify",  no_argument,       0, 'V' },
-        { "update",  no_argument,       0, 'U' },
-        { "remove",  no_argument,       0, 'R' },
-        { "query",   no_argument,       0, 'Q' },
-        { "info",    no_argument,       0, 'i' },
-        { "clean",   no_argument,       0, 'c' },
-        { "files",   no_argument,       0, 'f' },
-        { "sign",    no_argument,       0, 's' },
-        { "key",     required_argument, 0, 'k' },
-        { "color",   required_argument, 0, 0x100 },
+        { "help",     no_argument,       0, 'h' },
+        { "version",  no_argument,       0, 'v' },
+        { "verify",   no_argument,       0, 'V' },
+        { "update",   no_argument,       0, 'U' },
+        { "remove",   no_argument,       0, 'R' },
+        { "query",    no_argument,       0, 'Q' },
+        { "info",     no_argument,       0, 'i' },
+        { "clean",    no_argument,       0, 'c' },
+        { "files",    no_argument,       0, 'f' },
+        { "sign",     no_argument,       0, 's' },
+        { "key",      required_argument, 0, 'k' },
+        { "color",    required_argument, 0, 0x100 },
+        { "elephant", no_argument,       0, 0x101 },
         { 0, 0, 0, 0 }
     };
 
@@ -661,6 +691,9 @@ void parse_repose_args(int *argc, char **argv[])
             else if (strcmp("auto", optarg) != 0)
                 errx(EXIT_FAILURE, "invalid argument '%s' for --color", optarg);
             break;
+        case 0x101:
+            elephant();
+            break;
         default:
             usage(stderr);
         }
@@ -679,6 +712,8 @@ int main(int argc, char *argv[])
         parse_repo_add_args(&argc, &argv);
     } else if (strcmp(program_invocation_short_name, "repo-remove") == 0) {
         parse_repo_remove_args(&argc, &argv);
+    } else if (strcmp(program_invocation_short_name, "repo-elephant") == 0) {
+        elephant();
     } else {
         parse_repose_args(&argc, &argv);
     }
