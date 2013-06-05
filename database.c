@@ -93,19 +93,22 @@ static void db_writer_close(db_writer_t *writer)
 
 static void compile_depends_entry(const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
-    write_list(buf, "DEPENDS",     pkg->depends);
-    write_list(buf, "CONFLICTS",   pkg->conflicts);
-    write_list(buf, "PROVIDES",    pkg->provides);
-    write_list(buf, "OPTDEPENDS",  pkg->optdepends);
-    write_list(buf, "MAKEDEPENDS", pkg->makedepends);
+    write_list(buf, "DEPENDS",      pkg->depends);
+    write_list(buf, "CONFLICTS",    pkg->conflicts);
+    write_list(buf, "PROVIDES",     pkg->provides);
+    write_list(buf, "OPTDEPENDS",   pkg->optdepends);
+    write_list(buf, "MAKEDEPENDS",  pkg->makedepends);
+    write_list(buf, "CHECKDEPENDS", pkg->checkdepends);
 }
 
 static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
 {
     write_string(buf, "FILENAME",  pkg->filename);
     write_string(buf, "NAME",      pkg->name);
+    write_string(buf, "BASE",      pkg->base);
     write_string(buf, "VERSION",   pkg->version);
     write_string(buf, "DESC",      pkg->desc);
+    write_list(buf,   "GROUPS",    pkg->groups);
     write_long(buf,   "CSIZE",     (long)pkg->size);
     write_long(buf,   "ISIZE",     (long)pkg->isize);
 
@@ -133,6 +136,7 @@ static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct 
     write_string(buf, "ARCH",      pkg->arch);
     write_long(buf,   "BUILDDATE", pkg->builddate);
     write_string(buf, "PACKAGER",  pkg->packager);
+    write_list(buf,   "REPLACES",  pkg->replaces);
 }
 
 static void compile_files_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)

@@ -31,6 +31,8 @@ static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 
     if (strcmp(var, "pkgname") == 0)
         pkg->name = strdup(buf);
+    else if (strcmp(var, "pkgbase") == 0)
+        pkg->base = strdup(buf);
     else if (strcmp(var, "pkgver") == 0)
         pkg->version = strdup(buf);
     else if (strcmp(var, "pkgdesc") == 0)
@@ -46,8 +48,12 @@ static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
     else if (strcmp(var, "arch") == 0)
         pkg->arch = strdup(buf);
 
+    else if (strcmp(var, "group") == 0)
+        pkg->groups = alpm_list_add(pkg->groups, strdup(buf));
     else if (strcmp(var, "license") == 0)
         pkg->license = alpm_list_add(pkg->license, strdup(buf));
+    else if (strcmp(var, "replaces") == 0)
+        pkg->replaces = alpm_list_add(pkg->replaces, strdup(buf));
     else if (strcmp(var, "depend") == 0)
         pkg->depends = alpm_list_add(pkg->depends, strdup(buf));
     else if (strcmp(var, "conflict") == 0)
@@ -58,6 +64,8 @@ static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
         pkg->optdepends = alpm_list_add(pkg->optdepends, strdup(buf));
     else if (strcmp(var, "makedepend") == 0)
         pkg->makedepends = alpm_list_add(pkg->makedepends, strdup(buf));
+    else if (strcmp(var, "checkdepend") == 0)
+        pkg->checkdepends = alpm_list_add(pkg->checkdepends, strdup(buf));
 }
 
 static void read_pkg_metadata(struct archive *archive, struct archive_entry *entry, alpm_pkg_meta_t *pkg)
