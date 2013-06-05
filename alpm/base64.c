@@ -32,6 +32,7 @@
  *  * removal of SELF_TEST code
  */
 
+#include <stdlib.h>
 #include <stdint.h>
 
 #include "base64.h"
@@ -67,35 +68,33 @@ static const unsigned char base64_dec_map[128] =
 /*
  * Encode a buffer into base64 format
  */
-int base64_encode( unsigned char *dst, size_t *dlen,
-                   const unsigned char *src, size_t slen )
+int base64_encode(unsigned char **dst, const unsigned char *src, size_t len)
 {
     size_t i, n;
     int C1, C2, C3;
     unsigned char *p;
+    unsigned char *mem;
 
-    if( slen == 0 )
-        return( 0 );
+    if(len == 0)
+        return 0;
 
-    n = (slen << 3) / 6;
+    n = (len << 3) / 6;
 
-    switch( (slen << 3) - (n * 6) )
-    {
-        case  2: n += 3; break;
-        case  4: n += 2; break;
-        default: break;
+    switch((len << 3) - (n * 6)) {
+    case 2:
+        n += 3;
+        break;
+    case 4:
+        n += 2;
+        break;
+    default:
+        break;
     }
 
-    if( *dlen < n + 1 )
-    {
-        *dlen = n + 1;
-        return( POLARSSL_ERR_BASE64_BUFFER_TOO_SMALL );
-    }
+    mem = malloc(n + 1);
+    n = (len / 3) * 3;
 
-    n = (slen / 3) * 3;
-
-    for( i = 0, p = dst; i < n; i += 3 )
-    {
+    for(i = 0, p = mem; i < n; i += 3) {
         C1 = *src++;
         C2 = *src++;
         C3 = *src++;
@@ -106,40 +105,40 @@ int base64_encode( unsigned char *dst, size_t *dlen,
         *p++ = base64_enc_map[C3 & 0x3F];
     }
 
-    if( i < slen )
-    {
+    if(i < len) {
         C1 = *src++;
-        C2 = ((i + 1) < slen) ? *src++ : 0;
+        C2 = (i + 1 < len) ? *src++ : 0;
 
         *p++ = base64_enc_map[(C1 >> 2) & 0x3F];
         *p++ = base64_enc_map[(((C1 & 3) << 4) + (C2 >> 4)) & 0x3F];
 
-        if( (i + 1) < slen )
-             *p++ = base64_enc_map[((C2 & 15) << 2) & 0x3F];
-        else *p++ = '=';
+        if(i + 1 < len) {
+            *p++ = base64_enc_map[((C2 & 15) << 2) & 0x3F];
+        } else {
+            *p++ = '=';
+        }
 
         *p++ = '=';
     }
 
-    *dlen = p - dst;
     *p = 0;
-
-    return( 0 );
+    *dst = mem;
+    return 0;
 }
 
 /*
  * Decode a base64-formatted buffer
  */
 int base64_decode( unsigned char *dst, size_t *dlen,
-                   const unsigned char *src, size_t slen )
+                   const unsigned char *src, size_t len )
 {
     size_t i, n;
     uint32_t j, x;
     unsigned char *p;
 
-    for( i = j = n = 0; i < slen; i++ )
+    for( i = j = n = 0; i < len; i++ )
     {
-        if( ( slen - i ) >= 2 &&
+        if( ( len - i ) >= 2 &&
             src[i] == '\r' && src[i + 1] == '\n' )
             continue;
 
