@@ -430,6 +430,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
     for (node = pkgs; node; node = node->next) {
         alpm_pkg_meta_t *pkg = node->data;
         alpm_pkg_meta_t *old = _alpm_pkghash_find(repo->pkgcache, pkg->name);
+        int vercmp;
 
         /* if the package isn't in the cache, add it */
         if (!old) {
@@ -439,9 +440,23 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             continue;
         }
 
+        vercmp = alpm_pkg_vercmp(pkg->version, old->version);
+
+        /* if the package is in the cache, but we're doing a forced
+         * update, replace it anywaysj*/
+        if (force) {
+            printf(" replacing %s %s => %s\n", pkg->name, old->version, pkg->version);
+            repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
+            if ((vercmp == -1 && cfg.clean >= 1) || (vercmp == 1 && cfg.clean >= 2))
+                unlink_package(repo, old);
+            alpm_pkg_free_metadata(old);
+            repo->state = REPO_DIRTY;
+            continue;
+        }
+
         /* if the package is in the cache and we have a newer version,
          * replace it */
-        switch(alpm_pkg_vercmp(pkg->version, old->version)) {
+        switch(vercmp) {
         case 1:
             printf(" updating %s %s => %s\n", pkg->name, old->version, pkg->version);
             repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
@@ -459,17 +474,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             }
             break;
         case -1:
-            /* if the package is in the cache, but we're doing a forced
-             * update, replace it anyways */
-            if (force) {
-                printf(" replacing %s %s => %s\n", pkg->name, old->version, pkg->version);
-                repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
-                if (cfg.clean >= 2)
-                    unlink_package(repo, old);
-                alpm_pkg_free_metadata(old);
-                repo->state = REPO_DIRTY;
-                continue;
-            } else if (cfg.clean >= 2) {
+            if (cfg.clean >= 2) {
                 unlink_package(repo, pkg);
             }
         }
