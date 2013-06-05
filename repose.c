@@ -584,7 +584,7 @@ static void __attribute__((__noreturn__)) elephant(void)
     unsigned char *usline = (unsigned char *)base64_data[i];
     unsigned char *data;
 
-    if (base64_decode(&data, usline, len) == 0)
+    if (base64_decode(&data, usline, len) > 0)
         puts((char *)data);
 
     exit(EXIT_SUCCESS);
