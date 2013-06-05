@@ -25,8 +25,6 @@
 #ifndef _BASE64_H
 #define _BASE64_H
 
-#define POLARSSL_ERR_BASE64_INVALID_CHARACTER -0x0012  /**< Invalid character in input. */
-
 int base64_encode(unsigned char **dst, const unsigned char *src, size_t len);
 int base64_decode(unsigned char **dst, const unsigned char *src, size_t len);
 

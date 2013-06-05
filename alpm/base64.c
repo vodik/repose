@@ -34,6 +34,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <errno.h>
 
 #include "base64.h"
 
@@ -123,7 +124,7 @@ int base64_encode(unsigned char **dst, const unsigned char *src, size_t len)
 
     *p = 0;
     *dst = mem;
-    return 0;
+    return p - mem;
 }
 
 /*
@@ -144,13 +145,13 @@ int base64_decode(unsigned char **dst, const unsigned char *src, size_t len)
             continue;
 
         if(src[i] == '=' && ++j > 2)
-            return POLARSSL_ERR_BASE64_INVALID_CHARACTER;
+            return -EINVAL;
 
         if(src[i] > 127 || base64_dec_map[src[i]] == 127)
-            return POLARSSL_ERR_BASE64_INVALID_CHARACTER;
+            return -EINVAL;
 
         if(base64_dec_map[src[i]] < 64 && j != 0)
-            return POLARSSL_ERR_BASE64_INVALID_CHARACTER;
+            return -EINVAL;
 
         n++;
     }
@@ -180,5 +181,5 @@ int base64_decode(unsigned char **dst, const unsigned char *src, size_t len)
     }
 
    *dst = mem;
-    return 0;
+    return p - mem;
 }
