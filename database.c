@@ -24,6 +24,9 @@ typedef struct db_writer {
 
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
 {
+    if (lst == NULL)
+        return;
+
     buffer_printf(buf, "%%%s%%\n", header);
     for (; lst; lst = lst->next) {
         const char *str = lst->data;
@@ -34,6 +37,9 @@ static void write_list(struct buffer *buf, const char *header, const alpm_list_t
 
 static void write_string(struct buffer *buf, const char *header, const char *str)
 {
+    if (str == NULL)
+        return;
+
     buffer_printf(buf, "%%%s%%\n%s\n\n", header, str);
 }
 
