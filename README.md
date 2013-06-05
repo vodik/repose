@@ -37,11 +37,21 @@ make symlinks against `repose`
     ln -s /usr/bin/repose /usr/bin/repo-remove
     ln -s /usr/bin/repose /usr/bin/repo-elephant
 
-Note only `repo-add` and `repo-remove` are implemented at the moment.
+```
+     __
+    '. \
+     '- \
+      / /_         .---.
+     / | \\,.\/--.//    )
+     |  \//        )/  /
+      \  ' ^ ^    /    )____.----..  6
+       '.____.    .___/            \._)
+          .\/.                      )
+           '\                       /
+           _/ \/    ).        )    (
+          /#  .!    |        /\    /
+          \  C// #  /'-----''/ #  /
+       .   'C/ |    |    |   |    |mrf  ,
+       \), .. .'OOO-'. ..'OOO'OOO-'. ..\(,
 
-### TODO
-
-- speed up archive updating.
-    - provide a method of shallow db-parsing?
-    - instead of reading in all the data and writing it out all over
-      again, build up a set of operations to apply.
+```
