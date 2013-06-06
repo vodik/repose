@@ -57,6 +57,7 @@ static struct {
     bool info;
     bool sign;
     bool files;
+    bool rebuild;
 
     bool color;
     colstr_t colstr;
@@ -175,7 +176,9 @@ static repo_t *repo_new(char *path)
     asprintf(&repo->files.link_file, "%s.files",       name);
     asprintf(&repo->files.link_sig,  "%s.files.sig",   name);
 
-    if (faccessat(repo->dirfd, repo->db.file, F_OK, 0) < 0) {
+    if (cfg.rebuild) {
+        repo->state = REPO_NEW;
+    } else if (faccessat(repo->dirfd, repo->db.file, F_OK, 0) < 0) {
         if (errno != ENOENT) {
             err(EXIT_FAILURE, "couldn't access database %s", repo->db.file);
         }
@@ -605,7 +608,8 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -f, --files           generate a complementing files database\n"
         " -s, --sign            sign database(s) with GnuPG after update\n"
         " -k, --key=KEY         use the specified key to sign the database\n"
-        "     --color=MODE      enable colour support\n", out);
+        "     --color=MODE      enable colour support\n"
+        "     --rebuild         force rebuild the repo\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
 }
@@ -638,7 +642,8 @@ void parse_repose_args(int *argc, char **argv[])
         { "sign",     no_argument,       0, 's' },
         { "key",      required_argument, 0, 'k' },
         { "color",    required_argument, 0, 0x100 },
-        { "elephant", no_argument,       0, 0x101 },
+        { "rebuild",  no_argument,       0, 0x101 },
+        { "elephant", no_argument,       0, 0x102 },
         { 0, 0, 0, 0 }
     };
 
@@ -692,6 +697,9 @@ void parse_repose_args(int *argc, char **argv[])
                 errx(EXIT_FAILURE, "invalid argument '%s' for --color", optarg);
             break;
         case 0x101:
+            cfg.rebuild = true;
+            break;
+        case 0x102:
             elephant();
             break;
         default:
