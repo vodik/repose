@@ -472,7 +472,8 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             /* check to see if the package now has a signature */
             if (old->base64_sig == NULL && pkg->base64_sig) {
                 printf(" adding signature for %s\n", pkg->name);
-                old->base64_sig = strdup(pkg->base64_sig);
+                repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
+                alpm_pkg_free_metadata(old);
                 repo->state = REPO_DIRTY;
             }
             break;
