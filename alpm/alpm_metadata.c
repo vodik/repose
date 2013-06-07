@@ -302,11 +302,16 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
         } else if (strcmp(buf, "%NAME%") == 0) {
             /* FIXME: name should already be set, rather, validate it */
             read_desc_entry(reader, buf, entry_size, &pkg->name);
+        } else if (strcmp(buf, "%BASE%") == 0) {
+            /* FIXME: name should already be set, rather, validate it */
+            read_desc_entry(reader, buf, entry_size, &pkg->base);
         } else if (strcmp(buf, "%VERSION%") == 0) {
             /* FIXME: version should already be set, rather, validate it */
             read_desc_entry(reader, buf, entry_size, &pkg->version);
         } else if (strcmp(buf, "%DESC%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->desc);
+        } else if (strcmp(buf, "%GROUPS%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->groups);
         } else if (strcmp(buf, "%CSIZE%") == 0) {
             read_desc_long(reader, buf, entry_size, (long *)&pkg->size);
         } else if (strcmp(buf, "%ISIZE%") == 0) {
@@ -327,6 +332,8 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
             read_desc_long(reader, buf, entry_size, &pkg->builddate);
         } else if (strcmp(buf, "%PACKAGER%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->packager);
+        } else if (strcmp(buf, "%REPLACES%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->replaces);
         } else if (strcmp(buf, "%DEPENDS%") == 0) {
             read_desc_list(reader, buf, entry_size, &pkg->depends);
         } else if (strcmp(buf, "%CONFLICTS%") == 0) {
@@ -336,6 +343,8 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
         } else if (strcmp(buf, "%OPTDEPENDS%") == 0) {
             read_desc_list(reader, buf, entry_size, &pkg->optdepends);
         } else if (strcmp(buf, "%MAKEDEPENDS%") == 0) {
+            read_desc_list(reader, buf, entry_size, &pkg->makedepends);
+        } else if (strcmp(buf, "%CHECKDEPENDS%") == 0) {
             read_desc_list(reader, buf, entry_size, &pkg->makedepends);
         } else if (strcmp(buf, "%FILES%") == 0) {
             read_desc_list(reader, buf, entry_size, &pkg->files);
