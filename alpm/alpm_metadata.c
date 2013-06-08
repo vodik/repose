@@ -293,6 +293,7 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
 {
     size_t entry_size = archive_entry_size(entry);
     char *buf = malloc(entry_size);
+    char *temp;
 
     /* FIXME: check -1 might not be the best here. need actual rc */
     while(archive_fgets(reader, buf, entry_size) != -1) {
@@ -300,14 +301,17 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
             read_desc_entry(reader, buf, entry_size, &pkg->filename);
             asprintf(&pkg->signame, "%s.sig", pkg->filename);
         } else if (strcmp(buf, "%NAME%") == 0) {
-            /* FIXME: name should already be set, rather, validate it */
-            read_desc_entry(reader, buf, entry_size, &pkg->name);
+            read_desc_entry(reader, buf, entry_size, &temp);
+            if (strcmp(temp, pkg->name) != 0)
+                errx(EXIT_FAILURE, "database entry name and desc record are mismatched!");
+            free(temp);
         } else if (strcmp(buf, "%BASE%") == 0) {
-            /* FIXME: name should already be set, rather, validate it */
             read_desc_entry(reader, buf, entry_size, &pkg->base);
         } else if (strcmp(buf, "%VERSION%") == 0) {
-            /* FIXME: version should already be set, rather, validate it */
-            read_desc_entry(reader, buf, entry_size, &pkg->version);
+            read_desc_entry(reader, buf, entry_size, &temp);
+            if (strcmp(temp, pkg->version) != 0)
+                errx(EXIT_FAILURE, "database entry version and desc record are mismatched!");
+            free(temp);
         } else if (strcmp(buf, "%DESC%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->desc);
         } else if (strcmp(buf, "%GROUPS%") == 0) {
