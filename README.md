@@ -6,10 +6,10 @@ At the moment, a half baked and hacked together alternative to repo-add.
 
 ### Usage
 
-    repose -U --sign foo.db.tar.gz
+    repose -Usf foo.db.tar.gz
 
-Add all packages in the current directory to foo.db.tar.gz and then sign
-the database with gnupg.
+Add all packages in the current directory to foo.db.tar.gz, build a
+corresponding files db  and then sign both databases with gnupg.
 
 Add a `-c` flag to also delete and files removed from the db and a
 second `-c` to also remove any other outdated packages in the cache.
