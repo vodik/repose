@@ -9,7 +9,7 @@ CFLAGS := -std=c99 \
 LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
 
 all: repose
-repose: repose.o database.o buffer.o \
+repose: repose.o database.o elf.o buffer.o \
 	alpm/alpm_metadata.o alpm/archive_reader.o \
 	alpm/pkghash.o alpm/signing.o alpm/base64.o alpm/util.o
 

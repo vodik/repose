@@ -7,7 +7,8 @@
 enum contents {
     DB_DESC    = 1,
     DB_DEPENDS = 1 << 2,
-    DB_FILES   = 1 << 3
+    DB_FILES   = 1 << 3,
+    DB_ELF     = 1 << 4
 };
 
 void compile_database(repo_t *repo, file_t *db, int contents);

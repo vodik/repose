@@ -204,7 +204,7 @@ static int repo_write(repo_t *repo)
     case REPO_DIRTY:
         colon_printf("Writing databases to disk...\n");
         printf(" writing %s...\n", repo->db.file);
-        compile_database(repo, &repo->db, DB_DESC | DB_DEPENDS);
+        compile_database(repo, &repo->db, DB_DESC | DB_DEPENDS | DB_ELF);
         if (cfg.sign) {
             sign_database(repo, &repo->db, cfg.key);
         }

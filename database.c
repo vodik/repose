@@ -13,6 +13,7 @@
 #include "alpm/signing.h"
 #include "alpm/util.h"
 #include "repose.h"
+#include "elf.h"
 #include "buffer.h"
 
 typedef struct db_writer {
@@ -164,6 +165,29 @@ static void compile_files_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct
     }
 }
 
+static void compile_elf_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
+{
+    /* if (pkg->files) { */
+    /*     write_list(buf, "FILES", pkg->files); */
+    /* } else { */
+        int pkgfd = openat(repo->dirfd, pkg->filename, O_RDONLY);
+        if (pkgfd < 0 && errno != ENOENT) {
+            err(EXIT_FAILURE, "failed to open %s", pkg->filename);
+        }
+
+        alpm_list_t *needed = NULL, *soname = NULL;
+        pkg_dump_elf(pkgfd, &needed, &soname);
+        close(pkgfd);
+
+        write_list(buf, "NEEDED", needed);
+        write_list(buf, "SONAMES", soname);
+        alpm_list_free_inner(needed, free);
+        alpm_list_free_inner(soname, free);
+        alpm_list_free(needed);
+        alpm_list_free(soname);
+    /* } */
+}
+
 static void record_entry(db_writer_t *writer, const char *root, const char *entry)
 {
     time_t now = time(NULL);
@@ -202,6 +226,10 @@ static void compile_database_entry(repo_t *repo, db_writer_t *writer, alpm_pkg_m
     if (contents & DB_FILES) {
         compile_files_entry(repo, pkg, &writer->buf);
         record_entry(writer, entry, "files");
+    }
+    if (contents & DB_ELF) {
+        compile_elf_entry(repo, pkg, &writer->buf);
+        record_entry(writer, entry, "elf");
     }
 }
 
