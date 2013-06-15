@@ -584,7 +584,7 @@ static int repo_database_query(repo_t *repo, int argc, char *argv[])
 
 static void __attribute__((__noreturn__)) elephant(void)
 {
-    static char *base64_data[2] = {
+    static const char *base64_data[2] = {
         "ICAgICBfXwogICAgJy4gXAogICAgICctIFwKICAgICAgLyAvXyAgICAgICAgIC4tLS0uCiAgICAg"
         "LyB8IFxcLC5cLy0tLi8vICAgICkKICAgICB8ICBcLy8gICAgICAgICkvICAvCiAgICAgIFwgICcg"
         "XiBeICAgIC8gICAgKV9fX18uLS0tLS4uICA2CiAgICAgICAnLl9fX18uICAgIC5fX18vICAgICAg"
