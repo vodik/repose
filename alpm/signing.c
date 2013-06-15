@@ -165,8 +165,10 @@ void gpgme_sign(int fd, int sigfd, const char *key)
     if (ret)
         return;
 
-    while ((ret = gpgme_data_read(out, buf, BUFSIZ)) > 0)
-        write(sigfd, buf, ret);
+    while ((ret = gpgme_data_read(out, buf, BUFSIZ)) > 0) {
+        if (write(sigfd, buf, ret) < 0)
+            err(EXIT_FAILURE, "failed to write out signtaure");
+    }
 
     /* if (ret < 0) */
     /*     return; */
