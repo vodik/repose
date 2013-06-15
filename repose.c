@@ -101,6 +101,22 @@ static void alloc_pkghash(repo_t *repo)
     closedir(dirp);
 }
 
+static int populate_db_files(file_t *db, const char *name, const char *base, const char *ext)
+{
+    /* db full filename */
+    if (asprintf(&db->file, "%s.%s%s", name, base, ext) < 0)
+        return -1;
+    /* db signature */
+    if (asprintf(&db->sig, "%s.%s%s.sig", name, base, ext) < 0)
+        return -1;
+    /* link to db file */
+    if (asprintf(&db->link_file, "%s.%s", name, base) < 0)
+        return -1;
+    /* link to signature */
+    if (asprintf(&db->link_sig,  "%s.%s.sig", name, base) < 0)
+        return -1;
+    return 0;
+}
 
 static repo_t *repo_new(char *path)
 {
@@ -133,7 +149,6 @@ static repo_t *repo_new(char *path)
         repo->root = get_current_dir_name();
     }
 
-    /* FIXME: figure this out on compression */
     if (!dot) {
         errx(EXIT_FAILURE, "no file extension");
     } else if (strcmp(dot, ".db") == 0) {
@@ -164,17 +179,15 @@ static repo_t *repo_new(char *path)
         dot = ".tar.gz";
     }
 
-    /* populate the package database paths */
-    asprintf(&repo->db.file,      "%s.db%s",     name, dot);
-    asprintf(&repo->db.sig,       "%s.db%s.sig", name, dot);
-    asprintf(&repo->db.link_file, "%s.db",       name);
-    asprintf(&repo->db.link_sig,  "%s.db.sig",   name);
+    if (populate_db_files(&repo->db, "db", name, dot) < 0) {
+        err(EXIT_FAILURE, "failed to allocate db filename strings");
+    }
 
-    /* populate the files database paths */
-    asprintf(&repo->files.file,      "%s.files%s",     name, dot);
-    asprintf(&repo->files.sig,       "%s.files%s.sig", name, dot);
-    asprintf(&repo->files.link_file, "%s.files",       name);
-    asprintf(&repo->files.link_sig,  "%s.files.sig",   name);
+    if (cfg.files) {
+        if (populate_db_files(&repo->files, "files", name, dot) < 0) {
+            err(EXIT_FAILURE, "failed to allocate db filename strings");
+        }
+    }
 
     if (cfg.rebuild) {
         repo->state = REPO_NEW;
@@ -188,7 +201,9 @@ static repo_t *repo_new(char *path)
 
         /* load the databases if possible */
         load_database(repo, &repo->db);
-        load_database(repo, &repo->files);
+        if (cfg.files) {
+            load_database(repo, &repo->files);
+        }
 
         repo_database_reduce(repo);
     }
