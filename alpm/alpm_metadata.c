@@ -299,7 +299,8 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
     while(archive_fgets(reader, buf, entry_size) != -1) {
         if (strcmp(buf, "%FILENAME%") == 0) {
             read_desc_entry(reader, buf, entry_size, &pkg->filename);
-            asprintf(&pkg->signame, "%s.sig", pkg->filename);
+            if (asprintf(&pkg->signame, "%s.sig", pkg->filename) < 0)
+                err(EXIT_FAILURE, "failed to allocate memory for sig");
         } else if (strcmp(buf, "%NAME%") == 0) {
             read_desc_entry(reader, buf, entry_size, &temp);
             if (strcmp(temp, pkg->name) != 0)
@@ -447,7 +448,9 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 		pkg = calloc(1, sizeof(alpm_pkg_meta_t));
 		if(pkg == NULL) {
 			/* RET_ERR(db->handle, ALPM_ERR_MEMORY, NULL); */
-            return NULL;
+			free(pkgname);
+			free(pkgver);
+			return NULL;
 		}
 
 		pkg->name = pkgname;
@@ -476,11 +479,11 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
                         struct archive_entry *entry)
 {
     const char *entryname = archive_entry_pathname(entry);
-    const char *filename;  //= strsep(&entryname, "/");
-    /* if (entryname == NULL) */
-    /*     return; */
+    const char *filename = NULL;
 
-    alpm_pkg_meta_t *pkg = load_pkg_for_entry(pkgcache, entryname, (const char **)&filename, NULL);
+    alpm_pkg_meta_t *pkg = load_pkg_for_entry(pkgcache, entryname, &filename, NULL);
+    if (pkg == NULL || filename == NULL)
+        return;
 
     if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0 || strcmp(filename, "files") == 0) {
         read_desc(reader, entry, pkg);
