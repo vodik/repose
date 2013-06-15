@@ -268,7 +268,9 @@ static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
 
     alpm_pkg_load_metadata(pkgfd, &pkg);
     pkg->filename = strdup(filename);
-    asprintf(&pkg->signame, "%s.sig", filename);
+
+    if (asprintf(&pkg->signame, "%s.sig", filename) < 0)
+        err(EXIT_FAILURE, "failed to allocate memory");
 
     sigfd = openat(repo->dirfd, pkg->signame, O_RDONLY);
     if (sigfd < 0) {
