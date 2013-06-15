@@ -179,12 +179,12 @@ static repo_t *repo_new(char *path)
         dot = ".tar.gz";
     }
 
-    if (populate_db_files(&repo->db, "db", name, dot) < 0) {
+    if (populate_db_files(&repo->db, name, "db", dot) < 0) {
         err(EXIT_FAILURE, "failed to allocate db filename strings");
     }
 
     if (cfg.files) {
-        if (populate_db_files(&repo->files, "files", name, dot) < 0) {
+        if (populate_db_files(&repo->files, name, "files", dot) < 0) {
             err(EXIT_FAILURE, "failed to allocate db filename strings");
         }
     }
