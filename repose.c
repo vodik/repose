@@ -218,14 +218,14 @@ static int repo_write(repo_t *repo)
     switch (repo->state) {
     case REPO_DIRTY:
         colon_printf("Writing databases to disk...\n");
-        printf(" writing %s...\n", repo->db.file);
+        printf("writing %s...\n", repo->db.file);
         compile_database(repo, &repo->db, DB_DESC | DB_DEPENDS);
         if (cfg.sign) {
             sign_database(repo, &repo->db, cfg.key);
         }
 
         if (cfg.files) {
-            printf(" writing %s...\n", repo->files.file);
+            printf("writing %s...\n", repo->files.file);
             compile_database(repo, &repo->files, DB_FILES);
             if (cfg.sign) {
                 sign_database(repo, &repo->db, cfg.key);
@@ -252,7 +252,7 @@ static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
         return 0;
     }
 
-    printf(" deleting %s %s\n", pkg->name, pkg->version);
+    printf("deleting %s %s\n", pkg->name, pkg->version);
     unlinkat(repo->dirfd, pkg->filename, 0);
     unlinkat(repo->dirfd, pkg->signame, 0);
     return 0;
@@ -454,7 +454,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
 
         /* if the package isn't in the cache, add it */
         if (!old) {
-            printf(" adding %s %s\n", pkg->name, pkg->version);
+            printf("adding %s %s\n", pkg->name, pkg->version);
             repo->pkgcache = _alpm_pkghash_add(repo->pkgcache, pkg);
             repo->state = REPO_DIRTY;
             continue;
@@ -465,7 +465,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
         /* if the package is in the cache, but we're doing a forced
          * update, replace it anywaysj*/
         if (force) {
-            printf(" replacing %s %s => %s\n", pkg->name, old->version, pkg->version);
+            printf("replacing %s %s => %s\n", pkg->name, old->version, pkg->version);
             repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
             if ((vercmp == -1 && cfg.clean >= 1) || (vercmp == 1 && cfg.clean >= 2))
                 unlink_package(repo, old);
@@ -478,7 +478,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
          * replace it */
         switch(vercmp) {
         case 1:
-            printf(" updating %s %s => %s\n", pkg->name, old->version, pkg->version);
+            printf("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
             repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
             if (cfg.clean >= 1)
                 unlink_package(repo, old);
@@ -488,7 +488,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
         case 0:
             /* check to see if the package now has a signature */
             if (old->base64_sig == NULL && pkg->base64_sig) {
-                printf(" adding signature for %s\n", pkg->name);
+                printf("adding signature for %s\n", pkg->name);
                 repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
                 alpm_pkg_free_metadata(old);
                 repo->state = REPO_DIRTY;
