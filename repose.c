@@ -744,6 +744,8 @@ int main(int argc, char *argv[])
         parse_repose_args(&argc, &argv);
     }
 
+    if (cfg.action == INVALID_ACTION)
+        errx(EXIT_FAILURE, "no operation specified");
     if (argc == 0)
         errx(EXIT_FAILURE, "not enough arguments");
 
