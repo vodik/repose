@@ -105,7 +105,7 @@ int gpgme_verify(int fd, int sigfd)
     return ret;
 }
 
-void gpgme_sign(int fd, int sigfd, const char *key)
+int gpgme_sign(int fd, int sigfd, const char *key)
 {
     gpgme_error_t rc;
     gpgme_ctx_t ctx;
@@ -113,7 +113,7 @@ void gpgme_sign(int fd, int sigfd, const char *key)
     gpgme_sign_result_t result;
 
     if (init_gpgme() < 0)
-        return;
+        return 0;
 
     rc = gpgme_new(&ctx);
     if (gpg_err_code(rc) != GPG_ERR_NO_ERROR)
@@ -146,7 +146,7 @@ void gpgme_sign(int fd, int sigfd, const char *key)
 
     rc = gpgme_op_sign(ctx, in, out, GPGME_SIG_MODE_DETACH);
     if (rc)
-        errx(EXIT_FAILURE, "signing failed: %s", gpgme_strerror(rc));
+        return rc; // Unlink
 
     result = gpgme_op_sign_result(ctx);
     /* if (result) */
@@ -163,7 +163,7 @@ void gpgme_sign(int fd, int sigfd, const char *key)
 
     ret = gpgme_data_seek(out, 0, SEEK_SET);
     if (ret)
-        return;
+        return 0;
 
     while ((ret = gpgme_data_read(out, buf, BUFSIZ)) > 0) {
         if (write(sigfd, buf, ret) < 0)
@@ -175,4 +175,5 @@ void gpgme_sign(int fd, int sigfd, const char *key)
     gpgme_data_release(out);
     gpgme_data_release(in);
     gpgme_release(ctx);
+    return 0;
 }
