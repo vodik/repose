@@ -9,6 +9,7 @@
 #include <sys/file.h>
 #include <archive.h>
 #include <archive_entry.h>
+#include <gpgme.h>
 
 #include "alpm/signing.h"
 #include "alpm/util.h"
@@ -213,16 +214,22 @@ void sign_database(repo_t *repo, file_t *db, const char *key)
 
     int sigfd = openat(repo->dirfd, db->sig, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (sigfd < 0)
-        err(EXIT_FAILURE, "failed to open %s for writing", db->sig);
+        err(EXIT_FAILURE, "failed to open %s", db->sig);
 
     /* XXX: check return type */
-    gpgme_sign(dbfd, sigfd, key);
+    int rc = gpgme_sign(dbfd, sigfd, key);
+    if (rc) {
+        unlinkat(repo->dirfd, db->sig, 0);
+        unlinkat(repo->dirfd, db->link_sig, 0);
+        errx(EXIT_FAILURE, "signing error: %s\n", gpgme_strerror(rc));
+    }
 
-    close(sigfd);
-    close(dbfd);
 
     if (symlinkat(db->sig, repo->dirfd, db->link_sig) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink for %s failed", db->link_sig);
+
+    close(sigfd);
+    close(dbfd);
 }
 
 void compile_database(repo_t *repo, file_t *db, int contents)
