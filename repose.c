@@ -88,16 +88,16 @@ static int colon_printf(const char *fmt, ...)
 
 static void alloc_pkghash(repo_t *repo)
 {
-    int files = 0;
     DIR *dirp = opendir(repo->root);
     struct dirent *entry;
 
+    repo->cachesize = 0;
     while ((entry = readdir(dirp)) != NULL) {
         if (entry->d_type == DT_REG)
-            files++;
+            repo->cachesize++;
     }
 
-    repo->pkgcache = _alpm_pkghash_create(files);
+    repo->pkgcache = _alpm_pkghash_create(repo->cachesize);
     closedir(dirp);
 }
 
@@ -320,7 +320,7 @@ static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo,
 
 static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
 {
-    alpm_pkghash_t *cache = _alpm_pkghash_create(23);
+    alpm_pkghash_t *cache;
 
     if (count == 0) {
         struct dirent *dp;
@@ -328,6 +328,7 @@ static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
         if (dir == NULL)
             err(EXIT_FAILURE, "failed to open directory");
 
+        cache = _alpm_pkghash_create(repo->cachesize);
         while ((dp = readdir(dir))) {
             if (!(dp->d_type & DT_REG))
                 continue;
@@ -343,6 +344,7 @@ static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
     } else {
         int i;
 
+        cache = _alpm_pkghash_create(count);
         for (i = 0; i < count; ++i)
             cache = filecache_add(cache, repo, pkg_list[i]);
     }

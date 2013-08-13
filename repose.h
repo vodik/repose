@@ -24,6 +24,7 @@ typedef struct file {
 } file_t;
 
 typedef struct repo {
+    size_t cachesize;
     alpm_pkghash_t *pkgcache;
     char *root;
     file_t db;
