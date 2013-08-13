@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <fnmatch.h>
+#include <sys/utsname.h>
 
 #include "alpm/signing.h"
 #include "alpm/util.h"
@@ -51,6 +52,7 @@ typedef struct colstr {
 
 static struct {
     const char *key;
+    const char *arch;
     char *pool;
     enum action action;
 
@@ -281,6 +283,11 @@ static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
     }
 
     alpm_pkg_load_metadata(pkgfd, &pkg);
+
+    if (strcmp(pkg->arch, cfg.arch) != 0 && strcmp(pkg->arch, "any") != 0) {
+        alpm_pkg_free_metadata(pkg);
+        return NULL;
+    }
     pkg->filename = strdup(filename);
 
     if (asprintf(&pkg->signame, "%s.sig", filename) < 0)
@@ -704,6 +711,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -p, --pool=POOL       set the pool to find packages in\n"
         " -c, --clean           remove stuff\n"
         " -f, --files           generate a complementing files database\n"
+        " -a, --arch=ARCH       the primary architecture of the database\n"
         " -s, --sign            sign database(s) with GnuPG after update\n"
         " -k, --key=KEY         use the specified key to sign the database\n"
         "     --color=MODE      enable colour support\n"
@@ -738,6 +746,7 @@ void parse_repose_args(int *argc, char **argv[])
         { "pool",     required_argument, 0, 'p' },
         { "clean",    no_argument,       0, 'c' },
         { "files",    no_argument,       0, 'f' },
+        { "arch",     required_argument, 0, 'a' },
         { "sign",     no_argument,       0, 's' },
         { "key",      required_argument, 0, 'k' },
         { "color",    required_argument, 0, 0x100 },
@@ -749,7 +758,7 @@ void parse_repose_args(int *argc, char **argv[])
     cfg.color = isatty(fileno(stdout)) ? true : false;
 
     while (true) {
-        int opt = getopt_long(*argc, *argv, "hvURQVicfsk:", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvURQVicfsa:k:", opts, NULL);
         if (opt == -1)
             break;
 
@@ -787,6 +796,9 @@ void parse_repose_args(int *argc, char **argv[])
         case 's':
             cfg.sign = true;
             break;
+        case 'a':
+            cfg.arch = optarg;
+            break;
         case 'k':
             cfg.key = optarg;
             break;
@@ -815,6 +827,7 @@ void parse_repose_args(int *argc, char **argv[])
 
 int main(int argc, char *argv[])
 {
+    struct utsname buf;
     repo_t *repo;
     int rc = 0;
 
@@ -835,6 +848,12 @@ int main(int argc, char *argv[])
 
     /* enable colors if necessary */
     enable_colors(cfg.color);
+
+    /* if arch isn't set, detect it */
+    if (!cfg.arch) {
+        uname(&buf);
+        cfg.arch = buf.machine;
+    }
 
     repo = repo_new(argv[0]);
     if (!repo)
