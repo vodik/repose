@@ -297,10 +297,31 @@ static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
     return pkg;
 }
 
-static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo, const char *filepath)
+static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, alpm_pkg_meta_t *pkg)
 {
-    alpm_pkg_meta_t *pkg, *old;
-    char *basename = strrchr(filepath, '/');
+    alpm_pkg_meta_t *old = _alpm_pkghash_find(cache, pkg->name);
+    int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(pkg->version, old->version);
+
+    if (vercmp == 0 || vercmp == 1) {
+        if (old) {
+            cache = _alpm_pkghash_remove(cache, old, NULL);
+            /* if (cfg.clean >= 2) */
+            /*     unlink_package(repo, old); */
+            alpm_pkg_free_metadata(old);
+        }
+        return _alpm_pkghash_add(cache, pkg);
+    } else {
+        /* if (cfg.clean >= 2) */
+        /*     unlink_package(repo, pkg); */
+        alpm_pkg_free_metadata(pkg);
+        return cache;
+    }
+}
+
+static inline alpm_pkghash_t *pkgcache_from_file(alpm_pkghash_t *cache, repo_t *repo, const char *filepath)
+{
+    alpm_pkg_meta_t *pkg;
+    const char *basename = strrchr(filepath, '/');
 
     if (basename) {
         if (memcmp(filepath, repo->pool, basename - filepath) != 0) {
@@ -313,55 +334,97 @@ static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo,
     if (!pkg)
         return cache;
 
-    old = _alpm_pkghash_find(cache, pkg->name);
-    int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(pkg->version, old->version);
-
-    if (vercmp == 0 || vercmp == 1) {
-        if (old) {
-            cache = _alpm_pkghash_remove(cache, old, NULL);
-            if (cfg.clean >= 2)
-                unlink_package(repo, old);
-            alpm_pkg_free_metadata(old);
-        }
-        return _alpm_pkghash_add(cache, pkg);
-    } else {
-        if (cfg.clean >= 2)
-            unlink_package(repo, pkg);
-        alpm_pkg_free_metadata(pkg);
-        return cache;
-    }
+    return pkgcache_add(cache, pkg);
 }
 
-static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
+static alpm_pkghash_t *match_targets(alpm_pkghash_t *cache, alpm_pkg_meta_t *pkg, alpm_list_t *targets)
 {
-    alpm_pkghash_t *cache;
+    char *buf = NULL;
+    const alpm_list_t *node;
 
-    if (count == 0) {
-        struct dirent *dp;
-        DIR *dir = opendir(repo->pool);
-        if (dir == NULL)
-            err(EXIT_FAILURE, "failed to open directory");
+    for (node = targets; node; node = node->next) {
+        const char *target = node->data;
 
-        cache = _alpm_pkghash_create(repo->cachesize);
-        while ((dp = readdir(dir))) {
-            if (!(dp->d_type & DT_REG))
-                continue;
+        if (strcmp(target, pkg->filename) == 0) {
+            cache = pkgcache_add(cache, pkg);
+            break;
+        } else if (strcmp(target, pkg->name) == 0) {
+            cache = pkgcache_add(cache, pkg);
+            break;
+        } else {
+            if (buf == NULL) {
+                int bytes_w = asprintf(&buf, "%s-%s", pkg->name, pkg->version);
+                if (bytes_w < 0)
+                    err(EXIT_FAILURE, "failed to calculate full pkgname");
+            }
 
-            if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
-                fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
-                continue;
+            if (fnmatch(target, buf, 0) == 0) {
+                cache = pkgcache_add(cache, pkg);
+                break;
+            }
+        }
+    }
 
-            cache = filecache_add(cache, repo, dp->d_name);
+    free(buf);
+    return cache;
+}
+
+static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, repo_t *repo, alpm_list_t *targets)
+{
+    DIR *dir = opendir(repo->pool);
+    const struct dirent *dp;
+
+    while ((dp = readdir(dir))) {
+        alpm_pkg_meta_t *pkg = NULL;
+
+        if (!(dp->d_type & DT_REG))
+            continue;
+
+        if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
+            fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
+            continue;
+
+        pkg = load_package(repo, dp->d_name);
+        if (!pkg) {
+            /* warnx("failed to open %s", dp->d_name); */
+            continue;
         }
 
-        closedir(dir);
-    } else {
+        if (targets == NULL) {
+            cache = pkgcache_add(cache, pkg);
+        } else {
+            cache = match_targets(cache, pkg, targets);
+        }
+    }
+
+    return cache;
+}
+
+alpm_pkghash_t *get_filecache(repo_t *repo, int argc, char *argv[])
+{
+    alpm_pkghash_t *cache = _alpm_pkghash_create(argc ? argc : repo->cachesize);
+
+    if (argc > 0) {
+        alpm_list_t *targets = NULL;
         int i;
 
-        cache = _alpm_pkghash_create(count);
-        for (i = 0; i < count; ++i)
-            cache = filecache_add(cache, repo, pkg_list[i]);
+        for (i = 0; i < argc; ++i) {
+            char *target = argv[i];
+
+            if (target[0] == '/' || target[0] == '.') {
+                cache = pkgcache_from_file(cache, repo, target);
+            } else {
+                targets = alpm_list_add(targets, target);
+            }
+        }
+
+        if (targets) {
+            cache = scan_for_targets(cache, repo, targets);
+        }
+    } else {
+        cache = scan_for_targets(cache, repo, NULL);
     }
+
     return cache;
 }
 
@@ -459,7 +522,7 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
     if (repo->state == REPO_NEW)
         warnx("repo doesn't exist, creating...");
 
-    alpm_pkghash_t *filecache = get_filecache(repo, argv, argc);
+    alpm_pkghash_t *filecache = get_filecache(repo, argc, argv);
     pkgs = filecache->list;
 
     colon_printf("Updating repo database...\n");
