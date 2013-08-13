@@ -117,7 +117,6 @@ int alpm_pkg_load_metadata(int fd, alpm_pkg_meta_t **_pkg)
 
     int r = archive_read_open_memory(archive, memblock, st.st_size);
     if (r != ARCHIVE_OK) {
-        warnx("package is not an archive");
         rc = -1;
         goto cleanup;
     }
