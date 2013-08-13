@@ -232,6 +232,12 @@ static repo_t *repo_new(char *path)
 static int repo_write(repo_t *repo)
 {
     switch (repo->state) {
+    case REPO_NEW:
+        printf("repo empty!\n");
+        return 1;
+    case REPO_CLEAN:
+        printf("repo does not need updating\n");
+        break;
     case REPO_DIRTY:
         colon_printf("Writing databases to disk...\n");
         printf("writing %s...\n", repo->db.file);
@@ -248,9 +254,6 @@ static int repo_write(repo_t *repo)
             }
         }
         printf("repo updated successfully\n");
-        break;
-    case REPO_CLEAN:
-        printf("repo does not need updating\n");
         break;
     default:
         break;
