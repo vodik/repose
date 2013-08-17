@@ -88,7 +88,7 @@ static int colon_printf(const char *fmt, ...)
 
 static void alloc_pkghash(repo_t *repo)
 {
-    DIR *dirp = opendir(repo->root);
+    DIR *dirp = opendir(repo->pool);
     struct dirent *entry;
 
     repo->cachesize = 0;
@@ -142,11 +142,11 @@ static repo_t *repo_new(char *path)
     if (div) {
         dot = memchr(div, '.', len - (dbpath - div));
         name = strndup(div + 1, dot - div - 1);
-        repo->root = strndup(dbpath, div - dbpath);
+        repo->pool = strndup(dbpath, div - dbpath);
     } else {
         dot = memchr(dbpath, '.', len);
         name = strndup(dbpath, dot - dbpath);
-        repo->root = get_current_dir_name();
+        repo->pool = get_current_dir_name();
     }
 
     if (!dot) {
@@ -168,9 +168,9 @@ static repo_t *repo_new(char *path)
     }
 
     /* open the directory so we can use openat later */
-    repo->dirfd = open(repo->root, O_RDONLY);
+    repo->dirfd = open(repo->pool, O_RDONLY);
     if (repo->dirfd < 0)
-        err(EXIT_FAILURE, "cannot access %s", repo->root);
+        err(EXIT_FAILURE, "cannot access %s", repo->pool);
     alloc_pkghash(repo);
 
     /* skip '.db' */
@@ -289,7 +289,7 @@ static inline alpm_pkghash_t *filecache_add(alpm_pkghash_t *cache, repo_t *repo,
     char *basename = strrchr(filepath, '/');
 
     if (basename) {
-        if (memcmp(filepath, repo->root, basename - filepath) != 0) {
+        if (memcmp(filepath, repo->pool, basename - filepath) != 0) {
             warnx("%s is not in the same path as the database", filepath);
             return cache;
         }
@@ -324,7 +324,7 @@ static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
 
     if (count == 0) {
         struct dirent *dp;
-        DIR *dir = opendir(repo->root);
+        DIR *dir = opendir(repo->pool);
         if (dir == NULL)
             err(EXIT_FAILURE, "failed to open directory");
 
