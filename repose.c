@@ -51,6 +51,7 @@ typedef struct colstr {
 
 static struct {
     const char *key;
+    char *pool;
     enum action action;
 
     short clean;
@@ -133,8 +134,11 @@ static repo_t *repo_new(char *path)
         dbpath = path;
     }
 
-    repo_t *repo = calloc(1, sizeof(repo_t));
-    repo->state = REPO_CLEAN;
+    repo_t *repo = malloc(sizeof(repo_t));
+    *repo = (repo_t){
+        .state = REPO_CLEAN,
+        .pool  = cfg.pool
+    };
 
     len = strlen(dbpath);
     div = memrchr(dbpath, '/', len);
@@ -142,12 +146,15 @@ static repo_t *repo_new(char *path)
     if (div) {
         dot = memchr(div, '.', len - (dbpath - div));
         name = strndup(div + 1, dot - div - 1);
-        repo->pool = strndup(dbpath, div - dbpath);
+        repo->root = strndup(dbpath, div - dbpath);
     } else {
         dot = memchr(dbpath, '.', len);
         name = strndup(dbpath, dot - dbpath);
-        repo->pool = get_current_dir_name();
+        repo->root = get_current_dir_name();
     }
+
+    if (!repo->pool)
+        repo->pool = repo->root;
 
     if (!dot) {
         errx(EXIT_FAILURE, "no file extension");
@@ -170,7 +177,7 @@ static repo_t *repo_new(char *path)
     /* open the directory so we can use openat later */
     repo->dirfd = open(repo->pool, O_RDONLY);
     if (repo->dirfd < 0)
-        err(EXIT_FAILURE, "cannot access %s", repo->pool);
+        err(EXIT_FAILURE, "cannot access %s", repo->root);
     alloc_pkghash(repo);
 
     /* skip '.db' */
@@ -624,6 +631,7 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -Q, --query           query the database\n"
         " -V, --verify          verify the contents of the database\n"
         " -i, --info            show package info\n"
+        " -p, --pool=POOL       set the pool to find packages in\n"
         " -c, --clean           remove stuff\n"
         " -f, --files           generate a complementing files database\n"
         " -s, --sign            sign database(s) with GnuPG after update\n"
@@ -657,6 +665,7 @@ void parse_repose_args(int *argc, char **argv[])
         { "remove",   no_argument,       0, 'R' },
         { "query",    no_argument,       0, 'Q' },
         { "info",     no_argument,       0, 'i' },
+        { "pool",     required_argument, 0, 'p' },
         { "clean",    no_argument,       0, 'c' },
         { "files",    no_argument,       0, 'f' },
         { "sign",     no_argument,       0, 's' },
@@ -695,6 +704,9 @@ void parse_repose_args(int *argc, char **argv[])
             break;
         case 'i':
             cfg.info = true;
+            break;
+        case 'p':
+            cfg.pool = optarg;
             break;
         case 'c':
             ++cfg.clean;
