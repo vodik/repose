@@ -207,7 +207,7 @@ static repo_t *repo_new(char *path)
 
     if (cfg.rebuild) {
         repo->state = REPO_NEW;
-    } else if (faccessat(repo->poolfd, repo->db.file, F_OK, 0) < 0) {
+    } else if (faccessat(repo->rootfd, repo->db.file, F_OK, 0) < 0) {
         if (errno != ENOENT) {
             err(EXIT_FAILURE, "couldn't access database %s", repo->db.file);
         }
