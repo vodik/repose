@@ -6,13 +6,7 @@
 
 static inline size_t next_power(size_t x)
 {
-    --x;
-    x |= x >> 0x01;
-    x |= x >> 0x02;
-    x |= x >> 0x04;
-    x |= x >> 0x08;
-    x |= x >> 0x10;
-    return ++x;
+    return 1 << (32 - __builtin_clz(x - 1));
 }
 
 /* Extend the buffer in buf by at least len bytes.  Note len should
