@@ -153,9 +153,6 @@ static repo_t *repo_new(char *path)
         repo->root = get_current_dir_name();
     }
 
-    if (!repo->pool)
-        repo->pool = repo->root;
-
     if (!dot) {
         errx(EXIT_FAILURE, "no file extension");
     } else if (strcmp(dot, ".db") == 0) {
@@ -175,9 +172,19 @@ static repo_t *repo_new(char *path)
     }
 
     /* open the directory so we can use openat later */
-    repo->dirfd = open(repo->pool, O_RDONLY);
-    if (repo->dirfd < 0)
-        err(EXIT_FAILURE, "cannot access %s", repo->root);
+    repo->rootfd = open(repo->root, O_RDONLY);
+    if (repo->poolfd < 0)
+        err(EXIT_FAILURE, "cannot access repo root %s", repo->root);
+
+    if (!repo->pool) {
+        repo->pool = repo->root;
+        repo->poolfd = repo->rootfd;
+    } else {
+        repo->poolfd = open(repo->pool, O_RDONLY);
+        if (repo->poolfd < 0)
+            err(EXIT_FAILURE, "cannot access repo pool %s", repo->pool);
+    }
+
     alloc_pkghash(repo);
 
     /* skip '.db' */
@@ -198,7 +205,7 @@ static repo_t *repo_new(char *path)
 
     if (cfg.rebuild) {
         repo->state = REPO_NEW;
-    } else if (faccessat(repo->dirfd, repo->db.file, F_OK, 0) < 0) {
+    } else if (faccessat(repo->poolfd, repo->db.file, F_OK, 0) < 0) {
         if (errno != ENOENT) {
             err(EXIT_FAILURE, "couldn't access database %s", repo->db.file);
         }
@@ -252,7 +259,7 @@ static int repo_write(repo_t *repo)
 
 static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
-    if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
+    if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
         if (errno != ENOENT) {
             err(EXIT_FAILURE, "couldn't access package %s to unlink", pkg->filename);
         }
@@ -260,15 +267,15 @@ static int unlink_package(repo_t *repo, const alpm_pkg_meta_t *pkg)
     }
 
     printf("deleting %s %s\n", pkg->name, pkg->version);
-    unlinkat(repo->dirfd, pkg->filename, 0);
-    unlinkat(repo->dirfd, pkg->signame, 0);
+    unlinkat(repo->poolfd, pkg->filename, 0);
+    unlinkat(repo->poolfd, pkg->signame, 0);
     return 0;
 }
 
 static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
 {
     alpm_pkg_meta_t *pkg = NULL;
-    int sigfd, pkgfd = openat(repo->dirfd, filename, O_RDONLY);
+    int sigfd, pkgfd = openat(repo->poolfd, filename, O_RDONLY);
     if (pkgfd < 0) {
         err(EXIT_FAILURE, "failed to open %s", filename);
     }
@@ -279,7 +286,7 @@ static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
     if (asprintf(&pkg->signame, "%s.sig", filename) < 0)
         err(EXIT_FAILURE, "failed to allocate memory");
 
-    sigfd = openat(repo->dirfd, pkg->signame, O_RDONLY);
+    sigfd = openat(repo->poolfd, pkg->signame, O_RDONLY);
     if (sigfd < 0) {
         if (errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", pkg->signame);
@@ -361,14 +368,14 @@ static alpm_pkghash_t *get_filecache(repo_t *repo, char *pkg_list[], int count)
 /* {{{ VERIFY */
 static int verify_pkg_sig(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
-    int pkgfd, sigfd = openat(repo->dirfd, pkg->signame, O_RDONLY);
+    int pkgfd, sigfd = openat(repo->poolfd, pkg->signame, O_RDONLY);
     if (sigfd < 0) {
         if (errno == ENOENT)
             return -1;
         err(EXIT_FAILURE, "failed to open %s", pkg->signame);
     }
 
-    pkgfd = openat(repo->dirfd, pkg->filename, O_RDONLY);
+    pkgfd = openat(repo->poolfd, pkg->filename, O_RDONLY);
     if (pkgfd < 0) {
         err(EXIT_FAILURE, "failed to open %s", pkg->filename);
     }
@@ -381,7 +388,7 @@ static int verify_pkg_sig(repo_t *repo, const alpm_pkg_meta_t *pkg)
 
 static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
-    if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
+    if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
         warn("couldn't find pkg %s at %s", pkg->name, pkg->filename);
         return 1;
     }
@@ -394,7 +401,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
 
     /* if we have a md5sum, verify it */
     if (pkg->md5sum) {
-        char *md5sum = _compute_md5sum(repo->dirfd, pkg->filename);
+        char *md5sum = _compute_md5sum(repo->poolfd, pkg->filename);
         if (strcmp(pkg->md5sum, md5sum) != 0) {
             warnx("md5 sum for pkg %s is different", pkg->name);
             return 1;
@@ -404,7 +411,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
 
     /* if we have a sha256sum, verify it */
     if (pkg->sha256sum) {
-        char *sha256sum = _compute_sha256sum(repo->dirfd, pkg->filename);
+        char *sha256sum = _compute_sha256sum(repo->poolfd, pkg->filename);
         if (strcmp(pkg->sha256sum, sha256sum) != 0) {
             warnx("sha256 sum for pkg %s is different", pkg->name);
             return 1;

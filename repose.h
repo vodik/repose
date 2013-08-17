@@ -32,7 +32,8 @@ typedef struct repo {
     file_t files;
     enum state state;
     enum compress compression;
-    int dirfd;
+    int poolfd;
+    int rootfd;
 } repo_t;
 
 #endif

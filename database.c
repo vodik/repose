@@ -74,7 +74,7 @@ static db_writer_t *db_writer_new(repo_t *repo, file_t *db)
 
     archive_write_set_format_pax_restricted(writer->archive);
 
-    writer->fd = openat(repo->dirfd, db->file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    writer->fd = openat(repo->rootfd, db->file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (writer->fd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", db->file);
     if (flock(writer->fd, LOCK_EX) < 0)
@@ -121,7 +121,7 @@ static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct 
     if (pkg->md5sum) {
         write_string(buf, "MD5SUM", pkg->md5sum);
     } else {
-        char *md5sum = _compute_md5sum(repo->dirfd, pkg->filename);
+        char *md5sum = _compute_md5sum(repo->poolfd, pkg->filename);
         write_string(buf, "MD5SUM", md5sum);
         free(md5sum);
     }
@@ -129,7 +129,7 @@ static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct 
     if (pkg->sha256sum) {
         write_string(buf, "SHA256SUM", pkg->sha256sum);
     } else {
-        char *sha256sum = _compute_sha256sum(repo->dirfd, pkg->filename);
+        char *sha256sum = _compute_sha256sum(repo->poolfd, pkg->filename);
         write_string(buf, "SHA256SUM", sha256sum);
         free(sha256sum);
     }
@@ -150,7 +150,7 @@ static void compile_files_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct
     if (pkg->files) {
         write_list(buf, "FILES", pkg->files);
     } else {
-        int pkgfd = openat(repo->dirfd, pkg->filename, O_RDONLY);
+        int pkgfd = openat(repo->poolfd, pkg->filename, O_RDONLY);
         if (pkgfd < 0 && errno != ENOENT) {
             err(EXIT_FAILURE, "failed to open %s", pkg->filename);
         }
@@ -203,15 +203,27 @@ static void compile_database_entry(repo_t *repo, db_writer_t *writer, alpm_pkg_m
         compile_files_entry(repo, pkg, &writer->buf);
         record_entry(writer, entry, "files");
     }
+
+    if (repo->root != repo->pool) {
+        char *full_pkgpath;
+
+        if (asprintf(&full_pkgpath, "%s/%s", repo->pool, pkg->filename) < 0) {
+            warn("failed to malloc pkg fullpath");
+            return;
+        }
+
+        symlinkat(full_pkgpath, repo->rootfd, pkg->filename);
+        free(full_pkgpath);
+    }
 }
 
 void sign_database(repo_t *repo, file_t *db, const char *key)
 {
-    int dbfd = openat(repo->dirfd, db->file, O_RDONLY);
+    int dbfd = openat(repo->rootfd, db->file, O_RDONLY);
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s", db->file);
 
-    int sigfd = openat(repo->dirfd, db->sig, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    int sigfd = openat(repo->rootfd, db->sig, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (sigfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", db->sig);
 
@@ -221,7 +233,7 @@ void sign_database(repo_t *repo, file_t *db, const char *key)
     close(sigfd);
     close(dbfd);
 
-    if (symlinkat(db->sig, repo->dirfd, db->link_sig) < 0 && errno != EEXIST)
+    if (symlinkat(db->sig, repo->rootfd, db->link_sig) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink for %s failed", db->link_sig);
 }
 
@@ -238,13 +250,13 @@ void compile_database(repo_t *repo, file_t *db, int contents)
     db_writer_close(writer);
 
     /* make the appropriate symlink for the database */
-    if (symlinkat(db->file, repo->dirfd, db->link_file) < 0 && errno != EEXIST)
+    if (symlinkat(db->file, repo->rootfd, db->link_file) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink for %s failed", db->link_file);
 }
 
 int load_database(repo_t *repo, file_t *db)
 {
-    int sigfd, dbfd = openat(repo->dirfd, db->file, O_RDONLY);
+    int sigfd, dbfd = openat(repo->rootfd, db->file, O_RDONLY);
     if (dbfd < 0) {
         if(errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", db->file);
@@ -260,7 +272,7 @@ int load_database(repo_t *repo, file_t *db)
     if (alpm_db_populate(dbfd, &repo->pkgcache) < 0)
         return -1; /* FIXME: fix (but atm this shouldn't ever run) */
 
-    sigfd = openat(repo->dirfd, db->sig, O_RDONLY);
+    sigfd = openat(repo->rootfd, db->sig, O_RDONLY);
     if (sigfd < 0) {
        if (errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", db->file);
@@ -286,7 +298,7 @@ void repo_database_reduce(repo_t *repo)
         for (node = pkgs; node; node = node->next) {
             alpm_pkg_meta_t *pkg = node->data;
 
-            if (faccessat(repo->dirfd, pkg->filename, F_OK, 0) < 0) {
+            if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
                 if (errno != ENOENT)
                     err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
                 printf("dropping %s\n", pkg->name);
