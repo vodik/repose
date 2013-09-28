@@ -575,8 +575,14 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
             repo->state = REPO_DIRTY;
             break;
         case 0:
-            /* check to see if the package now has a signature */
-            if (old->base64_sig == NULL && pkg->base64_sig) {
+            /* XXX: REFACTOR */
+            if (pkg->builddate > old->builddate) {
+                printf("updating %s %s [newer build]\n", pkg->name, pkg->version);
+                repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
+                alpm_pkg_free_metadata(old);
+                repo->state = REPO_DIRTY;
+            } else if (old->base64_sig == NULL && pkg->base64_sig) {
+                /* check to see if the package now has a signature */
                 printf("adding signature for %s\n", pkg->name);
                 repo->pkgcache = _alpm_pkghash_replace(repo->pkgcache, pkg, old);
                 alpm_pkg_free_metadata(old);
