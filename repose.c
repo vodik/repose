@@ -406,7 +406,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, repo_t *repo, alp
     return cache;
 }
 
-alpm_pkghash_t *get_filecache(repo_t *repo, int argc, char *argv[])
+static alpm_pkghash_t *get_filecache(repo_t *repo, int argc, char *argv[])
 {
     alpm_pkghash_t *cache = _alpm_pkghash_create(argc ? argc : repo->cachesize);
 
@@ -762,7 +762,7 @@ static void enable_colors(bool on)
     };
 }
 
-void parse_repose_args(int *argc, char **argv[])
+static void parse_repose_args(int *argc, char **argv[])
 {
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
