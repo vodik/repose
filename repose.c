@@ -74,6 +74,16 @@ static struct {
     }
 };
 
+static void safe_asprintf(char **strp, const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    if (vasprintf(strp, fmt, ap) < 0)
+        err(EXIT_FAILURE, "failed to allocate memory");
+    va_end(ap);
+}
+
 static int colon_printf(const char *fmt, ...)
 {
     int ret;
@@ -104,21 +114,19 @@ static void alloc_pkghash(repo_t *repo)
     closedir(dirp);
 }
 
-static int populate_db_files(file_t *db, const char *name, const char *base, const char *ext)
+static void populate_db_files(file_t *db, const char *name, const char *base, const char *ext)
 {
-    /* db full filename */
-    if (asprintf(&db->file, "%s.%s%s", name, base, ext) < 0)
-        return -1;
-    /* db signature */
-    if (asprintf(&db->sig, "%s.%s%s.sig", name, base, ext) < 0)
-        return -1;
-    /* link to db file */
-    if (asprintf(&db->link_file, "%s.%s", name, base) < 0)
-        return -1;
-    /* link to signature */
-    if (asprintf(&db->link_sig,  "%s.%s.sig", name, base) < 0)
-        return -1;
-    return 0;
+    /* precompile some filepaths:
+     *  - db full filename
+     *  - link to db file
+     *  - db signature
+     *  - link to signature
+     */
+
+    safe_asprintf(&db->file, "%s.%s%s", name, base, ext);
+    safe_asprintf(&db->sig, "%s.%s%s.sig", name, base, ext);
+    safe_asprintf(&db->link_file, "%s.%s", name, base);
+    safe_asprintf(&db->link_sig, "%s.%s.sig", name, base);
 }
 
 static repo_t *repo_new(char *path)
@@ -195,15 +203,9 @@ static repo_t *repo_new(char *path)
         dot = ".tar.gz";
     }
 
-    if (populate_db_files(&repo->db, name, "db", dot) < 0) {
-        err(EXIT_FAILURE, "failed to allocate db filename strings");
-    }
-
-    if (cfg.files) {
-        if (populate_db_files(&repo->files, name, "files", dot) < 0) {
-            err(EXIT_FAILURE, "failed to allocate db filename strings");
-        }
-    }
+    populate_db_files(&repo->db, name, "db", dot);
+    if (cfg.files)
+        populate_db_files(&repo->files, name, "files", dot);
 
     if (cfg.rebuild) {
         repo->state = REPO_NEW;
@@ -293,8 +295,7 @@ static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
     }
     pkg->filename = strdup(filename);
 
-    if (asprintf(&pkg->signame, "%s.sig", filename) < 0)
-        err(EXIT_FAILURE, "failed to allocate memory");
+    safe_asprintf(&pkg->signame, "%s.sig", filename);
 
     sigfd = openat(repo->poolfd, pkg->signame, O_RDONLY);
     if (sigfd < 0) {
@@ -362,11 +363,8 @@ static alpm_pkghash_t *match_targets(alpm_pkghash_t *cache, alpm_pkg_meta_t *pkg
             cache = pkgcache_add(cache, pkg);
             break;
         } else {
-            if (buf == NULL) {
-                int bytes_w = asprintf(&buf, "%s-%s", pkg->name, pkg->version);
-                if (bytes_w < 0)
-                    err(EXIT_FAILURE, "failed to calculate full pkgname");
-            }
+            if (buf == NULL)
+                safe_asprintf(&buf, "%s-%s", pkg->name, pkg->version);
 
             if (fnmatch(target, buf, 0) == 0) {
                 cache = pkgcache_add(cache, pkg);
