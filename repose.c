@@ -598,6 +598,21 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
 /* }}} */
 
 /* {{{ REMOVE */
+static alpm_pkg_meta_t *glob_cache(alpm_pkghash_t *pkgcache, const char *target)
+{
+    alpm_pkg_meta_t *ret = NULL;
+    char *buf = NULL;
+    const alpm_list_t *node;
+
+    for (node = pkgcache->list; node && !ret; node = node->next) {
+        if (match_target_r(node->data, target, &buf))
+            ret = node->data;
+    }
+
+    free(buf);
+    return ret;
+}
+
 /* read the existing repo or construct a new package cache */
 static int repo_database_remove(repo_t *repo, int argc, char *argv[])
 {
@@ -608,27 +623,11 @@ static int repo_database_remove(repo_t *repo, int argc, char *argv[])
         return 0;
     }
 
-    alpm_list_t *targets = NULL;
-
-    if (argc > 0) {
-        int i;
-
-        for (i = 0; i < argc; ++i) {
-            char *target = argv[i];
-            targets = alpm_list_add(targets, target);
-        }
-    }
-
-    if (!targets)
-        return 0;
-
-    /* XXX: shit: this won't scale well, it needs to be the other way
-     * around */
-    alpm_list_t *node, *pkgs = repo->pkgcache->list;
-    for (node = pkgs; node; node = node->next) {
-        alpm_pkg_meta_t *pkg = node->data;
-
-        if (match_targets(pkg, targets)) {
+    int i;
+    for (i = 0; i < argc; ++i) {
+        alpm_pkg_meta_t *pkg = glob_cache(repo->pkgcache, argv[i]);
+        if (pkg != NULL) {
+            printf("removing %s %s\n", pkg->name, pkg->version);
             repo->pkgcache = _alpm_pkghash_remove(repo->pkgcache, pkg, NULL);
             if (cfg.clean >= 1)
                 unlink_package(repo, pkg);
@@ -636,8 +635,7 @@ static int repo_database_remove(repo_t *repo, int argc, char *argv[])
             repo->state = REPO_DIRTY;
             continue;
         }
-
-        /* warnx("didn't find entry: %s", argv[0]); */
+        warnx("didn't find entry: %s", argv[0]);
     }
 
     return repo_write(repo);
