@@ -348,8 +348,9 @@ static inline alpm_pkghash_t *pkgcache_from_file(alpm_pkghash_t *cache, repo_t *
     return pkgcache_add(cache, pkg);
 }
 
-static alpm_pkghash_t *match_targets(alpm_pkghash_t *cache, alpm_pkg_meta_t *pkg, alpm_list_t *targets)
+static bool match_targets(alpm_pkg_meta_t *pkg, alpm_list_t *targets)
 {
+    bool ret = false;
     char *buf = NULL;
     const alpm_list_t *node;
 
@@ -357,24 +358,24 @@ static alpm_pkghash_t *match_targets(alpm_pkghash_t *cache, alpm_pkg_meta_t *pkg
         const char *target = node->data;
 
         if (strcmp(target, pkg->filename) == 0) {
-            cache = pkgcache_add(cache, pkg);
+            ret = true;
             break;
         } else if (strcmp(target, pkg->name) == 0) {
-            cache = pkgcache_add(cache, pkg);
+            ret = true;
             break;
         } else {
             if (buf == NULL)
                 safe_asprintf(&buf, "%s-%s", pkg->name, pkg->version);
 
             if (fnmatch(target, buf, 0) == 0) {
-                cache = pkgcache_add(cache, pkg);
+                ret = true;
                 break;
             }
         }
     }
 
     free(buf);
-    return cache;
+    return ret;
 }
 
 static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, repo_t *repo, alpm_list_t *targets)
@@ -398,11 +399,8 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, repo_t *repo, alp
             continue;
         }
 
-        if (targets == NULL) {
+        if (targets == NULL || match_targets(pkg, targets))
             cache = pkgcache_add(cache, pkg);
-        } else {
-            cache = match_targets(cache, pkg, targets);
-        }
     }
 
     return cache;
