@@ -598,22 +598,21 @@ static int repo_database_update(repo_t *repo, int argc, char *argv[])
 /* }}} */
 
 /* {{{ REMOVE */
-static alpm_pkg_meta_t *glob_cache(alpm_pkghash_t *pkgcache, const char *target)
+static alpm_list_t *glob_cache(alpm_pkghash_t *pkgcache, const char *target)
 {
-    alpm_pkg_meta_t *ret = NULL;
+    alpm_list_t *ret = NULL;
     char *buf = NULL;
     const alpm_list_t *node;
 
-    for (node = pkgcache->list; node && !ret; node = node->next) {
+    for (node = pkgcache->list; node; node = node->next) {
         if (match_target_r(node->data, target, &buf))
-            ret = node->data;
+            ret = alpm_list_add(ret, node->data);
     }
 
     free(buf);
     return ret;
 }
 
-/* read the existing repo or construct a new package cache */
 static int repo_database_remove(repo_t *repo, int argc, char *argv[])
 {
     if (repo->state == REPO_NEW) {
@@ -625,17 +624,21 @@ static int repo_database_remove(repo_t *repo, int argc, char *argv[])
 
     int i;
     for (i = 0; i < argc; ++i) {
-        alpm_pkg_meta_t *pkg = glob_cache(repo->pkgcache, argv[i]);
-        if (pkg != NULL) {
+        alpm_list_t *node, *pkgs = glob_cache(repo->pkgcache, argv[i]);
+
+        if (!pkgs)
+            warnx("didn't find entry: %s", argv[0]);
+
+        for (node = pkgs; node; node = node->next) {
+            alpm_pkg_meta_t *pkg = node->data;
+
             printf("removing %s %s\n", pkg->name, pkg->version);
             repo->pkgcache = _alpm_pkghash_remove(repo->pkgcache, pkg, NULL);
             if (cfg.clean >= 1)
                 unlink_package(repo, pkg);
             alpm_pkg_free_metadata(pkg);
             repo->state = REPO_DIRTY;
-            continue;
         }
-        warnx("didn't find entry: %s", argv[0]);
     }
 
     return repo_write(repo);
