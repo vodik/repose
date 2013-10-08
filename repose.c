@@ -677,7 +677,7 @@ static int repo_database_query(repo_t *repo, int argc, char *argv[])
 
 static void __attribute__((__noreturn__)) elephant(void)
 {
-    static const char *base64_data[2] = {
+    static const unsigned char big_elephant[] =
         "ICAgICBfXwogICAgJy4gXAogICAgICctIFwKICAgICAgLyAvXyAgICAgICAgIC4tLS0uCiAgICAg"
         "LyB8IFxcLC5cLy0tLi8vICAgICkKICAgICB8ICBcLy8gICAgICAgICkvICAvCiAgICAgIFwgICcg"
         "XiBeICAgIC8gICAgKV9fX18uLS0tLS4uICA2CiAgICAgICAnLl9fX18uICAgIC5fX18vICAgICAg"
@@ -685,23 +685,28 @@ static void __attribute__((__noreturn__)) elephant(void)
         "ICAgJ1wgICAgICAgICAgICAgICAgICAgICAgIC8KICAgICAgICAgICBfLyBcLyAgICApLiAgICAg"
         "ICAgKSAgICAoCiAgICAgICAgICAvIyAgLiEgICAgfCAgICAgICAgL1wgICAgLwogICAgICAgICAg"
         "XCAgQy8vICMgIC8nLS0tLS0nJy8gIyAgLwogICAgICAgLiAgICdDLyB8ICAgIHwgICAgfCAgIHwg"
-        "ICAgfG1yZiAgLAogICAgICAgXCksIC4uIC4nT09PLScuIC4uJ09PTydPT08tJy4gLi5cKCw=",
+        "ICAgfG1yZiAgLAogICAgICAgXCksIC4uIC4nT09PLScuIC4uJ09PTydPT08tJy4gLi5cKCw=";
+
+    static const unsigned char small_elephant[] =
         "ICAgIF8gICAgXwogICAvIFxfXy8gXF9fX19fCiAgLyAgLyAgXCAgXCAgICBgXAogICkgIFwnJy8g"
         "ICggICAgIHxcCiAgYFxfXykvX18vJ19cICAvIGAKICAgICAvL198X3x+fF98X3wKICAgICBeIiIn"
-        "IicgIiInIic="
-    };
+        "IicgIiInIic=";
+
+    int ret = 0;
+    unsigned char *data = NULL;
 
     srand(time(NULL));
-    int i = rand() % 2;
+    if (rand() % 2 == 0)
+        ret = base64_decode(&data, big_elephant, sizeof(big_elephant) - 1);
+    else
+        ret = base64_decode(&data, small_elephant, sizeof(small_elephant) - 1);
 
-    size_t len = strlen(base64_data[i]);
-    unsigned char *usline = (unsigned char *)base64_data[i];
-    unsigned char *data;
-
-    if (base64_decode(&data, usline, len) > 0)
+    if (ret > 0) {
         puts((char *)data);
+        exit(EXIT_SUCCESS);
+    }
 
-    exit(EXIT_SUCCESS);
+    exit(ret);
 }
 
 static void __attribute__((__noreturn__)) usage(FILE *out)
