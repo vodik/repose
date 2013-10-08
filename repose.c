@@ -348,31 +348,31 @@ static inline alpm_pkghash_t *pkgcache_from_file(alpm_pkghash_t *cache, repo_t *
     return pkgcache_add(cache, pkg);
 }
 
+static bool match_target_r(alpm_pkg_meta_t *pkg, const char *target, char **buf)
+{
+    if (strcmp(target, pkg->filename) == 0)
+        return true;
+    else if (strcmp(target, pkg->name) == 0)
+        return true;
+
+    /* since this may be called multiple times, buf is external to avoid
+     * recalculating it each time. */
+    if (*buf == NULL)
+        safe_asprintf(buf, "%s-%s", pkg->name, pkg->version);
+
+    if (fnmatch(target, *buf, 0) == 0)
+        return true;
+    return false;
+}
+
 static bool match_targets(alpm_pkg_meta_t *pkg, alpm_list_t *targets)
 {
     bool ret = false;
     char *buf = NULL;
     const alpm_list_t *node;
 
-    for (node = targets; node; node = node->next) {
-        const char *target = node->data;
-
-        if (strcmp(target, pkg->filename) == 0) {
-            ret = true;
-            break;
-        } else if (strcmp(target, pkg->name) == 0) {
-            ret = true;
-            break;
-        } else {
-            if (buf == NULL)
-                safe_asprintf(&buf, "%s-%s", pkg->name, pkg->version);
-
-            if (fnmatch(target, buf, 0) == 0) {
-                ret = true;
-                break;
-            }
-        }
-    }
+    for (node = targets; node && !ret; node = node->next)
+        ret = match_target_r(pkg, node->data, &buf);
 
     free(buf);
     return ret;
