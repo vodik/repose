@@ -88,7 +88,7 @@ Drop all git packages from the repo:
 ### Compatability
 
 Backwards compatibility to the original repository tools is provided
-through symlinks. Backward compatable behaviours are maintained with the
+through symlinks. Backward compatible behaviours are maintained with the
 addition of a few new features:
 
 - symlink following
