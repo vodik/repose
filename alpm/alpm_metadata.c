@@ -349,7 +349,7 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
         } else if (strcmp(buf, "%MAKEDEPENDS%") == 0) {
             read_desc_list(reader, buf, entry_size, &pkg->makedepends);
         } else if (strcmp(buf, "%CHECKDEPENDS%") == 0) {
-            read_desc_list(reader, buf, entry_size, &pkg->makedepends);
+            read_desc_list(reader, buf, entry_size, &pkg->checkdepends);
         } else if (strcmp(buf, "%FILES%") == 0) {
             read_desc_list(reader, buf, entry_size, &pkg->files);
         }
