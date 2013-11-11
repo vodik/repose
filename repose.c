@@ -222,8 +222,6 @@ static repo_t *repo_new(char *path)
         if (cfg.files) {
             load_database(repo, &repo->files);
         }
-
-        repo_database_reduce(repo);
     }
 
     free(name);
@@ -887,6 +885,9 @@ int main(int argc, char *argv[])
     repo = repo_new(argv[0]);
     if (!repo)
         return 1;
+
+    if (cfg.action != ACTION_QUERY && cfg.action != ACTION_VERIFY)
+        repo_database_reduce(repo);
 
     switch (cfg.action) {
     case ACTION_VERIFY:
