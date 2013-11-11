@@ -397,7 +397,6 @@ static int parse_db_entry(struct pkg_t *pkg, const char *entryname)
 static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char *entryname,
 		const char **entry_filename, alpm_pkg_meta_t *likely_pkg)
 {
-	char *pkgname = NULL, *pkgver = NULL;
 	unsigned long pkgname_hash;
 	alpm_pkg_meta_t *pkg;
     struct pkg_t p;
