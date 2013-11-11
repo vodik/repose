@@ -16,6 +16,12 @@
 #include "pkghash.h"
 #include "base64.h"
 
+struct pkg_t {
+    char name[PATH_MAX];
+    const char *version;
+    int namelen;
+};
+
 static void read_pkg_metadata_line(char *buf, alpm_pkg_meta_t *pkg)
 {
     char *var;
@@ -358,60 +364,34 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
     free(buf);
 }
 
-static int _alpm_splitname(const char *target, char **name, char **version,
-		unsigned long *name_hash)
+static int parse_pkgname(struct pkg_t *pkg, const char *entryname, size_t len)
 {
-	/* the format of a db entry is as follows:
-	 *    package-version-rel/
-	 *    package-version-rel/desc (we ignore the filename portion)
-	 * package name can contain hyphens, so parse from the back- go bact
-	 * two hyphens and we have split the version from the name.
-	 */
-	const char *pkgver, *end;
+    const char *dash, *slash = &entryname[len];
 
-	if(target == NULL) {
-		return -1;
-	}
+    dash = slash;
+    while (dash > entryname && --dash && *dash != '-')
+        ;
+    while (dash > entryname && --dash && *dash != '-')
+        ;
 
-	/* remove anything trailing a '/' */
-	end = strchr(target, '/');
-	if(!end) {
-		end = target + strlen(target);
-	}
+    if (*dash != '-') {
+        return -EINVAL;
+    }
 
-	/* do the magic parsing- find the beginning of the version string
-	 * by doing two iterations of same loop to lop off two hyphens */
-	for(pkgver = end - 1; *pkgver && *pkgver != '-'; pkgver--);
-	for(pkgver = pkgver - 1; *pkgver && *pkgver != '-'; pkgver--);
-	if(*pkgver != '-' || pkgver == target) {
-		return -1;
-	}
+    memcpy(pkg->name, entryname, len);
 
-	/* copy into fields and return */
-	if(version) {
-		if(*version) {
-			free(*version);
-		}
-		/* version actually points to the dash, so need to increment 1 and account
-		 * for potential end character */
-		*version = strndup(pkgver + 1, end - pkgver - 1);
-        if(!*version)
-            return -1;
-	}
+    /* ->name and ->version share the same memory */
+    pkg->name[dash - entryname] = pkg->name[slash - entryname] = '\0';
+    pkg->version = &pkg->name[dash - entryname + 1];
+    pkg->namelen = pkg->version - pkg->name - 1;
 
-	if(name) {
-		if(*name) {
-			free(*name);
-		}
-		*name = strndup(target, pkgver - target);
-        if(!*name)
-            return -1;
-		if(name_hash) {
-			*name_hash = _alpm_hash_sdbm(*name);
-		}
-	}
+    return 0;
+}
 
-	return 0;
+static int parse_db_entry(struct pkg_t *pkg, const char *entryname)
+{
+    char *slash = strchr(entryname, '/');
+    return parse_pkgname(pkg, entryname, slash ? slash - entryname : strlen(entryname));
 }
 
 static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char *entryname,
@@ -420,6 +400,7 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 	char *pkgname = NULL, *pkgver = NULL;
 	unsigned long pkgname_hash;
 	alpm_pkg_meta_t *pkg;
+    struct pkg_t p;
 
 	/* get package and db file names */
 	if(entry_filename) {
@@ -430,45 +411,35 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 			*entry_filename = NULL;
 		}
 	}
-	if(_alpm_splitname(entryname, &pkgname, &pkgver, &pkgname_hash) != 0) {
+
+    if (parse_db_entry(&p, entryname) < 0) {
 		/* _alpm_log(db->handle, ALPM_LOG_ERROR, */
 		/* 		_("invalid name for database entry '%s'\n"), entryname); */
 		return NULL;
 	}
 
+    pkgname_hash = _alpm_hash_sdbm(p.name);
 	if(likely_pkg && pkgname_hash == likely_pkg->name_hash
-			&& strcmp(likely_pkg->name, pkgname) == 0) {
+			&& strcmp(likely_pkg->name, p.name) == 0) {
 		pkg = likely_pkg;
 	} else {
-		pkg = _alpm_pkghash_find(*pkgcache, pkgname);
+		pkg = _alpm_pkghash_find(*pkgcache, p.name);
 	}
 
 	if(pkg == NULL) {
 		pkg = calloc(1, sizeof(alpm_pkg_meta_t));
 		if(pkg == NULL) {
-			/* RET_ERR(db->handle, ALPM_ERR_MEMORY, NULL); */
-			free(pkgname);
-			free(pkgver);
 			return NULL;
 		}
 
-		pkg->name = pkgname;
-		pkg->version = pkgver;
+		pkg->name = strdup(p.name);
+		pkg->version = strdup(p.version);
 		pkg->name_hash = pkgname_hash;
-
-		/* pkg->origin = ALPM_PKG_FROM_SYNCDB; */
-		/* pkg->origin_data.db = db; */
-		/* pkg->ops = &default_pkg_ops; */
-		/* pkg->ops->get_validation = _sync_get_validation; */
-		/* pkg->handle = db->handle; */
 
 		/* add to the collection */
 		/* _alpm_log(db->handle, ALPM_LOG_FUNCTION, "adding '%s' to package cache for db '%s'\n", */
 		/* 		pkg->name, db->treename); */
 		*pkgcache = _alpm_pkghash_add_sorted(*pkgcache, pkg);
-	} else {
-		free(pkgname);
-		free(pkgver);
 	}
 
     return pkg;
@@ -487,8 +458,6 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
     if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0 || strcmp(filename, "files") == 0) {
         read_desc(reader, entry, pkg);
     }
-
-    /* free(filename); */
 }
 
 int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
