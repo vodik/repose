@@ -107,58 +107,50 @@ int read_pkg_signature(int fd, alpm_pkg_meta_t *pkg)
 
 int alpm_pkg_load_metadata(int fd, alpm_pkg_meta_t **_pkg)
 {
-    struct archive *archive = NULL;
+    struct archive *archive;
+    struct archive_entry *entry;
     alpm_pkg_meta_t *pkg;
     struct stat st;
     char *memblock = MAP_FAILED;
     int rc = 0;
+
+    archive = archive_read_new();
+    archive_read_support_filter_all(archive);
+    archive_read_support_format_all(archive);
 
     fstat(fd, &st);
     memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     if (memblock == MAP_FAILED)
         err(EXIT_FAILURE, "failed to mmap package");
 
-    archive = archive_read_new();
-    archive_read_support_filter_all(archive);
-    archive_read_support_format_all(archive);
-
-    int r = archive_read_open_memory(archive, memblock, st.st_size);
-    if (r != ARCHIVE_OK) {
+    if (archive_read_open_memory(archive, memblock, st.st_size) != ARCHIVE_OK) {
         rc = -1;
         goto cleanup;
     }
 
     pkg = calloc(1, sizeof(alpm_pkg_meta_t));
-    for (;;) {
-        struct archive_entry *entry;
-
-        r = archive_read_next_header(archive, &entry);
-        if (r == ARCHIVE_EOF) {
-            break;
-        } else if (r != ARCHIVE_OK) {
-            errx(EXIT_FAILURE, "failed to read header: %s", archive_error_string(archive));
-        }
-
-        const mode_t mode = archive_entry_mode(entry);
+    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
         const char *entry_name = archive_entry_pathname(entry);
+        const mode_t mode = archive_entry_mode(entry);
+
         if (S_ISREG(mode) && strcmp(entry_name, ".PKGINFO") == 0) {
             read_pkg_metadata(archive, entry, pkg);
             break;
         }
     }
+
+    archive_read_close(archive);
+
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
     pkg->size = st.st_size;
-
     *_pkg = pkg;
 
 cleanup:
     if (memblock != MAP_FAILED)
         munmap(memblock, st.st_size);
 
-    if (archive) {
-        archive_read_close(archive);
+    if (archive)
         archive_read_free(archive);
-    }
 
     return rc;
 }
@@ -198,6 +190,7 @@ void alpm_pkg_free_metadata(alpm_pkg_meta_t *pkg)
 alpm_list_t *alpm_pkg_files(int fd)
 {
     struct archive *archive = archive_read_new();
+    struct archive_entry *entry;
     alpm_list_t *files = NULL;
     struct stat st;
     char *memblock = MAP_FAILED;
@@ -216,31 +209,22 @@ alpm_list_t *alpm_pkg_files(int fd)
         goto cleanup;
     }
 
-    for (;;) {
-        struct archive_entry *entry;
-
-        r = archive_read_next_header(archive, &entry);
-        if (r == ARCHIVE_EOF) {
-            break;
-        } else if (r != ARCHIVE_OK) {
-            errx(EXIT_FAILURE, "failed to read header: %s", archive_error_string(archive));
-        }
-
+    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
         const char *entry_name = archive_entry_pathname(entry);
-        if (entry_name[0] != '.') {
+
+        if (entry_name[0] != '.')
             files = alpm_list_add(files, strdup(entry_name));
-        }
     }
+
+    archive_read_close(archive);
 
 cleanup:
     if (memblock != MAP_FAILED)
         munmap(memblock, st.st_size);
 
-    archive_read_close(archive);
     archive_read_free(archive);
     return files;
 }
-
 
 static size_t _alpm_strip_newline(char *str, size_t len)
 {
@@ -452,6 +436,7 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
 int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
 {
     struct archive *archive = NULL;
+    struct archive_entry *entry;
     struct archive_reader* reader = NULL;
     struct stat st;
     char *memblock = MAP_FAILED;
@@ -475,17 +460,9 @@ int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
         goto cleanup;
     }
 
-    for (;;) {
-        struct archive_entry *entry;
-
-        r = archive_read_next_header(archive, &entry);
-        if (r == ARCHIVE_EOF) {
-            break;
-        } else if (r != ARCHIVE_OK) {
-            errx(EXIT_FAILURE, "failed to read header: %s", archive_error_string(archive));
-        }
-
+    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
         const mode_t mode = archive_entry_mode(entry);
+
         if (S_ISDIR(mode))
             continue;
 
@@ -495,12 +472,13 @@ int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
         db_read_pkg(pkgcache, reader, entry);
     }
 
+    archive_read_close(archive);
+
 cleanup:
     if (memblock != MAP_FAILED)
         munmap(memblock, st.st_size);
 
     if (archive) {
-        archive_read_close(archive);
         archive_read_free(archive);
         free(reader);
     }
