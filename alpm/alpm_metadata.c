@@ -16,8 +16,9 @@
 #include "pkghash.h"
 #include "base64.h"
 
-struct pkg_t {
+struct entry_t {
     char name[PATH_MAX];
+    const char *type;
     const char *version;
     int namelen;
 };
@@ -364,9 +365,11 @@ static void read_desc(struct archive_reader *reader, struct archive_entry *entry
     free(buf);
 }
 
-static int parse_pkgname(struct pkg_t *pkg, const char *entryname, size_t len)
+static int parse_db_entry(struct entry_t *pkg, const char *entryname, size_t len)
 {
-    const char *dash, *slash = &entryname[len];
+    const char *dash, *slash = memchr(entryname, '/', len);
+    if (!slash)
+        slash = &entryname[len];
 
     dash = slash;
     while (dash > entryname && --dash && *dash != '-')
@@ -382,41 +385,24 @@ static int parse_pkgname(struct pkg_t *pkg, const char *entryname, size_t len)
 
     /* ->name and ->version share the same memory */
     pkg->name[dash - entryname] = pkg->name[slash - entryname] = '\0';
+    pkg->type = slash ? slash + 1 : NULL;
     pkg->version = &pkg->name[dash - entryname + 1];
     pkg->namelen = pkg->version - pkg->name - 1;
 
     return 0;
 }
 
-static int parse_db_entry(struct pkg_t *pkg, const char *entryname, const char **entry_filename)
+static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct entry_t *e,
+                                           alpm_pkg_meta_t *likely_pkg)
 {
-    char *slash = strchr(entryname, '/');
-    if (entry_filename)
-        *entry_filename = slash ? slash + 1 : NULL;
-    return parse_pkgname(pkg, entryname, slash ? slash - entryname : strlen(entryname));
-}
-
-static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char *entryname,
-		const char **entry_filename, alpm_pkg_meta_t *likely_pkg)
-{
-	unsigned long pkgname_hash;
+	unsigned long pkgname_hash = _alpm_hash_sdbm(e->name);
 	alpm_pkg_meta_t *pkg;
-    struct pkg_t p;
 
-    if (parse_db_entry(&p, entryname, entry_filename) < 0) {
-		/* _alpm_log(db->handle, ALPM_LOG_ERROR, */
-		/* 		_("invalid name for database entry '%s'\n"), entryname); */
-		return NULL;
-	}
-
-    printf("filename: %s\n", *entry_filename);
-
-    pkgname_hash = _alpm_hash_sdbm(p.name);
 	if(likely_pkg && pkgname_hash == likely_pkg->name_hash
-			&& strcmp(likely_pkg->name, p.name) == 0) {
+			&& strcmp(likely_pkg->name, e->name) == 0) {
 		pkg = likely_pkg;
 	} else {
-		pkg = _alpm_pkghash_find(*pkgcache, p.name);
+		pkg = _alpm_pkghash_find(*pkgcache, e->name);
 	}
 
 	if(pkg == NULL) {
@@ -425,8 +411,8 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 			return NULL;
 		}
 
-		pkg->name = strdup(p.name);
-		pkg->version = strdup(p.version);
+		pkg->name = strdup(e->name);
+		pkg->version = strdup(e->version);
 		pkg->name_hash = pkgname_hash;
 
 		/* add to the collection */
@@ -442,13 +428,23 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive_reader *reader
                         struct archive_entry *entry)
 {
     const char *entryname = archive_entry_pathname(entry);
-    const char *filename = NULL;
+    size_t len = strlen(entryname);
+    struct entry_t e;
 
-    alpm_pkg_meta_t *pkg = load_pkg_for_entry(pkgcache, entryname, &filename, NULL);
-    if (pkg == NULL || filename == NULL)
+    if (parse_db_entry(&e, entryname, len) < 0) {
+        /* _alpm_log(db->handle, ALPM_LOG_ERROR, */
+        /* 		_("invalid name for database entry '%s'\n"), entryname); */
+        return;
+    }
+
+    if (e.type == NULL)
         return;
 
-    if (strcmp(filename, "desc") == 0 || strcmp(filename, "depends") == 0 || strcmp(filename, "files") == 0) {
+    alpm_pkg_meta_t *pkg = load_pkg_for_entry(pkgcache, &e, NULL);
+    if (pkg == NULL)
+        return;
+
+    if (strcmp(e.type, "desc") == 0 || strcmp(e.type, "depends") == 0 || strcmp(e.type, "files") == 0) {
         read_desc(reader, entry, pkg);
     }
 }
