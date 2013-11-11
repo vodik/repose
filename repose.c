@@ -65,7 +65,7 @@ static struct {
     bool color;
     colstr_t colstr;
 } cfg = {
-    .action = INVALID_ACTION,
+    .action = ACTION_UPDATE,
     .colstr = {
         .colon   = ":: ",
         .warn    = "",
