@@ -388,9 +388,11 @@ static int parse_pkgname(struct pkg_t *pkg, const char *entryname, size_t len)
     return 0;
 }
 
-static int parse_db_entry(struct pkg_t *pkg, const char *entryname)
+static int parse_db_entry(struct pkg_t *pkg, const char *entryname, const char **entry_filename)
 {
     char *slash = strchr(entryname, '/');
+    if (entry_filename)
+        *entry_filename = slash ? slash + 1 : NULL;
     return parse_pkgname(pkg, entryname, slash ? slash - entryname : strlen(entryname));
 }
 
@@ -401,21 +403,13 @@ static alpm_pkg_meta_t *load_pkg_for_entry(alpm_pkghash_t **pkgcache, const char
 	alpm_pkg_meta_t *pkg;
     struct pkg_t p;
 
-	/* get package and db file names */
-	if(entry_filename) {
-		char *fname = strrchr(entryname, '/');
-		if(fname) {
-			*entry_filename = fname + 1;
-		} else {
-			*entry_filename = NULL;
-		}
-	}
-
-    if (parse_db_entry(&p, entryname) < 0) {
+    if (parse_db_entry(&p, entryname, entry_filename) < 0) {
 		/* _alpm_log(db->handle, ALPM_LOG_ERROR, */
 		/* 		_("invalid name for database entry '%s'\n"), entryname); */
 		return NULL;
 	}
+
+    printf("filename: %s\n", *entry_filename);
 
     pkgname_hash = _alpm_hash_sdbm(p.name);
 	if(likely_pkg && pkgname_hash == likely_pkg->name_hash
