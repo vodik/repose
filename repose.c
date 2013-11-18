@@ -61,11 +61,13 @@ static struct {
     bool sign;
     bool files;
     bool rebuild;
+    enum compress compression;
 
     bool color;
     colstr_t colstr;
 } cfg = {
     .action = ACTION_UPDATE,
+    .compression = COMPRESS_NONE,
     .colstr = {
         .colon   = ":: ",
         .warn    = "",
@@ -166,7 +168,7 @@ static repo_t *repo_new(char *path)
     if (!dot) {
         errx(EXIT_FAILURE, "no file extension");
     } else if (strcmp(dot, ".db") == 0) {
-        repo->compression = COMPRESS_GZIP;
+        repo->compression = cfg.compression;
     } else if (strcmp(dot, ".db.tar") == 0) {
         repo->compression = COMPRESS_NONE;
     } else if (strcmp(dot, ".db.tar.gz") == 0) {
@@ -200,7 +202,23 @@ static repo_t *repo_new(char *path)
     /* skip '.db' */
     dot += 3;
     if (*dot == '\0') {
-        dot = ".tar.gz";
+        switch (repo->compression) {
+        case COMPRESS_NONE:
+            dot = ".tar";
+            break;
+        case COMPRESS_GZIP:
+            dot = ".tar.gz";
+            break;
+        case COMPRESS_BZIP2:
+            dot = ".tar.bz2";
+            break;
+        case COMPRESS_XZ:
+            dot = ".tar.xz";
+            break;
+        case COMPRESS_COMPRESS:
+            dot = ".tar.Z";
+            break;
+        }
     }
 
     populate_db_files(&repo->db, name, "db", dot);
@@ -741,6 +759,10 @@ static void __attribute__((__noreturn__)) usage(FILE *out)
         " -a, --arch=ARCH       the primary architecture of the database\n"
         " -s, --sign            sign database(s) with GnuPG after update\n"
         " -k, --key=KEY         use the specified key to sign the database\n"
+        " -j, --bzip2           filter the archive through bzip2\n"
+        " -J, --xz              filter the archive through xz\n"
+        " -z, --gzip            filter the archive through gzip\n"
+        " -Z, --compress        filter the archive through compress\n"
         "     --color=MODE      enable colour support\n"
         "     --rebuild         force rebuild the repo\n", out);
 
@@ -776,16 +798,21 @@ static void parse_repose_args(int *argc, char **argv[])
         { "arch",     required_argument, 0, 'a' },
         { "sign",     no_argument,       0, 's' },
         { "key",      required_argument, 0, 'k' },
+        { "bzip2",    no_argument,       0, 'j' },
+        { "xz",       no_argument,       0, 'J' },
+        { "gzip",     no_argument,       0, 'z' },
+        { "compress", no_argument,       0, 'Z' },
         { "color",    required_argument, 0, 0x100 },
         { "rebuild",  no_argument,       0, 0x101 },
         { "elephant", no_argument,       0, 0x102 },
+
         { 0, 0, 0, 0 }
     };
 
     cfg.color = isatty(fileno(stdout)) ? true : false;
 
     while (true) {
-        int opt = getopt_long(*argc, *argv, "hvURQVicfsa:k:", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvURQVicfsa:k:jJzZ", opts, NULL);
         if (opt == -1)
             break;
 
@@ -842,6 +869,18 @@ static void parse_repose_args(int *argc, char **argv[])
             break;
         case 0x102:
             elephant();
+            break;
+        case 'j':
+            cfg.compression = COMPRESS_BZIP2;
+            break;
+        case 'J':
+            cfg.compression = COMPRESS_XZ;
+            break;
+        case 'z':
+            cfg.compression = COMPRESS_GZIP;
+            break;
+        case 'Z':
+            cfg.compression = COMPRESS_COMPRESS;
             break;
         default:
             usage(stderr);
