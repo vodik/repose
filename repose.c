@@ -1,5 +1,3 @@
-#include "repose.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,25 +13,7 @@
 #include "alpm/util.h"
 #include "alpm/base64.h"
 #include "database.h"
-
-#define NOCOLOR     "\033[0m"
-#define BOLD        "\033[1m"
-
-#define BLACK       "\033[0;30m"
-#define RED         "\033[0;31m"
-#define GREEN       "\033[0;32m"
-#define YELLOW      "\033[0;33m"
-#define BLUE        "\033[0;34m"
-#define MAGENTA     "\033[0;35m"
-#define CYAN        "\033[0;36m"
-
-#define BOLDBLACK   "\033[1;30m"
-#define BOLDRED     "\033[1;31m"
-#define BOLDGREEN   "\033[1;32m"
-#define BOLDYELLOW  "\033[1;33m"
-#define BOLDBLUE    "\033[1;34m"
-#define BOLDMAGENTA "\033[1;35m"
-#define BOLDCYAN    "\033[1;36m"
+#include "utils.h"
 
 enum action {
     ACTION_VERIFY,
@@ -103,7 +83,7 @@ static int colon_printf(const char *fmt, ...)
 
 static void alloc_pkghash(repo_t *repo)
 {
-    DIR *dirp = opendir(repo->pool);
+    _cleanup_closedir_ DIR *dirp = opendir(repo->pool);
     struct dirent *entry;
 
     repo->cachesize = 0;
@@ -113,7 +93,6 @@ static void alloc_pkghash(repo_t *repo)
     }
 
     repo->pkgcache = _alpm_pkghash_create(repo->cachesize);
-    closedir(dirp);
 }
 
 static void populate_db_files(file_t *db, const char *name, const char *base, const char *ext)
@@ -134,8 +113,8 @@ static void populate_db_files(file_t *db, const char *name, const char *base, co
 static repo_t *repo_new(char *path)
 {
     size_t len;
-    char *div, *dot, *name;
-    char *dbpath = NULL, *real = NULL;
+    char *div, *dot, *dbpath = NULL;
+    _cleanup_free_ char *name, *real = NULL;
 
     real = realpath(path, NULL);
     if (real) {
@@ -242,8 +221,6 @@ static repo_t *repo_new(char *path)
         }
     }
 
-    free(name);
-    free(real);
     return repo;
 }
 
@@ -384,13 +361,12 @@ static bool match_target_r(alpm_pkg_meta_t *pkg, const char *target, char **buf)
 static bool match_targets(alpm_pkg_meta_t *pkg, alpm_list_t *targets)
 {
     bool ret = false;
-    char *buf = NULL;
+    _cleanup_free_ char *buf = NULL;
     const alpm_list_t *node;
 
     for (node = targets; node && !ret; node = node->next)
         ret = match_target_r(pkg, node->data, &buf);
 
-    free(buf);
     return ret;
 }
 
@@ -453,7 +429,7 @@ static alpm_pkghash_t *get_filecache(repo_t *repo, int argc, char *argv[])
 /* {{{ VERIFY */
 static int verify_pkg_sig(repo_t *repo, const alpm_pkg_meta_t *pkg)
 {
-    int pkgfd, sigfd = openat(repo->poolfd, pkg->signame, O_RDONLY);
+    _cleanup_close_ int pkgfd, sigfd = openat(repo->poolfd, pkg->signame, O_RDONLY);
     if (sigfd < 0) {
         if (errno == ENOENT)
             return -1;
@@ -465,10 +441,7 @@ static int verify_pkg_sig(repo_t *repo, const alpm_pkg_meta_t *pkg)
         err(EXIT_FAILURE, "failed to open %s", pkg->filename);
     }
 
-    int rc = gpgme_verify(pkgfd, sigfd);
-    close(pkgfd);
-    close(sigfd);
-    return rc;
+    return gpgme_verify(pkgfd, sigfd);
 }
 
 static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
@@ -486,22 +459,20 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
 
     /* if we have a md5sum, verify it */
     if (pkg->md5sum) {
-        char *md5sum = _compute_md5sum(repo->poolfd, pkg->filename);
+        _cleanup_free_ char *md5sum = _compute_md5sum(repo->poolfd, pkg->filename);
         if (strcmp(pkg->md5sum, md5sum) != 0) {
             warnx("md5 sum for pkg %s is different", pkg->name);
             return 1;
         }
-        free(md5sum);
     }
 
     /* if we have a sha256sum, verify it */
     if (pkg->sha256sum) {
-        char *sha256sum = _compute_sha256sum(repo->poolfd, pkg->filename);
+        _cleanup_free_ char *sha256sum = _compute_sha256sum(repo->poolfd, pkg->filename);
         if (strcmp(pkg->sha256sum, sha256sum) != 0) {
             warnx("sha256 sum for pkg %s is different", pkg->name);
             return 1;
         }
-        free(sha256sum);
     }
 
     return 0;
