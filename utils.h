@@ -15,3 +15,5 @@ static inline void freep(void *p) { free(*(void **)p); }
 static inline void fclosep(FILE **fp) { if (*fp) fclose(*fp); }
 static inline void closedirp(DIR **dp) { if (*dp) closedir(*dp); }
 static inline void closep(int *fd) { if (*fd >= 0) close(*fd); }
+
+void safe_asprintf(char **strp, const char *fmt, ...) _printf_(2,3);

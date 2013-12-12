@@ -56,16 +56,6 @@ static struct {
     }
 };
 
-static void safe_asprintf(char **strp, const char *fmt, ...)
-{
-    va_list ap;
-
-    va_start(ap, fmt);
-    if (vasprintf(strp, fmt, ap) < 0)
-        err(EXIT_FAILURE, "failed to allocate memory");
-    va_end(ap);
-}
-
 static int colon_printf(const char *fmt, ...)
 {
     int ret;
