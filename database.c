@@ -14,6 +14,7 @@
 #include "alpm/util.h"
 #include "repose.h"
 #include "strbuf.h"
+#include "utils.h"
 
 typedef struct db_writer {
     struct archive *archive;
@@ -121,17 +122,15 @@ static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct 
     if (pkg->md5sum) {
         write_string(buf, "MD5SUM", pkg->md5sum);
     } else {
-        char *md5sum = _compute_md5sum(repo->poolfd, pkg->filename);
+        _cleanup_free_ char *md5sum = _compute_md5sum(repo->poolfd, pkg->filename);
         write_string(buf, "MD5SUM", md5sum);
-        free(md5sum);
     }
 
     if (pkg->sha256sum) {
         write_string(buf, "SHA256SUM", pkg->sha256sum);
     } else {
-        char *sha256sum = _compute_sha256sum(repo->poolfd, pkg->filename);
+        _cleanup_free_ char *sha256sum = _compute_sha256sum(repo->poolfd, pkg->filename);
         write_string(buf, "SHA256SUM", sha256sum);
-        free(sha256sum);
     }
 
     if (pkg->base64_sig)
@@ -150,13 +149,12 @@ static void compile_files_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct
     if (pkg->files) {
         write_list(buf, "FILES", pkg->files);
     } else {
-        int pkgfd = openat(repo->poolfd, pkg->filename, O_RDONLY);
+        _cleanup_close_ int pkgfd = openat(repo->poolfd, pkg->filename, O_RDONLY);
         if (pkgfd < 0 && errno != ENOENT) {
             err(EXIT_FAILURE, "failed to open %s", pkg->filename);
         }
 
         alpm_list_t *files = alpm_pkg_files(pkgfd);
-        close(pkgfd);
 
         write_list(buf, "FILES", files);
         alpm_list_free_inner(files, free);
@@ -205,7 +203,7 @@ static void compile_database_entry(repo_t *repo, db_writer_t *writer, alpm_pkg_m
     }
 
     if (repo->root != repo->pool) {
-        char *full_pkgpath;
+        _cleanup_free_ char *full_pkgpath;
 
         if (asprintf(&full_pkgpath, "%s/%s", repo->pool, pkg->filename) < 0) {
             warn("failed to malloc pkg fullpath");
@@ -213,25 +211,21 @@ static void compile_database_entry(repo_t *repo, db_writer_t *writer, alpm_pkg_m
         }
 
         symlinkat(full_pkgpath, repo->rootfd, pkg->filename);
-        free(full_pkgpath);
     }
 }
 
 void sign_database(repo_t *repo, file_t *db, const char *key)
 {
-    int dbfd = openat(repo->rootfd, db->file, O_RDONLY);
+    _cleanup_close_ int dbfd = openat(repo->rootfd, db->file, O_RDONLY);
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s", db->file);
 
-    int sigfd = openat(repo->rootfd, db->sig, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    _cleanup_close_ int sigfd = openat(repo->rootfd, db->sig, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (sigfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", db->sig);
 
     /* XXX: check return type */
     gpgme_sign(dbfd, sigfd, key);
-
-    close(sigfd);
-    close(dbfd);
 
     if (symlinkat(db->sig, repo->rootfd, db->link_sig) < 0 && errno != EEXIST)
         err(EXIT_FAILURE, "symlink for %s failed", db->link_sig);
@@ -256,7 +250,7 @@ void compile_database(repo_t *repo, file_t *db, int contents)
 
 int load_database(repo_t *repo, file_t *db)
 {
-    int sigfd, dbfd = openat(repo->rootfd, db->file, O_RDONLY);
+    _cleanup_close_ int sigfd, dbfd = openat(repo->rootfd, db->file, O_RDONLY);
     if (dbfd < 0) {
         if(errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", db->file);
@@ -276,7 +270,6 @@ int load_database(repo_t *repo, file_t *db)
     if (sigfd < 0) {
        if (errno != ENOENT)
             err(EXIT_FAILURE, "failed to open %s", db->file);
-        close(dbfd);
         return 0;
     }
 
@@ -284,8 +277,6 @@ int load_database(repo_t *repo, file_t *db)
         errx(EXIT_FAILURE, "database signature is invalid or corrupt!");
     }
 
-    close(dbfd);
-    close(sigfd);
     return 0;
 }
 
