@@ -11,7 +11,7 @@ LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
 PREFIX = /usr
 
 all: repose
-repose: repose.o database.o buffer.o utils.o \
+repose: repose.o database.o strbuf.o utils.o \
 	alpm/alpm_metadata.o alpm/archive_reader.o \
 	alpm/pkghash.o alpm/signing.o alpm/base64.o alpm/util.o
 

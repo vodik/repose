@@ -1,4 +1,4 @@
-#include "buffer.h"
+#include "strbuf.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +7,11 @@
 
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 
+static inline void *zero(void *s, size_t n)
+{
+    return memset(s, 0, n);
+}
+
 static inline size_t next_power(size_t x)
 {
     return 1UL << (64 - __builtin_clzl(x - 1));
@@ -14,35 +19,38 @@ static inline size_t next_power(size_t x)
 
 /* Extend the buffer in buf by at least len bytes.  Note len should
  * include the space required for the NUL terminator */
-static inline int buffer_extendby(buffer_t *buf, size_t len)
+static inline int buffer_extendby(buffer_t *buf, size_t extby)
 {
-    char* data;
+    char *data;
+    size_t newlen;
 
-    if (unlikely(!buf->buflen && len < 64))
-        len = 64;
+    if (unlikely(!buf->buflen && extby < 64))
+        newlen = 64;
     else
-        len += buf->len;
+        newlen = buf->len + extby;
 
-    if (len <= buf->buflen)
-        return 0;
+    if (newlen > buf->buflen) {
+        buf->buflen = next_power(newlen);
+        data = realloc(buf->data, buf->buflen);
+        if (!data)
+            return -errno;
 
-    buf->buflen = next_power(len);
-    data = realloc(buf->data, buf->buflen);
-    if (!data)
-        return -errno;
+        buf->data = data;
+    }
 
-    buf->data = data;
     return 0;
 }
 
 int buffer_init(buffer_t *buf, size_t reserve)
 {
-    buf->data = NULL;
-    buf->len = 0;
-    buf->buflen = 0;
+    zero(buf, sizeof(buffer_t));
 
-    if (reserve)
-        return buffer_extendby(buf, reserve);
+    if (reserve) {
+        if (buffer_extendby(buf, reserve) < 0)
+            return -errno;
+        buf->data[buf->len] = '\0';
+    }
+
     return 0;
 }
 
@@ -89,6 +97,7 @@ ssize_t buffer_printf(buffer_t *buf, const char *fmt, ...)
         rc = vsnprintf(p, rc + 1, fmt, ap);
         va_end(ap);
     }
+
     buf->len += rc;
     return rc;
 }

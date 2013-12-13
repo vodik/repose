@@ -13,7 +13,7 @@
 #include "alpm/signing.h"
 #include "alpm/util.h"
 #include "repose.h"
-#include "buffer.h"
+#include "strbuf.h"
 
 typedef struct db_writer {
     struct archive *archive;
