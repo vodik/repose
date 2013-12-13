@@ -56,8 +56,7 @@ int buffer_init(buffer_t *buf, size_t reserve)
 
 void buffer_free(buffer_t *buf)
 {
-    if (buf->data)
-        free(buf->data);
+    free(buf->data);
 }
 
 void buffer_clear(buffer_t *buf)

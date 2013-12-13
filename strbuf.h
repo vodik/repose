@@ -1,5 +1,4 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#pragma once
 
 #include <stdarg.h>
 #include <sys/types.h>
@@ -17,5 +16,3 @@ void buffer_clear(buffer_t *buf);
 
 ssize_t buffer_putc(buffer_t *buf, const char c);
 ssize_t buffer_printf(buffer_t *buf, const char *fmt, ...) __attribute__((format (printf, 2, 3)));
-
-#endif /* end of include guard: BUFFER_H */
