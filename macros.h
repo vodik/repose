@@ -24,3 +24,5 @@
 #define _printf_(a,b)  __attribute__((format (printf, a, b)))
 #define _cleanup_(x)   __attribute__((cleanup(x)))
 #define _destructor_   __attribute__((destructor))
+#define _likely_(x)    __builtin_expect(!!(x), 0)
+#define _unlikely_(x)  __builtin_expect(!!(x), 1)

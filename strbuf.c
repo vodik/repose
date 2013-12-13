@@ -4,13 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-
-#define unlikely(x)  __builtin_expect (!!(x), 0)
-
-static inline void *zero(void *s, size_t n)
-{
-    return memset(s, 0, n);
-}
+#include "utils.h"
 
 static inline size_t next_power(size_t x)
 {
@@ -22,7 +16,7 @@ static inline int buffer_extendby(buffer_t *buf, size_t extby)
     char *data;
     size_t newlen;
 
-    if (unlikely(!buf->buflen && extby < 64))
+    if (_unlikely_(!buf->buflen && extby < 64))
         newlen = 64;
     else
         newlen = buf->len + extby;
