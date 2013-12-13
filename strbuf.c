@@ -17,8 +17,6 @@ static inline size_t next_power(size_t x)
     return 1UL << (64 - __builtin_clzl(x - 1));
 }
 
-/* Extend the buffer in buf by at least len bytes.  Note len should
- * include the space required for the NUL terminator */
 static inline int buffer_extendby(buffer_t *buf, size_t extby)
 {
     char *data;
@@ -30,11 +28,12 @@ static inline int buffer_extendby(buffer_t *buf, size_t extby)
         newlen = buf->len + extby;
 
     if (newlen > buf->buflen) {
-        buf->buflen = next_power(newlen);
-        data = realloc(buf->data, buf->buflen);
+        newlen = next_power(newlen);
+        data = realloc(buf->data, newlen);
         if (!data)
             return -errno;
 
+        buf->buflen = newlen;
         buf->data = data;
     }
 
