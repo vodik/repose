@@ -47,11 +47,6 @@ int buffer_init(buffer_t *buf, size_t reserve)
     return 0;
 }
 
-void buffer_free(buffer_t *buf)
-{
-    free(buf->data);
-}
-
 void buffer_clear(buffer_t *buf)
 {
     buf->len = 0;
