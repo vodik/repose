@@ -3,38 +3,47 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
+#define unlikely(x)  __builtin_expect (!!(x), 0)
 
 static inline size_t next_power(size_t x)
 {
-    return 1 << (32 - __builtin_clz(x - 1));
+    return 1UL << (64 - __builtin_clzl(x - 1));
 }
 
 /* Extend the buffer in buf by at least len bytes.  Note len should
  * include the space required for the NUL terminator */
-static inline void buffer_extendby(buffer_t *buf, size_t len)
+static inline int buffer_extendby(buffer_t *buf, size_t len)
 {
     char* data;
 
-    len += buf->len;
+    if (unlikely(!buf->buflen && len < 64))
+        len = 64;
+    else
+        len += buf->len;
+
     if (len <= buf->buflen)
-        return;
-    if (!buf->buflen)
-        buf->buflen = 32;
+        return 0;
 
     buf->buflen = next_power(len);
-    /* printf("--- expand: %zd\n", buf->buflen); */
     data = realloc(buf->data, buf->buflen);
+    if (!data)
+        return -errno;
+
     buf->data = data;
+    return 0;
 }
 
-void buffer_init(buffer_t *buf, size_t reserve)
+int buffer_init(buffer_t *buf, size_t reserve)
 {
     buf->data = NULL;
     buf->len = 0;
     buf->buflen = 0;
 
     if (reserve)
-        buffer_extendby(buf, reserve);
+        return buffer_extendby(buf, reserve);
+    return 0;
 }
 
 void buffer_free(buffer_t *buf)
@@ -50,14 +59,17 @@ void buffer_clear(buffer_t *buf)
         buf->data[buf->len] = '\0';
 }
 
-void buffer_putc(buffer_t *buf, const char c)
+ssize_t buffer_putc(buffer_t *buf, const char c)
 {
-    buffer_extendby(buf, 2);
+    if (buffer_extendby(buf, 2) < 0)
+        return -errno;
+
     buf->data[buf->len++] = c;
     buf->data[buf->len] = '\0';
+    return 0;
 }
 
-void buffer_printf(buffer_t *buf, const char *fmt, ...)
+ssize_t buffer_printf(buffer_t *buf, const char *fmt, ...)
 {
     size_t len = buf->buflen - buf->len;
     char *p = &buf->data[buf->len];
@@ -68,7 +80,9 @@ void buffer_printf(buffer_t *buf, const char *fmt, ...)
     va_end(ap);
 
     if (rc >= len) {
-        buffer_extendby(buf, rc + 1);
+        if (buffer_extendby(buf, rc + 1) < 0)
+            return -errno;
+
         p = &buf->data[buf->len];
 
         va_start(ap, fmt);
@@ -76,4 +90,5 @@ void buffer_printf(buffer_t *buf, const char *fmt, ...)
         va_end(ap);
     }
     buf->len += rc;
+    return rc;
 }

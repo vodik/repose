@@ -10,12 +10,12 @@ typedef struct buffer {
     size_t buflen;
 } buffer_t;
 
-void buffer_init(buffer_t *buf, size_t reserve);
+int buffer_init(buffer_t *buf, size_t reserve);
 void buffer_free(buffer_t *buf);
 
 void buffer_clear(buffer_t *buf);
 
-void buffer_printf(buffer_t *buf, const char *fmt, ...) __attribute__((format (printf, 2, 3)));
-void buffer_putc(buffer_t *buf, const char c);
+ssize_t buffer_putc(buffer_t *buf, const char c);
+ssize_t buffer_printf(buffer_t *buf, const char *fmt, ...) __attribute__((format (printf, 2, 3)));
 
 #endif /* end of include guard: BUFFER_H */
