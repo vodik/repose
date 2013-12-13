@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "utils.h"
+#include "util.h"
 
 static inline size_t next_power(size_t x)
 {

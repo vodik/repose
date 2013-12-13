@@ -13,7 +13,7 @@
 #include "alpm/util.h"
 #include "alpm/base64.h"
 #include "database.h"
-#include "utils.h"
+#include "util.h"
 
 enum action {
     ACTION_VERIFY,

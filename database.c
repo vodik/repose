@@ -14,7 +14,7 @@
 #include "alpm/util.h"
 #include "repose.h"
 #include "strbuf.h"
-#include "utils.h"
+#include "util.h"
 
 typedef struct db_writer {
     struct archive *archive;
