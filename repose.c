@@ -669,7 +669,7 @@ static int repo_database_query(repo_t *repo, int argc, char *argv[])
 #include "repo-compat.c"
 /* }}} */
 
-static void __attribute__((__noreturn__)) elephant(void)
+static _noreturn_ void elephant(void)
 {
     static const unsigned char big_elephant[] =
         "ICAgICBfXwogICAgJy4gXAogICAgICctIFwKICAgICAgLyAvXyAgICAgICAgIC4tLS0uCiAgICAg"
@@ -703,7 +703,7 @@ static void __attribute__((__noreturn__)) elephant(void)
     exit(ret);
 }
 
-static void __attribute__((__noreturn__)) usage(FILE *out)
+static _noreturn_ void usage(FILE *out)
 {
     fprintf(out, "usage: %s [options] <path-to-db> [pkgs|deltas ...]\n", program_invocation_short_name);
     fputs("Options:\n"
