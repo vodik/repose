@@ -56,7 +56,7 @@ static struct {
     }
 };
 
-static int colon_printf(const char *fmt, ...)
+static _printf_(1,2) int colon_printf(const char *fmt, ...)
 {
     int ret;
     va_list args;
