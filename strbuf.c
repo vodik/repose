@@ -14,12 +14,8 @@ static inline size_t next_power(size_t x)
 static inline int buffer_extendby(buffer_t *buf, size_t extby)
 {
     char *data;
-    size_t newlen;
-
-    if (_unlikely_(!buf->buflen && extby < 64))
-        newlen = 64;
-    else
-        newlen = buf->len + extby;
+    size_t newlen = _unlikely_(!buf->buflen && extby < 64)
+        ? 64 : buf->len + extby;
 
     if (newlen > buf->buflen) {
         newlen = next_power(newlen);
