@@ -78,7 +78,7 @@ static void alloc_pkghash(repo_t *repo)
 
     repo->cachesize = 0;
     while ((entry = readdir(dirp)) != NULL) {
-        if (entry->d_type == DT_REG)
+        if (entry->d_type == DT_REG || entry->d_type == DT_LNK)
             repo->cachesize++;
     }
 
