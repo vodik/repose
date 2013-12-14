@@ -1,5 +1,4 @@
-#ifndef REPOMAN_H
-#define REPOMAN_H
+#pragma once
 
 #include <stdbool.h>
 #include "alpm/pkghash.h"
@@ -35,5 +34,3 @@ typedef struct repo {
     int poolfd;
     int rootfd;
 } repo_t;
-
-#endif
