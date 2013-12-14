@@ -19,24 +19,22 @@
 typedef struct db_writer {
     struct archive *archive;
     struct archive_entry *entry;
-    struct buffer buf;
+    buffer_t buf;
     int fd;
 } db_writer_t;
 
-static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
+static void write_list(buffer_t *buf, const char *header, const alpm_list_t *lst)
 {
     if (lst == NULL)
         return;
 
     buffer_printf(buf, "%%%s%%\n", header);
-    for (; lst; lst = lst->next) {
-        const char *str = lst->data;
-        buffer_printf(buf, "%s\n", str);
-    }
+    for (; lst; lst = lst->next)
+        buffer_printf(buf, "%s\n", lst->data);
     buffer_putc(buf, '\n');
 }
 
-static void write_string(struct buffer *buf, const char *header, const char *str)
+static void write_string(buffer_t *buf, const char *header, const char *str)
 {
     if (str == NULL)
         return;
@@ -44,7 +42,7 @@ static void write_string(struct buffer *buf, const char *header, const char *str
     buffer_printf(buf, "%%%s%%\n%s\n\n", header, str);
 }
 
-static void write_long(struct buffer *buf, const char *header, long val)
+static void write_long(buffer_t *buf, const char *header, long val)
 {
     buffer_printf(buf, "%%%s%%\n%ld\n\n", header, val);
 }
@@ -98,7 +96,7 @@ static void db_writer_close(db_writer_t *writer)
     free(writer);
 }
 
-static void compile_depends_entry(const alpm_pkg_meta_t *pkg, struct buffer *buf)
+static void compile_depends_entry(const alpm_pkg_meta_t *pkg, buffer_t *buf)
 {
     write_list(buf, "DEPENDS",      pkg->depends);
     write_list(buf, "CONFLICTS",    pkg->conflicts);
@@ -108,7 +106,7 @@ static void compile_depends_entry(const alpm_pkg_meta_t *pkg, struct buffer *buf
     write_list(buf, "CHECKDEPENDS", pkg->checkdepends);
 }
 
-static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
+static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, buffer_t *buf)
 {
     write_string(buf, "FILENAME",  pkg->filename);
     write_string(buf, "NAME",      pkg->name);
@@ -144,7 +142,7 @@ static void compile_desc_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct 
     write_list(buf,   "REPLACES",  pkg->replaces);
 }
 
-static void compile_files_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, struct buffer *buf)
+static void compile_files_entry(repo_t *repo, const alpm_pkg_meta_t *pkg, buffer_t *buf)
 {
     if (pkg->files) {
         write_list(buf, "FILES", pkg->files);
