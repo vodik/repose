@@ -50,7 +50,7 @@ void buffer_clear(buffer_t *buf)
         buf->data[buf->len] = '\0';
 }
 
-ssize_t buffer_putc(buffer_t *buf, const char c)
+int buffer_putc(buffer_t *buf, const char c)
 {
     if (buffer_extendby(buf, 2) < 0)
         return -errno;
