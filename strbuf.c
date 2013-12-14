@@ -11,7 +11,7 @@ static inline size_t next_power(size_t x)
     return 1UL << (64 - __builtin_clzl(x - 1));
 }
 
-static inline int buffer_extendby(buffer_t *buf, size_t extby)
+static int buffer_extendby(buffer_t *buf, size_t extby)
 {
     char *data;
     size_t newlen = _unlikely_(!buf->buflen && extby < 64)
