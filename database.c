@@ -30,7 +30,7 @@ static void write_list(buffer_t *buf, const char *header, const alpm_list_t *lst
 
     buffer_printf(buf, "%%%s%%\n", header);
     for (; lst; lst = lst->next)
-        buffer_printf(buf, "%s\n", lst->data);
+        buffer_printf(buf, "%s\n", (const char *)lst->data);
     buffer_putc(buf, '\n');
 }
 

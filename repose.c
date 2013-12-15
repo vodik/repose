@@ -390,7 +390,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, repo_t *repo, alp
 
 static alpm_pkghash_t *get_filecache(repo_t *repo, int argc, char *argv[])
 {
-    alpm_pkghash_t *cache = _alpm_pkghash_create(argc ? argc : repo->cachesize);
+    alpm_pkghash_t *cache = _alpm_pkghash_create(argc ? (size_t)argc : repo->cachesize);
 
     if (argc > 0) {
         alpm_list_t *targets = NULL;
