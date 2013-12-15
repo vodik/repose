@@ -136,17 +136,17 @@ static repo_t *repo_new(char *path)
 
     if (!dot) {
         errx(EXIT_FAILURE, "no file extension");
-    } else if (strcmp(dot, ".db") == 0) {
+    } else if (streq(dot, ".db")) {
         repo->compression = cfg.compression;
-    } else if (strcmp(dot, ".db.tar") == 0) {
+    } else if (streq(dot, ".db.tar")) {
         repo->compression = COMPRESS_NONE;
-    } else if (strcmp(dot, ".db.tar.gz") == 0) {
+    } else if (streq(dot, ".db.tar.gz")) {
         repo->compression = COMPRESS_GZIP;
-    } else if (strcmp(dot, ".db.tar.bz2") == 0) {
+    } else if (streq(dot, ".db.tar.bz2")) {
         repo->compression = COMPRESS_BZIP2;
-    } else if (strcmp(dot, ".db.tar.xz") == 0) {
+    } else if (streq(dot, ".db.tar.xz")) {
         repo->compression = COMPRESS_XZ;
-    } else if (strcmp(dot, ".db.tar.Z") == 0) {
+    } else if (streq(dot, ".db.tar.Z")) {
         repo->compression = COMPRESS_COMPRESS;
     } else {
         errx(EXIT_FAILURE, "%s invalid repo type", dot);
@@ -272,7 +272,7 @@ static alpm_pkg_meta_t *load_package(repo_t *repo, const char *filename)
 
     alpm_pkg_load_metadata(pkgfd, &pkg);
 
-    if (strcmp(pkg->arch, cfg.arch) != 0 && strcmp(pkg->arch, "any") != 0) {
+    if (!streq(pkg->arch, cfg.arch) && !streq(pkg->arch, "any")) {
         alpm_pkg_free_metadata(pkg);
         return NULL;
     }
@@ -333,9 +333,9 @@ static inline alpm_pkghash_t *pkgcache_from_file(alpm_pkghash_t *cache, repo_t *
 
 static bool match_target_r(alpm_pkg_meta_t *pkg, const char *target, char **buf)
 {
-    if (strcmp(target, pkg->filename) == 0)
+    if (streq(target, pkg->filename))
         return true;
-    else if (strcmp(target, pkg->name) == 0)
+    else if (streq(target, pkg->name))
         return true;
 
     /* since this may be called multiple times, buf is external to avoid
@@ -450,7 +450,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
     /* if we have a md5sum, verify it */
     if (pkg->md5sum) {
         _cleanup_free_ char *md5sum = _compute_md5sum(repo->poolfd, pkg->filename);
-        if (strcmp(pkg->md5sum, md5sum) != 0) {
+        if (!streq(pkg->md5sum, md5sum)) {
             warnx("md5 sum for pkg %s is different", pkg->name);
             return 1;
         }
@@ -459,7 +459,7 @@ static int verify_pkg(repo_t *repo, const alpm_pkg_meta_t *pkg)
     /* if we have a sha256sum, verify it */
     if (pkg->sha256sum) {
         _cleanup_free_ char *sha256sum = _compute_sha256sum(repo->poolfd, pkg->filename);
-        if (strcmp(pkg->sha256sum, sha256sum) != 0) {
+        if (!streq(pkg->sha256sum, sha256sum)) {
             warnx("sha256 sum for pkg %s is different", pkg->name);
             return 1;
         }
@@ -818,11 +818,11 @@ static void parse_repose_args(int *argc, char **argv[])
             cfg.key = optarg;
             break;
         case 0x100:
-            if (strcmp("never", optarg) == 0)
+            if (streq("never", optarg))
                 cfg.color = false;
-            else if (strcmp("always", optarg) == 0)
+            else if (streq("always", optarg))
                 cfg.color = true;
-            else if (strcmp("auto", optarg) != 0)
+            else if (!streq("auto", optarg))
                 errx(EXIT_FAILURE, "invalid argument '%s' for --color", optarg);
             break;
         case 0x101:
@@ -858,11 +858,11 @@ int main(int argc, char *argv[])
     repo_t *repo;
     int rc = 0;
 
-    if (strcmp(program_invocation_short_name, "repo-add") == 0) {
+    if (streq(program_invocation_short_name, "repo-add")) {
         parse_repo_add_args(&argc, &argv);
-    } else if (strcmp(program_invocation_short_name, "repo-remove") == 0) {
+    } else if (streq(program_invocation_short_name, "repo-remove")) {
         parse_repo_remove_args(&argc, &argv);
-    } else if (strcmp(program_invocation_short_name, "repo-elephant") == 0) {
+    } else if (streq(program_invocation_short_name, "repo-elephant")) {
         elephant();
     } else {
         parse_repose_args(&argc, &argv);
