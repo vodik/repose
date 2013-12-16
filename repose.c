@@ -861,35 +861,41 @@ static void parse_repose_args(int *argc, char **argv[])
     *argv += optind;
 }
 
-int main(int argc, char *argv[])
+static void parse_args(int *argc, char **argv[])
 {
-    struct utsname buf;
-    repo_t *repo;
-    int rc = 0;
-
     if (streq(program_invocation_short_name, "repo-add")) {
-        parse_repo_add_args(&argc, &argv);
+        parse_repo_add_args(argc, argv);
     } else if (streq(program_invocation_short_name, "repo-remove")) {
-        parse_repo_remove_args(&argc, &argv);
+        parse_repo_remove_args(argc, argv);
     } else if (streq(program_invocation_short_name, "repo-elephant")) {
         elephant();
     } else {
-        parse_repose_args(&argc, &argv);
+        parse_repose_args(argc, argv);
     }
-
-    if (cfg.action == INVALID_ACTION)
-        errx(EXIT_FAILURE, "no operation specified");
-    if (argc == 0)
-        errx(EXIT_FAILURE, "not enough arguments");
 
     /* enable colors if necessary */
     enable_colors(cfg.color);
 
     /* if arch isn't set, detect it */
     if (!cfg.arch) {
+        struct utsname buf;
+
         uname(&buf);
         cfg.arch = buf.machine;
     }
+}
+
+int main(int argc, char *argv[])
+{
+    repo_t *repo;
+    int rc = 0;
+
+    parse_args(&argc, &argv);
+
+    if (cfg.action == INVALID_ACTION)
+        errx(EXIT_FAILURE, "no operation specified");
+    if (argc == 0)
+        errx(EXIT_FAILURE, "not enough arguments");
 
     repo = repo_new(argv[0]);
     if (!repo)
