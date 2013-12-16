@@ -878,10 +878,9 @@ static void parse_args(int *argc, char **argv[])
 
     /* if arch isn't set, detect it */
     if (!cfg.arch) {
-        struct utsname buf;
-
-        uname(&buf);
-        cfg.arch = buf.machine;
+        struct utsname uts;
+        uname(&uts);
+        cfg.arch = strdup(uts.machine);
     }
 }
 
