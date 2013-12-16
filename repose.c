@@ -690,10 +690,18 @@ static _noreturn_ void elephant(void)
     unsigned char *data = NULL;
 
     srand(time(NULL));
-    if (rand() % 2 == 0)
+
+    switch (rand() % 2) {
+    case 0:
         ret = base64_decode(&data, big_elephant, sizeof(big_elephant) - 1);
-    else
+        break;
+    case 1:
         ret = base64_decode(&data, small_elephant, sizeof(small_elephant) - 1);
+        break;
+    default:
+        errx(EXIT_FAILURE, "failed to find elephant");
+        break;
+    }
 
     if (ret > 0) {
         puts((char *)data);
