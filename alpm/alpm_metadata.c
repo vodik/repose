@@ -6,7 +6,6 @@
 #include <err.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
 
 #include <alpm.h>
@@ -15,6 +14,7 @@
 #include "archive_reader.h"
 #include "pkghash.h"
 #include "base64.h"
+#include "../memory.h"
 
 struct entry_t {
     char name[PATH_MAX];
@@ -91,17 +91,14 @@ static void read_pkg_metadata(struct archive *archive, struct archive_entry *ent
 
 int read_pkg_signature(int fd, alpm_pkg_meta_t *pkg)
 {
-    struct stat st;
-    char *memblock = MAP_FAILED;
+    memblock_t mem;
 
-    fstat(fd, &st);
-    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
-    if (memblock == MAP_FAILED)
+    if (memblock_open_fd(&mem, fd) < 0)
         err(EXIT_FAILURE, "failed to mmap package signature %s", pkg->signame);
 
-    base64_encode((unsigned char **)&pkg->base64_sig, (const unsigned char *)memblock, st.st_size);
+    base64_encode((unsigned char **)&pkg->base64_sig, (const unsigned char *)mem.mem, mem.len);
 
-    munmap(memblock, st.st_size);
+    memblock_close(&mem);
     return 0;
 }
 
@@ -110,20 +107,17 @@ int alpm_pkg_load_metadata(int fd, alpm_pkg_meta_t **_pkg)
     struct archive *archive;
     struct archive_entry *entry;
     alpm_pkg_meta_t *pkg;
-    struct stat st;
-    char *memblock = MAP_FAILED;
     int rc = 0;
+    memblock_t mem;
 
     archive = archive_read_new();
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    fstat(fd, &st);
-    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
-    if (memblock == MAP_FAILED)
+    if (memblock_open_fd(&mem, fd) < 0)
         err(EXIT_FAILURE, "failed to mmap package");
 
-    if (archive_read_open_memory(archive, memblock, st.st_size) != ARCHIVE_OK) {
+    if (archive_read_open_memory(archive, mem.mem, mem.len) != ARCHIVE_OK) {
         rc = -1;
         goto cleanup;
     }
@@ -142,12 +136,11 @@ int alpm_pkg_load_metadata(int fd, alpm_pkg_meta_t **_pkg)
     archive_read_close(archive);
 
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
-    pkg->size = st.st_size;
+    pkg->size = mem.len;
     *_pkg = pkg;
 
 cleanup:
-    if (memblock != MAP_FAILED)
-        munmap(memblock, st.st_size);
+    memblock_close(&mem);
 
     if (archive)
         archive_read_free(archive);
@@ -192,18 +185,15 @@ alpm_list_t *alpm_pkg_files(int fd)
     struct archive *archive = archive_read_new();
     struct archive_entry *entry;
     alpm_list_t *files = NULL;
-    struct stat st;
-    char *memblock = MAP_FAILED;
+    memblock_t mem;
 
-    fstat(fd, &st);
-    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
-    if (memblock == MAP_FAILED)
+    if (memblock_open_fd(&mem, fd) < 0)
         err(EXIT_FAILURE, "failed to mmap package");
 
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    int r = archive_read_open_memory(archive, memblock, st.st_size);
+    int r = archive_read_open_memory(archive, mem.mem, mem.len);
     if (r != ARCHIVE_OK) {
         warnx("is not an archive");
         goto cleanup;
@@ -219,8 +209,7 @@ alpm_list_t *alpm_pkg_files(int fd)
     archive_read_close(archive);
 
 cleanup:
-    if (memblock != MAP_FAILED)
-        munmap(memblock, st.st_size);
+    memblock_close(&mem);
 
     archive_read_free(archive);
     return files;
@@ -438,13 +427,10 @@ int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
     struct archive *archive = NULL;
     struct archive_entry *entry;
     struct archive_reader* reader = NULL;
-    struct stat st;
-    char *memblock = MAP_FAILED;
     int rc = 0;
+    memblock_t mem;
 
-    fstat(fd, &st);
-    memblock = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
-    if (memblock == MAP_FAILED)
+    if (memblock_open_fd(&mem, fd) < 0)
         err(EXIT_FAILURE, "failed to mmap database");
 
     archive = archive_read_new();
@@ -453,7 +439,7 @@ int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    int r = archive_read_open_memory(archive, memblock, st.st_size);
+    int r = archive_read_open_memory(archive, mem.mem, mem.len);
     if (r != ARCHIVE_OK) {
         warnx("file is not an archive");
         rc = -1;
@@ -475,8 +461,7 @@ int alpm_db_populate(int fd, alpm_pkghash_t **pkgcache)
     archive_read_close(archive);
 
 cleanup:
-    if (memblock != MAP_FAILED)
-        munmap(memblock, st.st_size);
+    memblock_close(&mem);
 
     if (archive) {
         archive_read_free(archive);
