@@ -873,23 +873,22 @@ static void parse_args(int *argc, char **argv[])
         parse_repose_args(argc, argv);
     }
 
-    /* enable colors if necessary */
     enable_colors(cfg.color);
-
-    /* if arch isn't set, detect it */
-    if (!cfg.arch) {
-        struct utsname uts;
-        uname(&uts);
-        cfg.arch = strdup(uts.machine);
-    }
 }
 
 int main(int argc, char *argv[])
 {
+    struct utsname uts;
     repo_t *repo;
     int rc = 0;
 
     parse_args(&argc, &argv);
+
+    /* if arch isn't set, detect it */
+    if (!cfg.arch) {
+        uname(&uts);
+        cfg.arch = uts.machine;
+    }
 
     if (cfg.action == INVALID_ACTION)
         errx(EXIT_FAILURE, "no operation specified");
