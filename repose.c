@@ -811,6 +811,7 @@ static void parse_repose_args(int *argc, char **argv[])
             cfg.pool = optarg;
             break;
         case 'c':
+            warnx("clean operation currently unsupported");
             ++cfg.clean;
             break;
         case 'f':
