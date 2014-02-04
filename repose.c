@@ -793,15 +793,23 @@ static void parse_repose_args(int *argc, char **argv[])
             printf("%s %s\n", program_invocation_short_name, REPOSE_VERSION);
             exit(EXIT_SUCCESS);
         case 'V':
+            if(cfg.action != INVALID_ACTION)
+                errx(EXIT_FAILURE, "only one operation may be used at a time");
             cfg.action = ACTION_VERIFY;
             break;
         case 'U':
+            if(cfg.action != INVALID_ACTION)
+                errx(EXIT_FAILURE, "only one operation may be used at a time");
             cfg.action = ACTION_UPDATE;
             break;
         case 'R':
+            if(cfg.action != INVALID_ACTION)
+                errx(EXIT_FAILURE, "only one operation may be used at a time");
             cfg.action = ACTION_REMOVE;
             break;
         case 'Q':
+            if(cfg.action != INVALID_ACTION)
+                errx(EXIT_FAILURE, "only one operation may be used at a time");
             cfg.action = ACTION_QUERY;
             break;
         case 'i':
