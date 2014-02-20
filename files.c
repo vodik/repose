@@ -16,7 +16,7 @@ static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pk
     struct pkg *old = _alpm_pkghash_find(cache, pkg->name);
     int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(pkg->version, old->version);
 
-    printf(" -- vercmp = %d\n", vercmp);
+    /* printf(" -- vercmp = %d\n", vercmp); */
 
     if (vercmp == 0 || vercmp == 1) {
         if (old) {
@@ -122,7 +122,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
             fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
             continue;
 
-        printf("considering %s", dp->d_name);
+        /* printf("considering %s", dp->d_name); */
 
         struct pkg *pkg = load_pkg(dirfd, dp->d_name);
         if (!pkg) {
