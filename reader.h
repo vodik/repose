@@ -1,5 +1,4 @@
-#ifndef ARCHIVE_EXTRA_H
-#define ARCHIVE_EXTRA_H
+#pragma once
 
 #include <stddef.h>
 #include <archive.h>
@@ -15,6 +14,7 @@ struct archive_reader {
 };
 
 struct archive_reader *archive_reader_new(struct archive *a);
+
+int archive_getline(struct archive_reader *r, char **line);
 int archive_fgets(struct archive_reader *r, char *line, size_t line_size);
 
-#endif
