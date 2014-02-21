@@ -22,9 +22,9 @@ static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pk
             package_free(old);
         }
         return _alpm_pkghash_add(cache, pkg);
-    } else {
-        return cache;
     }
+
+    return cache;
 }
 
 static size_t filecache_size(DIR *dirp)
@@ -37,36 +37,28 @@ static size_t filecache_size(DIR *dirp)
             ++size;
     }
 
-    printf("cache size: %zd\n", size);
     rewinddir(dirp);
     return size;
 }
 
-static bool match_target_r(struct pkg *pkg, const char *target, char **buf)
+static bool match_target_r(struct pkg *pkg, const char *target, const char *fullname)
 {
     if (streq(target, pkg->filename))
         return true;
     else if (streq(target, pkg->name))
         return true;
-
-    /* since this may be called multiple times, buf is external to avoid
-     * recalculating it each time. */
-    if (*buf == NULL)
-        *buf = joinstring(pkg->name, "-", pkg->version, NULL);
-
-    if (fnmatch(target, *buf, 0) == 0)
-        return true;
-    return false;
+    return fnmatch(target, fullname, 0) == 0;
 }
 
 static bool match_targets(struct pkg *pkg, alpm_list_t *targets)
 {
-    bool ret = false;
-    _cleanup_free_ char *buf = NULL;
     const alpm_list_t *node;
+    bool ret = false;
+
+    _cleanup_free_ char *fullname = joinstring(pkg->name, "-", pkg->version, NULL);
 
     for (node = targets; node && !ret; node = node->next)
-        ret = match_target_r(pkg, node->data, &buf);
+        ret = match_target_r(pkg, node->data, fullname);
 
     return ret;
 }
@@ -105,11 +97,7 @@ static struct pkg *load_pkg(int dirfd, const char *filename)
  
 static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *dirp, alpm_list_t *targets)
 {
-    /* DIR *dir = fdopendir(dirfd); */
     const struct dirent *dp;
-
-    /* if (!dir) */
-    /*     err(1, "failed to open dir"); */
 
     while ((dp = readdir(dirp))) {
         if (!(dp->d_type & DT_REG))
@@ -119,13 +107,9 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
             fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
             continue;
 
-        /* printf("considering %s", dp->d_name); */
-
         struct pkg *pkg = load_pkg(dirfd, dp->d_name);
-        if (!pkg) {
-            /* warnx("failed to open %s", dp->d_name); */
+        if (!pkg)
             continue;
-        }
 
         if (targets == NULL || match_targets(pkg, targets))
             cache = pkgcache_add(cache, pkg);
