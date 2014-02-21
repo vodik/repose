@@ -134,13 +134,9 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
     return cache;
 }
 
-alpm_pkghash_t *get_filecache(const char *path)
+alpm_pkghash_t *get_filecache(int dirfd)
 {
-    int dirfd = open(path, O_RDONLY | O_DIRECTORY);
-    if (dirfd < 0)
-        return NULL;
-
-    _cleanup_closedir_ DIR *dirp = fdopendir(dirfd);
+    _cleanup_closedir_ DIR *dirp = fdopendir(dup(dirfd));
 
     size_t size = filecache_size(dirp);
     alpm_pkghash_t *cache = _alpm_pkghash_create(size);

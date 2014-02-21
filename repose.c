@@ -154,9 +154,9 @@ int main(int argc, char *argv[])
 
     _cleanup_close_ int poolfd = open(pool, O_RDONLY | O_DIRECTORY);
     if (poolfd < 0)
-        err(1, "failed to open root directory %s", pool);
+        err(1, "failed to open pool directory %s", pool);
 
-    alpm_pkghash_t *pkgcache = get_filecache(pool);
+    alpm_pkghash_t *pkgcache = get_filecache(poolfd);
     if (!pkgcache)
         err(1, "failed to get filecache");
 
