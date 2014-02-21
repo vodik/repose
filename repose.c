@@ -18,7 +18,7 @@
 #include "pkghash.h"
 #include <alpm_list.h>
 
-const char *pool = NULL, *root = NULL;
+const char *pool = ".", *root = ".";
 int compression = ARCHIVE_COMPRESSION_NONE;
 
 static void _noreturn_ usage(FILE *out)
@@ -140,7 +140,9 @@ static int reduce_database(int dirfd, alpm_pkghash_t **filecache)
 
 int main(int argc, char *argv[])
 {
+    struct repo repo;
     const char *dbname;
+    alpm_list_t *node;
 
     parse_args(&argc, &argv);
     dbname = argv[0];
@@ -148,33 +150,18 @@ int main(int argc, char *argv[])
     if (argc != 1)
         errx(1, "incorrect number of arguments provided");
 
-    pool = pool ? pool : ".";
-    root = root ? root : ".";
-
-    ///////////////////////
-
-    struct repo repo;
     load_repo(&repo, dbname);
-
-    ///////////////////////
-
-    alpm_pkghash_t *pkgcache = get_filecache(pool);
-    if (!pkgcache)
-        err(1, "failed to get filecache");
-
-    ///////////////////////
 
     _cleanup_close_ int poolfd = open(pool, O_RDONLY | O_DIRECTORY);
     if (poolfd < 0)
         err(1, "failed to open root directory %s", pool);
 
+    alpm_pkghash_t *pkgcache = get_filecache(pool);
+    if (!pkgcache)
+        err(1, "failed to get filecache");
+
     reduce_database(poolfd, &repo.filecache);
 
-    ///////////////////////
-
-    alpm_list_t *node;
-
-    /* colon_printf("Updating repo database...\n"); */
     for (node = pkgcache->list; node; node = node->next) {
         struct pkg *pkg = node->data;
         struct pkg *old = _alpm_pkghash_find(repo.filecache, pkg->name);
@@ -208,8 +195,6 @@ int main(int argc, char *argv[])
             case 1:
                 printf("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
                 repo.filecache = _alpm_pkghash_replace(repo.filecache, pkg, old);
-                /* if (cfg.clean >= 1) */
-                /*     unlink_package(repo, old); */
                 package_free(old);
                 /* repo->state = REPO_DIRTY; */
                 break;
@@ -229,9 +214,6 @@ int main(int argc, char *argv[])
                 }
                 break;
             case -1:
-                /* if (cfg.clean >= 2) { */
-                /*     unlink_package(repo, pkg); */
-                /* } */
                 break;
         }
 

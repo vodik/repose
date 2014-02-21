@@ -16,8 +16,6 @@ static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pk
     struct pkg *old = _alpm_pkghash_find(cache, pkg->name);
     int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(pkg->version, old->version);
 
-    /* printf(" -- vercmp = %d\n", vercmp); */
-
     if (vercmp == 0 || vercmp == 1) {
         if (old) {
             cache = _alpm_pkghash_remove(cache, old, NULL);
@@ -25,7 +23,6 @@ static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pk
         }
         return _alpm_pkghash_add(cache, pkg);
     } else {
-        /* package_free(pkg); */
         return cache;
     }
 }
@@ -55,7 +52,7 @@ static bool match_target_r(struct pkg *pkg, const char *target, char **buf)
     /* since this may be called multiple times, buf is external to avoid
      * recalculating it each time. */
     if (*buf == NULL)
-        asprintf(buf, "%s-%s", pkg->name, pkg->version);
+        *buf = joinstring(pkg->name, "-", pkg->version, NULL);
 
     if (fnmatch(target, *buf, 0) == 0)
         return true;
