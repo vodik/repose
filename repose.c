@@ -26,7 +26,15 @@ static void _noreturn_ usage(FILE *out)
 {
     fprintf(out, "usage: %s [options] <database> [pkgs|deltas ...]\n", program_invocation_short_name);
     fputs("Options\n"
-          " <TODO>\n", out);
+          " -h, --help            display this help and exit\n"
+          " -v, --version         display version\n"
+          " -r, --root=ROOT       set the root for the repository\n"
+          " -p, --pool=POOL       set the pool to find packages in\n"
+          " -j, --bzip2           filter the archive through bzip2\n"
+          " -J, --xz              filter the archive through xz\n"
+          " -z, --gzip            filter the archive through gzip\n"
+          " -Z, --compress        filter the archive through compress\n"
+          "     --rebuild         force rebuild the repo\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
 }
