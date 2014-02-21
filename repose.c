@@ -165,6 +165,7 @@ int main(int argc, char *argv[])
     for (node = pkgcache->list; node; node = node->next) {
         struct pkg *pkg = node->data;
         struct pkg *old = _alpm_pkghash_find(repo.filecache, pkg->name);
+        bool replace = false;
         int vercmp;
 
         /* if the package isn't in the cache, add it */
@@ -191,30 +192,29 @@ int main(int argc, char *argv[])
 
         /* if the package is in the cache and we have a newer version,
          * replace it */
+
         switch(vercmp) {
             case 1:
                 printf("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
-                repo.filecache = _alpm_pkghash_replace(repo.filecache, pkg, old);
-                package_free(old);
-                /* repo->state = REPO_DIRTY; */
+                replace = true;
                 break;
             case 0:
-                /* XXX: REFACTOR */
                 if (pkg->builddate > old->builddate) {
                     printf("updating %s %s [newer build]\n", pkg->name, pkg->version);
-                    repo.filecache = _alpm_pkghash_replace(repo.filecache, pkg, old);
-                    package_free(old);
-                    /* repo->state = REPO_DIRTY; */
+                    replace = true;
                 } else if (old->base64sig == NULL && pkg->base64sig) {
-                    /* check to see if the package now has a signature */
                     printf("adding signature for %s\n", pkg->name);
-                    repo.filecache = _alpm_pkghash_replace(repo.filecache, pkg, old);
-                    package_free(old);
-                    /* repo->state = REPO_DIRTY; */
+                    replace = true;
                 }
                 break;
             case -1:
                 break;
+        }
+
+        if (replace) {
+            repo.filecache = _alpm_pkghash_replace(repo.filecache, pkg, old);
+            package_free(old);
+            /* repo->state = REPO_DIRTY; */
         }
 
     }
