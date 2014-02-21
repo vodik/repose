@@ -18,6 +18,7 @@
 #include "pkghash.h"
 #include <alpm_list.h>
 
+bool rebuild = false;
 const char *pool = ".", *root = ".";
 int compression = ARCHIVE_COMPRESSION_NONE;
 
@@ -41,6 +42,7 @@ static void parse_args(int *argc, char **argv[])
         { "xz",       no_argument,       0, 'J' },
         { "gzip",     no_argument,       0, 'z' },
         { "compress", no_argument,       0, 'Z' },
+        { "rebuild",  no_argument,       0, 0x100 },
         { 0, 0, 0, 0 }
     };
 
@@ -74,6 +76,9 @@ static void parse_args(int *argc, char **argv[])
         case 'Z':
             compression = ARCHIVE_FILTER_COMPRESS;
             break;
+        case 0x100:
+            rebuild = true;
+            break;
         }
     }
 
@@ -98,6 +103,9 @@ static int load_repo(struct repo *repo, const char *dbname)
         .dbname    = joinstring(dbname, ".db", NULL),
         .filecache = _alpm_pkghash_create(100)
     };
+
+    if (rebuild)
+        return 0;
 
     _cleanup_close_ int dbfd = openat(rootfd, repo->dbname, O_RDONLY);
     if (dbfd < 0) {
@@ -177,21 +185,6 @@ int main(int argc, char *argv[])
         }
 
         vercmp = alpm_pkg_vercmp(pkg->version, old->version);
-
-        /* if the package is in the cache, but we're doing a forced
-         * update, replace it anywaysj*/
-        /* if (force) { */
-        /*     printf("replacing %s %s => %s\n", pkg->name, old->version, pkg->version); */
-        /*     repo.filecache = _alpm_pkghash_replace(repo.filecache, pkg, old); */
-        /*     /1* if ((vercmp == -1 && cfg.clean >= 1) || (vercmp == 1 && cfg.clean >= 2)) *1/ */
-        /*     /1*     unlink_package(repo, old); *1/ */
-        /*     package_free(old); */
-        /*     /1* repo->state = REPO_DIRTY; *1/ */
-        /*     continue; */
-        /* } */
-
-        /* if the package is in the cache and we have a newer version,
-         * replace it */
 
         switch(vercmp) {
             case 1:
