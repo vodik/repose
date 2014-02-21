@@ -94,7 +94,6 @@ static struct pkg *load_pkg(int dirfd, const char *filename)
     return pkg;
 }
 
- 
 static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *dirp, alpm_list_t *targets)
 {
     const struct dirent *dp;
@@ -120,7 +119,16 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
 
 alpm_pkghash_t *get_filecache(int dirfd)
 {
-    _cleanup_closedir_ DIR *dirp = fdopendir(dup(dirfd));
+    int dupfd = dup(dirfd);
+    if (dupfd < 0)
+        err(EXIT_FAILURE, "failed to duplicate fd");
+
+    if (lseek (dupfd, 0, SEEK_SET) < 0)
+        err(EXIT_FAILURE, "failed to lseek");
+
+    _cleanup_closedir_ DIR *dirp = fdopendir(dupfd);
+    if (!dirp)
+        err(EXIT_FAILURE, "fdopendir failed");
 
     size_t size = filecache_size(dirp);
     alpm_pkghash_t *cache = _alpm_pkghash_create(size);
