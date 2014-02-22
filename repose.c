@@ -108,8 +108,15 @@ static void parse_args(int *argc, char **argv[])
     *argv += optind;
 }
 
+enum state {
+    REPO_NEW,
+    REPO_CLEAN,
+    REPO_DIRTY
+};
+
 struct repo {
     int rootfd;
+    enum state state;
     const char *dbname;
     alpm_pkghash_t *filecache;
 };
@@ -121,6 +128,7 @@ static int load_repo(struct repo *repo, const char *dbname)
         err(1, "failed to open root directory %s", root);
 
     *repo = (struct repo){
+        .state     = REPO_NEW,
         .rootfd    = rootfd,
         .dbname    = joinstring(dbname, ".db", NULL),
         .filecache = _alpm_pkghash_create(100)
@@ -136,6 +144,7 @@ static int load_repo(struct repo *repo, const char *dbname)
     } else {
         printf("LOADING filecache\n");
         load_database(dbfd, &repo->filecache);
+        repo->state = REPO_CLEAN;
     }
 
     return 0;
@@ -168,41 +177,22 @@ static int reduce_database(int dirfd, alpm_pkghash_t **filecache)
     return 0;
 }
 
-int main(int argc, char *argv[])
+static bool merge_database(alpm_pkghash_t *pkgcache, alpm_pkghash_t **filecache)
 {
-    struct repo repo;
-    const char *dbname;
     alpm_list_t *node;
-
-    parse_args(&argc, &argv);
-    dbname = argv[0];
-
-    if (argc != 1)
-        errx(1, "incorrect number of arguments provided");
-
-    load_repo(&repo, dbname);
-
-    _cleanup_close_ int poolfd = open(pool, O_RDONLY | O_DIRECTORY);
-    if (poolfd < 0)
-        err(1, "failed to open pool directory %s", pool);
-
-    alpm_pkghash_t *pkgcache = get_filecache(poolfd);
-    if (!pkgcache)
-        err(1, "failed to get filecache");
-
-    reduce_database(poolfd, &repo.filecache);
+    bool dirty = false;
 
     for (node = pkgcache->list; node; node = node->next) {
         struct pkg *pkg = node->data;
-        struct pkg *old = _alpm_pkghash_find(repo.filecache, pkg->name);
+        struct pkg *old = _alpm_pkghash_find(*filecache, pkg->name);
         bool replace = false;
         int vercmp;
 
         /* if the package isn't in the cache, add it */
         if (!old) {
             printf("adding %s %s\n", pkg->name, pkg->version);
-            repo.filecache = _alpm_pkghash_add(repo.filecache, pkg);
-            /* repo->state = REPO_DIRTY; */
+            *filecache = _alpm_pkghash_add(*filecache, pkg);
+            dirty = true;
             continue;
         }
 
@@ -227,18 +217,71 @@ int main(int argc, char *argv[])
         }
 
         if (replace) {
-            repo.filecache = _alpm_pkghash_replace(repo.filecache, pkg, old);
+            *filecache = _alpm_pkghash_replace(*filecache, pkg, old);
             package_free(old);
-            /* repo->state = REPO_DIRTY; */
+            dirty = true;
         }
-
     }
 
-    ///////////////////////
+    return dirty;
+}
 
-    _cleanup_close_ int dbfd = open(repo.dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (dbfd < 0)
-        err(EXIT_FAILURE, "failed to open %s for writing", repo.dbname);
+/* NOTES TO SELF:
+ * - do i really need to do a merge when there's no database?
+ *    - how do i handle stdout then?
+ * - look at states, do I really need 3?
+ */
 
-    save_database(dbfd, pkgcache, compression);
+int main(int argc, char *argv[])
+{
+    struct repo repo;
+    const char *dbname;
+
+    parse_args(&argc, &argv);
+    dbname = argv[0];
+
+    if (argc != 1)
+        errx(1, "incorrect number of arguments provided");
+
+    load_repo(&repo, dbname);
+
+    _cleanup_close_ int poolfd = open(pool, O_RDONLY | O_DIRECTORY);
+    if (poolfd < 0)
+        err(1, "failed to open pool directory %s", pool);
+
+    alpm_pkghash_t *pkgcache = get_filecache(poolfd);
+    if (!pkgcache)
+        err(1, "failed to get filecache");
+
+    reduce_database(poolfd, &repo.filecache);
+
+    if (merge_database(pkgcache, &repo.filecache))
+        repo.state = REPO_DIRTY;
+
+    switch (repo.state) {
+    case REPO_NEW:
+        printf("repo empty!\n");
+        return 1;
+    case REPO_CLEAN:
+        printf("repo does not need updating\n");
+        break;
+    case REPO_DIRTY:
+        colon_printf("Writing databases to disk...\n");
+        printf("writing %s...\n", repo.dbname);
+
+        {
+            _cleanup_close_ int dbfd = open(repo.dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+            if (dbfd < 0)
+                err(EXIT_FAILURE, "failed to open %s for writing", repo.dbname);
+
+            save_database(dbfd, repo.filecache, compression);
+        }
+
+        printf("repo updated successfully\n");
+        break;
+    default:
+        break;
+    }
+
+    return 0;
 }
