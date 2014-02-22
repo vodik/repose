@@ -22,7 +22,21 @@ bool rebuild = false;
 const char *pool = ".", *root = ".";
 int compression = ARCHIVE_COMPRESSION_NONE;
 
-static void _noreturn_ usage(FILE *out)
+static _printf_(1,2) void colon_printf(const char *fmt, ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    /* fputs(cfg.colstr.colon, stdout); */
+    fputs(":: ", stdout);
+    vprintf(fmt, args);
+    /* fputs(cfg.colstr.nocolor, stdout); */
+    va_end(args);
+
+    fflush(stdout);
+}
+
+static _noreturn_ void usage(FILE *out)
 {
     fprintf(out, "usage: %s [options] <database> [pkgs|deltas ...]\n", program_invocation_short_name);
     fputs("Options\n"

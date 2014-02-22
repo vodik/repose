@@ -10,6 +10,7 @@
 #define _unused_            __attribute__((unsused))
 #define _noreturn_          __attribute__((noreturn))
 #define _cleanup_(x)        __attribute__((cleanup(x)))
+#define _printf_(a,b)       __attribute__((format (printf, a, b)))
 #define _cleanup_free_      _cleanup_(freep)
 #define _cleanup_fclose_    _cleanup_(fclosep)
 #define _cleanup_closedir_  _cleanup_(closedirp)
