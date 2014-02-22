@@ -55,7 +55,6 @@ static int open_db(struct db *db, int fd)
     }
 
     db->filter = archive_filter_code(db->archive, 0);
-
     return 0;
 }
 
@@ -159,12 +158,13 @@ static const char *compression_filter[] = {
     [ARCHIVE_COMPRESSION_COMPRESS] = "compress"
 };
 
-void load_database(int fd, alpm_pkghash_t **pkgcache)
+int load_database(int fd, alpm_pkghash_t **pkgcache)
 {
     struct db db;
     struct archive_entry *entry;
 
-    open_db(&db, fd);
+    if (open_db(&db, fd) < 0)
+        return -1;
 
     const char *filter_type = compression_filter[db.filter];
     printf("> archive filter: %s\n", filter_type ? filter_type : "unknown");
@@ -176,6 +176,7 @@ void load_database(int fd, alpm_pkghash_t **pkgcache)
             db_read_pkg(pkgcache, db.archive, entry);
     }
 
+    return 0;
 }
 
 static void write_list(buffer_t *buf, const char *header, const alpm_list_t *lst)

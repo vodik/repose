@@ -143,8 +143,10 @@ static int load_repo(struct repo *repo, const char *dbname)
             err(EXIT_FAILURE, "failed to open database %s", repo->dbname);
     } else {
         printf("LOADING filecache\n");
-        load_database(dbfd, &repo->filecache);
-        repo->state = REPO_CLEAN;
+        if (load_database(dbfd, &repo->filecache) < 0)
+            warn("failed to open database");
+        else
+            repo->state = REPO_CLEAN;
     }
 
     return 0;

@@ -1,5 +1,6 @@
 #include "memblock.h"
 
+#include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -10,8 +11,11 @@ int memblock_open_fd(struct memblock_t *memblock, int fd)
 {
     struct stat st;
     fstat(fd, &st);
-    memblock->len = st.st_size;
-    memblock->mem = mmap(NULL, memblock->len, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+
+    *memblock = (struct memblock_t){
+        .len = st.st_size,
+        .mem = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0)
+    };
 
     return memblock->mem == MAP_FAILED ? -errno : 0;
 }
