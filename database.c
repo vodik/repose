@@ -130,14 +130,6 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
     free(e.name);
 }
 
-static const char *compression_filter[] = {
-    [ARCHIVE_COMPRESSION_NONE]     = "none",
-    [ARCHIVE_COMPRESSION_GZIP]     = "gzip",
-    [ARCHIVE_COMPRESSION_BZIP2]    = "bzip2",
-    [ARCHIVE_COMPRESSION_XZ]       = "xz",
-    [ARCHIVE_COMPRESSION_COMPRESS] = "compress"
-};
-
 int load_database(int fd, alpm_pkghash_t **pkgcache)
 {
     struct db db;
@@ -145,9 +137,6 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
 
     if (open_db(&db, fd) < 0)
         return -1;
-
-    const char *filter_type = compression_filter[db.filter];
-    printf("> archive filter: %s\n", filter_type ? filter_type : "unknown");
 
     while (archive_read_next_header(db.archive, &entry) == ARCHIVE_OK) {
         const mode_t mode = archive_entry_mode(entry);
