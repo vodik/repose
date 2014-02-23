@@ -286,7 +286,7 @@ static void compile_database_entry(struct archive *archive, struct archive_entry
     /* } */
 }
 
-int save_database(int fd, alpm_pkghash_t *pkgcache, int compression)
+int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression)
 {
     struct archive *archive = archive_write_new();
     struct archive_entry *entry = archive_entry_new();
@@ -303,7 +303,7 @@ int save_database(int fd, alpm_pkghash_t *pkgcache, int compression)
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         struct pkg *metadata = pkg->data;
-        compile_database_entry(archive, entry, metadata, DB_DESC | DB_DEPENDS, &buf);
+        compile_database_entry(archive, entry, metadata, what, &buf);
     }
 
     buffer_free(&buf);

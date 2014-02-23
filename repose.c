@@ -118,8 +118,24 @@ struct repo {
     int rootfd;
     enum state state;
     const char *dbname;
+    const char *filesname;
     alpm_pkghash_t *filecache;
 };
+
+static int load_db(struct repo *repo, const char *dbname)
+{
+    _cleanup_close_ int dbfd = openat(repo->rootfd, dbname, O_RDONLY);
+    if (dbfd < 0) {
+        if (errno != ENOENT)
+            err(EXIT_FAILURE, "failed to open database %s", repo->dbname);
+    } else if (load_database(dbfd, &repo->filecache) < 0) {
+        warn("failed to open %s database", dbname);
+    } else {
+        repo->state = REPO_CLEAN;
+    }
+
+    return 0;
+}
 
 static int load_repo(struct repo *repo, const char *dbname)
 {
@@ -131,21 +147,15 @@ static int load_repo(struct repo *repo, const char *dbname)
         .state     = REPO_NEW,
         .rootfd    = rootfd,
         .dbname    = joinstring(dbname, ".db", NULL),
+        .filesname = joinstring(dbname, ".files", NULL),
         .filecache = _alpm_pkghash_create(100)
     };
 
     if (rebuild)
         return 0;
 
-    _cleanup_close_ int dbfd = openat(rootfd, repo->dbname, O_RDONLY);
-    if (dbfd < 0) {
-        if (errno != ENOENT)
-            err(EXIT_FAILURE, "failed to open database %s", repo->dbname);
-    } else if (load_database(dbfd, &repo->filecache) < 0) {
-        warn("failed to open database");
-    } else {
-        repo->state = REPO_CLEAN;
-    }
+    load_db(repo, repo->dbname);
+    load_db(repo, repo->filesname);
 
     return 0;
 }
@@ -230,6 +240,7 @@ static bool merge_database(alpm_pkghash_t *pkgcache, alpm_pkghash_t **filecache)
  * - do i really need to do a merge when there's no database?
  *    - how do i handle stdout then?
  * - look at states, do I really need 3?
+ * - minimal stdout
  */
 
 int main(int argc, char *argv[])
@@ -274,7 +285,7 @@ int main(int argc, char *argv[])
             if (dbfd < 0)
                 err(EXIT_FAILURE, "failed to open %s for writing", repo.dbname);
 
-            if (save_database(dbfd, repo.filecache, compression) < 0)
+            if (save_database(dbfd, repo.filecache, DB_DESC | DB_DEPENDS, compression) < 0)
                 err(EXIT_FAILURE, "failed to write %s", repo.dbname);
         }
 

@@ -9,4 +9,4 @@ enum contents {
 };
 
 int load_database(int fd, alpm_pkghash_t **pkgcache);
-int save_database(int fd, alpm_pkghash_t *pkgcache, int compression);
+int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression);
