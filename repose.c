@@ -160,7 +160,7 @@ static int load_repo(struct repo *repo, const char *dbname)
 {
     int rootfd = open(root, O_RDONLY | O_DIRECTORY);
     if (rootfd < 0)
-        err(1, "failed to open root directory %s", root);
+        err(EXIT_FAILURE, "failed to open root directory %s", root);
 
     *repo = (struct repo){
         .state     = REPO_NEW,
@@ -287,11 +287,11 @@ int main(int argc, char *argv[])
 
     _cleanup_close_ int poolfd = open(pool, O_RDONLY | O_DIRECTORY);
     if (poolfd < 0)
-        err(1, "failed to open pool directory %s", pool);
+        err(EXIT_FAILURE, "failed to open pool directory %s", pool);
 
     alpm_pkghash_t *pkgcache = get_filecache(poolfd, files);
     if (!pkgcache)
-        err(1, "failed to get filecache");
+        err(EXIT_FAILURE, "failed to get filecache");
 
     reduce_database(poolfd, &repo.filecache);
 
