@@ -8,5 +8,5 @@ enum contents {
     DB_FILES   = 1 << 3
 };
 
-int load_database(int fd, alpm_pkghash_t **pkghash);
-void save_database(int fd, alpm_pkghash_t *pkgcache, int compression);
+int load_database(int fd, alpm_pkghash_t **pkgcache);
+int save_database(int fd, alpm_pkghash_t *pkgcache, int compression);

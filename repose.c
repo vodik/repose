@@ -276,7 +276,8 @@ int main(int argc, char *argv[])
             if (dbfd < 0)
                 err(EXIT_FAILURE, "failed to open %s for writing", repo.dbname);
 
-            save_database(dbfd, repo.filecache, compression);
+            if (save_database(dbfd, repo.filecache, compression) < 0)
+                err(EXIT_FAILURE, "failed to write %s", repo.dbname);
         }
 
         printf("repo updated successfully\n");

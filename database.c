@@ -58,26 +58,6 @@ static int open_db(struct db *db, int fd)
     return 0;
 }
 
-static int write_db(struct db *db, int fd, int filter)
-{
-    /* int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644); */
-    /* if (fd < 0) */
-    /*     err(EXIT_FAILURE, "failed to open %s for writing", filename); */
-    /* if (flock(fd, LOCK_EX) < 0) */
-
-    *db = (struct db){
-        .archive = archive_write_new(),
-        .filter  = filter,
-        .fd      = fd
-    };
-
-    archive_write_add_filter(db->archive, db->filter);
-    archive_write_set_format_pax_restricted(db->archive);
-
-    archive_write_open_fd(db->archive, fd);
-    return 0;
-}
-
 static int parse_db_entry(const char *entryname, struct db_entry *entry)
 {
     entry->name = strdup(entryname);
@@ -264,8 +244,8 @@ static void compile_files_entry(const struct pkg *pkg, buffer_t *buf)
     }
 }
 
-static void record_entry(struct db *writer, struct archive_entry *e, const char *root,
-                         const char *entry, struct buffer *buf)
+static void record_entry(struct archive *archive, struct archive_entry *e,
+                         const char *root, const char *entry, struct buffer *buf)
 {
     _cleanup_free_ char *entry_path = joinstring(root, "/", entry, NULL);
     time_t now = time(NULL);
@@ -279,30 +259,30 @@ static void record_entry(struct db *writer, struct archive_entry *e, const char 
     archive_entry_set_mtime(e, now, 0);
     archive_entry_set_atime(e, now, 0);
 
-    archive_write_header(writer->archive, e);
-    archive_write_data(writer->archive, buf->data, buf->len);
+    archive_write_header(archive, e);
+    archive_write_data(archive, buf->data, buf->len);
 
     archive_entry_clear(e);
     buffer_clear(buf);
 }
 
 
-static void compile_database_entry(struct db *writer, struct archive_entry *e, struct pkg *pkg,
+static void compile_database_entry(struct archive *archive, struct archive_entry *e, struct pkg *pkg,
                                    int contents, struct buffer *buf)
 {
     _cleanup_free_ char *entry = joinstring(pkg->name, "-", pkg->version, NULL);
 
     if (contents & DB_DESC) {
         compile_desc_entry(pkg, buf);
-        record_entry(writer, e, entry, "desc", buf);
+        record_entry(archive, e, entry, "desc", buf);
     }
     if (contents & DB_DEPENDS) {
         compile_depends_entry(pkg, buf);
-        record_entry(writer, e, entry, "depends", buf);
+        record_entry(archive, e, entry, "depends", buf);
     }
     if (contents & DB_FILES) {
         compile_files_entry(pkg, buf);
-        record_entry(writer, e, entry, "files", buf);
+        record_entry(archive, e, entry, "files", buf);
     }
 
     /* if (repo->root != repo->pool) { */
@@ -317,25 +297,31 @@ static void compile_database_entry(struct db *writer, struct archive_entry *e, s
     /* } */
 }
 
-
-void save_database(int fd, alpm_pkghash_t *pkgcache, int compression)
+int save_database(int fd, alpm_pkghash_t *pkgcache, int compression)
 {
-    struct db db;
+    struct archive *archive = archive_write_new();
     struct archive_entry *entry = archive_entry_new();
-    struct buffer buf;
     alpm_list_t *pkg, *pkgs = pkgcache->list;
+    struct buffer buf;
 
-    write_db(&db, fd, compression);
+    archive_write_add_filter(archive, compression);
+    archive_write_set_format_pax_restricted(archive);
+
+    if (archive_write_open_fd(archive, fd) < 0)
+        return -1;
+
     buffer_init(&buf, 1024);
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         struct pkg *metadata = pkg->data;
-        compile_database_entry(&db, entry, metadata, DB_DESC | DB_DEPENDS, &buf);
+        compile_database_entry(archive, entry, metadata, DB_DESC | DB_DEPENDS, &buf);
     }
 
-    archive_write_close(db.archive);
     buffer_free(&buf);
+
+    archive_write_close(archive);
     archive_entry_free(entry);
-    archive_write_free(db.archive);
-    close(db.fd);
+    archive_write_free(archive);
+
+    return 0;
 }
