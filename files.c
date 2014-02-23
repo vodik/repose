@@ -63,7 +63,7 @@ static bool match_targets(struct pkg *pkg, alpm_list_t *targets)
     return ret;
 }
 
-static struct pkg *load_pkg(int dirfd, const char *filename)
+static struct pkg *load_pkg(int dirfd, const char *filename, bool loadfiles)
 {
     int pkgfd = openat(dirfd, filename, O_RDONLY);
     if (pkgfd < 0) {
@@ -73,7 +73,7 @@ static struct pkg *load_pkg(int dirfd, const char *filename)
     struct pkg *pkg = malloc(sizeof(pkg_t));
     zero(pkg, sizeof(pkg_t));
 
-    load_package(pkg, pkgfd);
+    load_package(pkg, pkgfd, loadfiles);
 
     /* if (strcmp(pkg->arch, cfg.arch) != 0 && strcmp(pkg->arch, "any") != 0) { */
     /*     /1* alpm_pkg_free_metadata(pkg); *1/ */
@@ -94,7 +94,8 @@ static struct pkg *load_pkg(int dirfd, const char *filename)
     return pkg;
 }
 
-static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *dirp, alpm_list_t *targets)
+static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *dirp,
+                                        alpm_list_t *targets, bool loadfiles)
 {
     const struct dirent *dp;
 
@@ -106,7 +107,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
             fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
             continue;
 
-        struct pkg *pkg = load_pkg(dirfd, dp->d_name);
+        struct pkg *pkg = load_pkg(dirfd, dp->d_name, loadfiles);
         if (!pkg)
             continue;
 
@@ -117,7 +118,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
     return cache;
 }
 
-alpm_pkghash_t *get_filecache(int dirfd)
+alpm_pkghash_t *get_filecache(int dirfd, bool loadfiles)
 {
     int dupfd = dup(dirfd);
     if (dupfd < 0)
@@ -133,5 +134,5 @@ alpm_pkghash_t *get_filecache(int dirfd)
     size_t size = filecache_size(dirp);
     alpm_pkghash_t *cache = _alpm_pkghash_create(size);
 
-    return scan_for_targets(cache, dirfd, dirp, NULL);
+    return scan_for_targets(cache, dirfd, dirp, NULL, loadfiles);
 }

@@ -18,9 +18,9 @@
 #include "pkghash.h"
 #include <alpm_list.h>
 
-bool rebuild = false;
-const char *pool = ".", *root = ".";
-int compression = ARCHIVE_COMPRESSION_NONE;
+static bool rebuild = false, files = false;
+static const char *pool = ".", *root = ".";
+static int compression = ARCHIVE_COMPRESSION_NONE;
 
 static _printf_(1,2) void colon_printf(const char *fmt, ...)
 {
@@ -42,6 +42,7 @@ static _noreturn_ void usage(FILE *out)
     fputs("Options\n"
           " -h, --help            display this help and exit\n"
           " -v, --version         display version\n"
+          " -f, --files           also build the .files database\n"
           " -r, --root=ROOT       set the root for the repository\n"
           " -p, --pool=POOL       set the pool to find packages in\n"
           " -j, --bzip2           filter the archive through bzip2\n"
@@ -58,6 +59,7 @@ static void parse_args(int *argc, char **argv[])
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
         { "version",  no_argument,       0, 'v' },
+        { "files",    no_argument,       0, 'f' },
         { "root",     required_argument, 0, 'r' },
         { "pool",     required_argument, 0, 'p' },
         { "bzip2",    no_argument,       0, 'j' },
@@ -69,7 +71,7 @@ static void parse_args(int *argc, char **argv[])
     };
 
     for (;;) {
-        int opt = getopt_long(*argc, *argv, "hvr:p:jJzZ", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvfr:p:jJzZ", opts, NULL);
         if (opt < 0)
             break;
 
@@ -80,6 +82,9 @@ static void parse_args(int *argc, char **argv[])
         case 'v':
             printf("%s %s\n",  program_invocation_short_name, REPOSE_VERSION);
             exit(EXIT_SUCCESS);
+        case 'f':
+            files = true;
+            break;
         case 'r':
             root = optarg;
             break;
@@ -128,11 +133,24 @@ static int load_db(struct repo *repo, const char *dbname)
     if (dbfd < 0) {
         if (errno != ENOENT)
             err(EXIT_FAILURE, "failed to open database %s", repo->dbname);
+        return -1;
     } else if (load_database(dbfd, &repo->filecache) < 0) {
         warn("failed to open %s database", dbname);
     } else {
         repo->state = REPO_CLEAN;
     }
+
+    return 0;
+}
+
+static int write_db(struct repo *repo, const char *dbname, int what)
+{
+    _cleanup_close_ int dbfd = openat(repo->rootfd, dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (dbfd < 0)
+        err(EXIT_FAILURE, "failed to open %s for writing", dbname);
+
+    if (save_database(dbfd, repo->filecache, what, compression) < 0)
+        err(EXIT_FAILURE, "failed to write %s", dbname);
 
     return 0;
 }
@@ -155,7 +173,8 @@ static int load_repo(struct repo *repo, const char *dbname)
         return 0;
 
     load_db(repo, repo->dbname);
-    load_db(repo, repo->filesname);
+    if (load_db(repo, repo->filesname) == 0)
+        files = true;
 
     return 0;
 }
@@ -260,7 +279,7 @@ int main(int argc, char *argv[])
     if (poolfd < 0)
         err(1, "failed to open pool directory %s", pool);
 
-    alpm_pkghash_t *pkgcache = get_filecache(poolfd);
+    alpm_pkghash_t *pkgcache = get_filecache(poolfd, files);
     if (!pkgcache)
         err(1, "failed to get filecache");
 
@@ -278,15 +297,13 @@ int main(int argc, char *argv[])
         break;
     case REPO_DIRTY:
         colon_printf("Writing databases to disk...\n");
+
         printf("writing %s...\n", repo.dbname);
+        write_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
 
-        {
-            _cleanup_close_ int dbfd = openat(repo.rootfd, repo.dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-            if (dbfd < 0)
-                err(EXIT_FAILURE, "failed to open %s for writing", repo.dbname);
-
-            if (save_database(dbfd, repo.filecache, DB_DESC | DB_DEPENDS, compression) < 0)
-                err(EXIT_FAILURE, "failed to write %s", repo.dbname);
+        if (files) {
+            printf("writing %s...\n", repo.filesname);
+            write_db(&repo, repo.filesname, DB_FILES);
         }
 
         printf("repo updated successfully\n");

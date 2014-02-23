@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <time.h>
 #include <alpm_list.h>
 
@@ -33,5 +34,5 @@ typedef struct pkg {
     alpm_list_t *files;
 } pkg_t;
 
-int load_package(pkg_t *pkg, int fd);
+int load_package(pkg_t *pkg, int fd, bool loadfiles);
 void package_free(pkg_t *pkg);

@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <limits.h>
 #include <err.h>
 #include <archive.h>
@@ -78,7 +79,7 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
     }
 }
 
-int load_package(pkg_t *pkg, int fd)
+int load_package(pkg_t *pkg, int fd, bool loadfiles)
 {
     struct archive *archive = archive_read_new();
     struct memblock_t memblock;
@@ -103,7 +104,10 @@ int load_package(pkg_t *pkg, int fd)
 
         if (S_ISREG(mode) && streq(entry_name, ".PKGINFO")) {
             read_pkginfo(archive, pkg);
-            break;
+            if (!loadfiles)
+                break;
+        } else if (loadfiles && !streq(entry_name, ".MTREE")) {
+            pkg->files = alpm_list_add(pkg->files, strdup(entry_name));
         }
     }
 
