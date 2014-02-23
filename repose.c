@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
         printf("writing %s...\n", repo.dbname);
 
         {
-            _cleanup_close_ int dbfd = open(repo.dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+            _cleanup_close_ int dbfd = openat(repo.rootfd, repo.dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
             if (dbfd < 0)
                 err(EXIT_FAILURE, "failed to open %s for writing", repo.dbname);
 
