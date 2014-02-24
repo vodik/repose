@@ -18,6 +18,7 @@
 
 #include "pkghash.h"
 #include <alpm_list.h>
+#include <sys/utsname.h>
 
 enum state {
     REPO_NEW,
@@ -26,11 +27,12 @@ enum state {
 };
 
 static enum state state = REPO_NEW;
-static const char *dbname = NULL, *filesname = NULL;
+static const char *dbname = NULL, *filesname = NULL, *arch = NULL;
 static alpm_pkghash_t *filecache = NULL;
 static int rootfd, poolfd;
 static bool rebuild = false, files = false;
 static int compression = ARCHIVE_COMPRESSION_NONE;
+static struct utsname uts;
 
 static _printf_(1,2) void colon_printf(const char *fmt, ...)
 {
@@ -55,6 +57,7 @@ static _noreturn_ void usage(FILE *out)
           " -f, --files           also build the .files database\n"
           " -r, --root=PATH       set the root for the repository\n"
           " -p, --pool=PATH       set the pool to find packages in\n"
+          " -m, --arch=ARCH       the architecture of the database\n"
           " -j, --bzip2           filter the archive through bzip2\n"
           " -J, --xz              filter the archive through xz\n"
           " -z, --gzip            filter the archive through gzip\n"
@@ -114,6 +117,7 @@ static void parse_args(int *argc, char **argv[])
         { "files",    no_argument,       0, 'f' },
         { "root",     required_argument, 0, 'r' },
         { "pool",     required_argument, 0, 'p' },
+        { "arch",     required_argument, 0, 'm' },
         { "bzip2",    no_argument,       0, 'j' },
         { "xz",       no_argument,       0, 'J' },
         { "gzip",     no_argument,       0, 'z' },
@@ -124,7 +128,7 @@ static void parse_args(int *argc, char **argv[])
     };
 
     for (;;) {
-        int opt = getopt_long(*argc, *argv, "hvfr:p:jJzZ", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvfr:p:m:jJzZ", opts, NULL);
         if (opt < 0)
             break;
 
@@ -143,6 +147,9 @@ static void parse_args(int *argc, char **argv[])
             break;
         case 'p':
             pool = optarg;
+            break;
+        case 'm':
+            arch = optarg;
             break;
         case 'j':
             compression = ARCHIVE_FILTER_BZIP2;
@@ -180,6 +187,10 @@ static void parse_args(int *argc, char **argv[])
         poolfd = rootfd;
     }
 
+    if (!arch) {
+        uname(&uts);
+        arch = uts.machine;
+    }
 }
 
 static int load_db(const char *name)
@@ -335,7 +346,7 @@ int main(int argc, char *argv[])
 
     load_repo(rootname);
 
-    alpm_pkghash_t *pkgcache = get_filecache(poolfd, targets);
+    alpm_pkghash_t *pkgcache = get_filecache(poolfd, targets, arch);
     if (!pkgcache)
         err(EXIT_FAILURE, "failed to get filecache");
 
