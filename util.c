@@ -11,6 +11,8 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
+#define WHITESPACE " \t\n\r"
+
 char *joinstring(const char *root, ...)
 {
     size_t len;
@@ -223,8 +225,6 @@ char *compute_sha256sum(int dirfd, char *filename)
         return NULL;
     return hex_representation(output, 32);
 }
-
-#define WHITESPACE " \t\n\r"
 
 char *strstrip(char *s)
 {
