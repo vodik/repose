@@ -79,7 +79,7 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
     }
 }
 
-int load_package(pkg_t *pkg, int fd, bool loadfiles)
+int load_package(pkg_t *pkg, int fd)
 {
     struct archive *archive = archive_read_new();
     struct memblock_t memblock;
@@ -104,14 +104,41 @@ int load_package(pkg_t *pkg, int fd, bool loadfiles)
 
         if (S_ISREG(mode) && streq(entry_name, ".PKGINFO")) {
             read_pkginfo(archive, pkg);
-            if (!loadfiles)
-                break;
-        } else if (loadfiles && !streq(entry_name, ".MTREE")) {
-            pkg->files = alpm_list_add(pkg->files, strdup(entry_name));
+            break;
         }
     }
 
+    pkg->size = memblock.len;
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
+
+    return 0;
+}
+
+int load_package_files(struct pkg *pkg, int fd)
+{
+    struct archive *archive = archive_read_new();
+    struct memblock_t memblock;
+
+    if (memblock_open_fd(&memblock, fd) < 0) {
+        archive_read_free(archive);
+        return -1;
+    }
+
+    archive_read_support_filter_all(archive);
+    archive_read_support_format_all(archive);
+
+    if (archive_read_open_memory(archive, memblock.mem, memblock.len) != ARCHIVE_OK) {
+        archive_read_free(archive);
+        return -1;
+    }
+
+    struct archive_entry *entry;
+    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
+        const char *entry_name = archive_entry_pathname(entry);
+
+        if (!streq(entry_name, ".PKGINFO") || !streq(entry_name, ".MTREE"))
+            pkg->files = alpm_list_add(pkg->files, strdup(entry_name));
+    }
 
     return 0;
 }

@@ -297,7 +297,7 @@ int main(int argc, char *argv[])
 
     load_repo(&repo, dbname);
 
-    alpm_pkghash_t *pkgcache = get_filecache(repo.poolfd, files);
+    alpm_pkghash_t *pkgcache = get_filecache(repo.poolfd);
     if (!pkgcache)
         err(EXIT_FAILURE, "failed to get filecache");
 

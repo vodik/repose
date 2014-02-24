@@ -212,25 +212,17 @@ static void compile_desc_entry(struct pkg *pkg, buffer_t *buf, int poolfd)
     write_list(buf,   "REPLACES",  pkg->replaces);
 }
 
-static void compile_files_entry(const struct pkg *pkg, buffer_t *buf)
+static void compile_files_entry(struct pkg *pkg, buffer_t *buf, int poolfd)
 {
-    if (pkg->files) {
-        write_list(buf, "FILES", pkg->files);
-    } else {
-        /* XXX: can be optimized */
+    if (!pkg->files) {
+        _cleanup_close_ int pkgfd = openat(poolfd, pkg->filename, O_RDONLY);
+        if (pkgfd < 0 && errno != ENOENT)
+            err(EXIT_FAILURE, "failed to open %s", pkg->filename);
 
-        /* _cleanup_close_ int pkgfd = openat(repo->poolfd, pkg->filename, O_RDONLY); */
-        /* _cleanup_close_ int pkgfd = open(pkg->filename, O_RDONLY); */
-        /* if (pkgfd < 0 && errno != ENOENT) { */
-        /*     err(EXIT_FAILURE, "failed to open %s", pkg->filename); */
-        /* } */
-
-        /* alpm_list_t *files = alpm_pkg_files(pkgfd); */
-
-        /* write_list(buf, "FILES", files); */
-        /* alpm_list_free_inner(files, free); */
-        /* alpm_list_free(files); */
+        load_package_files(pkg, pkgfd);
     }
+
+    write_list(buf, "FILES", pkg->files);
 }
 
 static void record_entry(struct archive *archive, struct archive_entry *e,

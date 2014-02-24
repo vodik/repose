@@ -34,5 +34,6 @@ typedef struct pkg {
     alpm_list_t *files;
 } pkg_t;
 
-int load_package(pkg_t *pkg, int fd, bool loadfiles);
+int load_package(pkg_t *pkg, int fd);
+int load_package_files(pkg_t *pkg, int fd);
 void package_free(pkg_t *pkg);
