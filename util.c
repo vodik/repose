@@ -204,41 +204,24 @@ static int sha2_file(int fd, unsigned char output[32], int is224)
 	return 0;
 }
 
-char *_compute_md5sum(char *filename)
+char *compute_md5sum(int dirfd, char *filename)
 {
-    /* int fd = openat(dirfd, filename, O_RDONLY); */
-    int fd = open(filename, O_RDONLY);
-	unsigned char output[16];
+    unsigned char output[16];
+    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
 
-	/* defined above for OpenSSL, otherwise defined in md5.h */
-	if(md5_file(fd, output) > 0) {
-        close(fd);
-		return NULL;
-	}
-
-    close(fd);
-	return hex_representation(output, 16);
+    if (md5_file(fd, output) > 0)
+        return NULL;
+    return hex_representation(output, 16);
 }
 
-/** Get the sha256 sum of file.
- * @param filename name of the file
- * @return the checksum on success, NULL on error
- * @addtogroup alpm_misc
- */
-char *_compute_sha256sum(char *filename)
+char *compute_sha256sum(int dirfd, char *filename)
 {
-    /* int fd = openat(dirfd, filename, O_RDONLY); */
-    int fd = open(filename, O_RDONLY);
-	unsigned char output[32];
+    unsigned char output[32];
+    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
 
-	/* defined above for OpenSSL, otherwise defined in sha2.h */
-	if(sha2_file(fd, output, 0) > 0) {
-        close(fd);
-		return NULL;
-	}
-
-    close(fd);
-	return hex_representation(output, 32);
+    if (sha2_file(fd, output, 0) > 0)
+        return NULL;
+    return hex_representation(output, 32);
 }
 
 #define WHITESPACE " \t\n\r"

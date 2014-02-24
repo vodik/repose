@@ -172,7 +172,7 @@ static void write_long(buffer_t *buf, const char *header, long val)
     buffer_printf(buf, "%%%s%%\n%ld\n\n", header, val);
 }
 
-static void compile_depends_entry(const struct pkg *pkg, buffer_t *buf)
+static void compile_depends_entry(struct pkg *pkg, buffer_t *buf)
 {
     write_list(buf, "DEPENDS",      pkg->depends);
     write_list(buf, "CONFLICTS",    pkg->conflicts);
@@ -182,7 +182,7 @@ static void compile_depends_entry(const struct pkg *pkg, buffer_t *buf)
     write_list(buf, "CHECKDEPENDS", pkg->checkdepends);
 }
 
-static void compile_desc_entry(struct pkg *pkg, buffer_t *buf)
+static void compile_desc_entry(struct pkg *pkg, buffer_t *buf, int poolfd)
 {
     write_string(buf, "FILENAME",  pkg->filename);
     write_string(buf, "NAME",      pkg->name);
@@ -194,9 +194,9 @@ static void compile_desc_entry(struct pkg *pkg, buffer_t *buf)
     write_long(buf,   "ISIZE",     (long)pkg->isize);
 
     if (!pkg->md5sum)
-        pkg->md5sum = _compute_md5sum(pkg->filename);
+        pkg->md5sum = compute_md5sum(poolfd, pkg->filename);
     if (!pkg->sha256sum)
-        pkg->sha256sum = _compute_sha256sum(pkg->filename);
+        pkg->sha256sum = compute_sha256sum(poolfd, pkg->filename);
 
     write_string(buf, "MD5SUM", pkg->md5sum);
     write_string(buf, "SHA256SUM", pkg->sha256sum);
@@ -257,12 +257,12 @@ static void record_entry(struct archive *archive, struct archive_entry *e,
 
 
 static void compile_database_entry(struct archive *archive, struct archive_entry *e, struct pkg *pkg,
-                                   int contents, struct buffer *buf)
+                                   int contents, struct buffer *buf, int poolfd)
 {
     _cleanup_free_ char *entry = joinstring(pkg->name, "-", pkg->version, NULL);
 
     if (contents & DB_DESC) {
-        compile_desc_entry(pkg, buf);
+        compile_desc_entry(pkg, buf, poolfd);
         record_entry(archive, e, entry, "desc", buf);
     }
     if (contents & DB_DEPENDS) {
@@ -270,7 +270,7 @@ static void compile_database_entry(struct archive *archive, struct archive_entry
         record_entry(archive, e, entry, "depends", buf);
     }
     if (contents & DB_FILES) {
-        compile_files_entry(pkg, buf);
+        compile_files_entry(pkg, buf, poolfd);
         record_entry(archive, e, entry, "files", buf);
     }
 
@@ -286,7 +286,7 @@ static void compile_database_entry(struct archive *archive, struct archive_entry
     /* } */
 }
 
-int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression)
+int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression, int poolfd)
 {
     struct archive *archive = archive_write_new();
     struct archive_entry *entry = archive_entry_new();
@@ -303,7 +303,7 @@ int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression)
 
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         struct pkg *metadata = pkg->data;
-        compile_database_entry(archive, entry, metadata, what, &buf);
+        compile_database_entry(archive, entry, metadata, what, &buf, poolfd);
     }
 
     buffer_free(&buf);

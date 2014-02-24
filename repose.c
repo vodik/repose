@@ -122,6 +122,7 @@ enum state {
 
 struct repo {
     int rootfd;
+    int poolfd;
     enum state state;
     const char *dbname;
     const char *filesname;
@@ -144,13 +145,13 @@ static int load_db(struct repo *repo, const char *dbname)
     return 0;
 }
 
-static int write_db(struct repo *repo, const char *dbname, int what)
+static int write_db(struct repo *repo, const char *dbname, int what, int poolfd)
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", dbname);
 
-    if (save_database(dbfd, repo->filecache, what, compression) < 0)
+    if (save_database(dbfd, repo->filecache, what, compression, poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", dbname);
 
     return 0;
@@ -162,9 +163,20 @@ static int load_repo(struct repo *repo, const char *dbname)
     if (rootfd < 0)
         err(EXIT_FAILURE, "failed to open root directory %s", root);
 
+    int poolfd;
+
+    if (pool) {
+        poolfd = open(pool, O_RDONLY | O_DIRECTORY);
+        if (poolfd < 0)
+            err(EXIT_FAILURE, "failed to open pool directory %s", pool);
+    } else {
+        poolfd = rootfd;
+    }
+
     *repo = (struct repo){
         .state     = REPO_NEW,
         .rootfd    = rootfd,
+        .poolfd    = poolfd,
         .dbname    = joinstring(dbname, ".db", NULL),
         .filesname = joinstring(dbname, ".files", NULL),
         .filecache = _alpm_pkghash_create(100)
@@ -267,7 +279,7 @@ static void *thread_write_files(void *data)
 {
     struct repo *repo = data;
     printf("writing %s...\n", repo->filesname);
-    write_db(repo, repo->filesname, DB_FILES);
+    write_db(repo, repo->filesname, DB_FILES, repo->poolfd);
     return NULL;
 }
 
@@ -285,15 +297,11 @@ int main(int argc, char *argv[])
 
     load_repo(&repo, dbname);
 
-    _cleanup_close_ int poolfd = open(pool, O_RDONLY | O_DIRECTORY);
-    if (poolfd < 0)
-        err(EXIT_FAILURE, "failed to open pool directory %s", pool);
-
-    alpm_pkghash_t *pkgcache = get_filecache(poolfd, files);
+    alpm_pkghash_t *pkgcache = get_filecache(repo.poolfd, files);
     if (!pkgcache)
         err(EXIT_FAILURE, "failed to get filecache");
 
-    reduce_database(poolfd, &repo.filecache);
+    reduce_database(repo.poolfd, &repo.filecache);
 
     if (merge_database(pkgcache, &repo.filecache))
         repo.state = REPO_DIRTY;
@@ -314,7 +322,7 @@ int main(int argc, char *argv[])
         }
 
         printf("writing %s...\n", repo.dbname);
-        write_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
+        write_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS, repo.poolfd);
 
         if (files)
             pthread_join(worker, NULL);
