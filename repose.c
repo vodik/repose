@@ -6,7 +6,6 @@
 #include <getopt.h>
 #include <archive.h>
 #include <archive_entry.h>
-#include <pthread.h>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -275,19 +274,10 @@ static bool merge_database(alpm_pkghash_t *pkgcache, alpm_pkghash_t **filecache)
  * - minimal stdout
  */
 
-static void *thread_write_files(void *data)
-{
-    struct repo *repo = data;
-    printf("writing %s...\n", repo->filesname);
-    write_db(repo, repo->filesname, DB_FILES, repo->poolfd);
-    return NULL;
-}
-
 int main(int argc, char *argv[])
 {
     struct repo repo;
     const char *dbname;
-    pthread_t worker;
 
     parse_args(&argc, &argv);
     dbname = argv[0];
@@ -316,16 +306,15 @@ int main(int argc, char *argv[])
     case REPO_DIRTY:
         colon_printf("Writing databases to disk...\n");
 
-        if (files) {
-            if (pthread_create(&worker, NULL, thread_write_files, &repo) < 0)
-                err(EXIT_FAILURE, "failed to create worker thread");
-        }
-
         printf("writing %s...\n", repo.dbname);
         write_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS, repo.poolfd);
 
-        if (files)
-            pthread_join(worker, NULL);
+        if (files) {
+            printf("writing %s...\n", repo.filesname);
+            write_db(&repo, repo.filesname, DB_FILES, repo.poolfd);
+        }
+
+        printf("repo updated successfully\n");
         break;
     default:
         break;
