@@ -309,6 +309,18 @@ static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest)
  * - minimal stdout
  */
 
+static alpm_list_t *parse_targets(char *targets[], int count)
+{
+    alpm_list_t *list = NULL;
+    int i;
+
+    for (i = 0; i < count; ++i) {
+        list = alpm_list_add(list, targets[i]);
+    }
+
+    return list;
+}
+
 int main(int argc, char *argv[])
 {
     const char *rootname;
@@ -316,12 +328,14 @@ int main(int argc, char *argv[])
     parse_args(&argc, &argv);
     rootname = argv[0];
 
-    if (argc != 1)
+    if (argc == 0)
         errx(1, "incorrect number of arguments provided");
+
+    alpm_list_t *targets = parse_targets(argv + 1, argc - 1);
 
     load_repo(rootname);
 
-    alpm_pkghash_t *pkgcache = get_filecache(poolfd);
+    alpm_pkghash_t *pkgcache = get_filecache(poolfd, targets);
     if (!pkgcache)
         err(EXIT_FAILURE, "failed to get filecache");
 

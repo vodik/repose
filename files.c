@@ -118,13 +118,13 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
     return cache;
 }
 
-alpm_pkghash_t *get_filecache(int dirfd)
+alpm_pkghash_t *get_filecache(int dirfd, alpm_list_t *targets)
 {
     int dupfd = dup(dirfd);
     if (dupfd < 0)
         err(EXIT_FAILURE, "failed to duplicate fd");
 
-    if (lseek (dupfd, 0, SEEK_SET) < 0)
+    if (lseek(dupfd, 0, SEEK_SET) < 0)
         err(EXIT_FAILURE, "failed to lseek");
 
     _cleanup_closedir_ DIR *dirp = fdopendir(dupfd);
@@ -134,5 +134,5 @@ alpm_pkghash_t *get_filecache(int dirfd)
     size_t size = filecache_size(dirp);
     alpm_pkghash_t *cache = _alpm_pkghash_create(size);
 
-    return scan_for_targets(cache, dirfd, dirp, NULL);
+    return scan_for_targets(cache, dirfd, dirp, targets);
 }
