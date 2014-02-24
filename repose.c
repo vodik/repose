@@ -18,8 +18,17 @@
 #include "pkghash.h"
 #include <alpm_list.h>
 
+enum state {
+    REPO_NEW,
+    REPO_CLEAN,
+    REPO_DIRTY
+};
+
+static enum state state = REPO_NEW;
+static const char *dbname = NULL, *filesname = NULL;
+static alpm_pkghash_t *filecache = NULL;
+static int rootfd, poolfd;
 static bool rebuild = false, files = false;
-static const char *pool = ".", *root = ".";
 static int compression = ARCHIVE_COMPRESSION_NONE;
 
 static _printf_(1,2) void colon_printf(const char *fmt, ...)
@@ -56,6 +65,8 @@ static _noreturn_ void usage(FILE *out)
 
 static void parse_args(int *argc, char **argv[])
 {
+    char *root = ".", *pool = NULL;
+
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
         { "version",  no_argument,       0, 'v' },
@@ -111,58 +122,10 @@ static void parse_args(int *argc, char **argv[])
 
     *argc -= optind;
     *argv += optind;
-}
 
-enum state {
-    REPO_NEW,
-    REPO_CLEAN,
-    REPO_DIRTY
-};
-
-struct repo {
-    int rootfd;
-    int poolfd;
-    enum state state;
-    const char *dbname;
-    const char *filesname;
-    alpm_pkghash_t *filecache;
-};
-
-static int load_db(struct repo *repo, const char *dbname)
-{
-    _cleanup_close_ int dbfd = openat(repo->rootfd, dbname, O_RDONLY);
-    if (dbfd < 0) {
-        if (errno != ENOENT)
-            err(EXIT_FAILURE, "failed to open database %s", repo->dbname);
-        return -1;
-    } else if (load_database(dbfd, &repo->filecache) < 0) {
-        warn("failed to open %s database", dbname);
-    } else {
-        repo->state = REPO_CLEAN;
-    }
-
-    return 0;
-}
-
-static int write_db(struct repo *repo, const char *dbname, int what, int poolfd)
-{
-    _cleanup_close_ int dbfd = openat(repo->rootfd, dbname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (dbfd < 0)
-        err(EXIT_FAILURE, "failed to open %s for writing", dbname);
-
-    if (save_database(dbfd, repo->filecache, what, compression, poolfd) < 0)
-        err(EXIT_FAILURE, "failed to write %s", dbname);
-
-    return 0;
-}
-
-static int load_repo(struct repo *repo, const char *dbname)
-{
-    int rootfd = open(root, O_RDONLY | O_DIRECTORY);
+    rootfd = open(root, O_RDONLY | O_DIRECTORY);
     if (rootfd < 0)
         err(EXIT_FAILURE, "failed to open root directory %s", root);
-
-    int poolfd;
 
     if (pool) {
         poolfd = open(pool, O_RDONLY | O_DIRECTORY);
@@ -172,20 +135,47 @@ static int load_repo(struct repo *repo, const char *dbname)
         poolfd = rootfd;
     }
 
-    *repo = (struct repo){
-        .state     = REPO_NEW,
-        .rootfd    = rootfd,
-        .poolfd    = poolfd,
-        .dbname    = joinstring(dbname, ".db", NULL),
-        .filesname = joinstring(dbname, ".files", NULL),
-        .filecache = _alpm_pkghash_create(100)
-    };
+}
+
+static int load_db(const char *name)
+{
+    _cleanup_close_ int dbfd = openat(rootfd, name, O_RDONLY);
+    if (dbfd < 0) {
+        if (errno != ENOENT)
+            err(EXIT_FAILURE, "failed to open database %s", name);
+        return -1;
+    } else if (load_database(dbfd, &filecache) < 0) {
+        warn("failed to open %s database", name);
+    } else {
+        state = REPO_CLEAN;
+    }
+
+    return 0;
+}
+
+static int write_db(const char *name, int what)
+{
+    _cleanup_close_ int dbfd = openat(rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (dbfd < 0)
+        err(EXIT_FAILURE, "failed to open %s for writing", name);
+
+    if (save_database(dbfd, filecache, what, compression, poolfd) < 0)
+        err(EXIT_FAILURE, "failed to write %s", name);
+
+    return 0;
+}
+
+static int load_repo(const char *rootname)
+{
+    dbname    = joinstring(rootname, ".db", NULL);
+    filesname = joinstring(rootname, ".files", NULL);
+    filecache = _alpm_pkghash_create(100);
 
     if (rebuild)
         return 0;
 
-    load_db(repo, repo->dbname);
-    if (load_db(repo, repo->filesname) == 0)
+    load_db(dbname);
+    if (load_db(filesname) == 0)
         files = true;
 
     return 0;
@@ -198,18 +188,18 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struc
     return _alpm_pkghash_add(cache, new);
 }
 
-static int reduce_database(int dirfd, alpm_pkghash_t **filecache)
+static int reduce_database(int dirfd, alpm_pkghash_t **cache)
 {
     alpm_list_t *node;
 
-    for (node = (*filecache)->list; node; node = node->next) {
+    for (node = (*cache)->list; node; node = node->next) {
         struct pkg *pkg = node->data;
 
         if (faccessat(dirfd, pkg->filename, F_OK, 0) < 0) {
             if (errno != ENOENT)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
             printf("dropping %s\n", pkg->name);
-            *filecache = _alpm_pkghash_remove(*filecache, pkg, NULL);
+            *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
             package_free(pkg);
             continue;
         }
@@ -218,21 +208,21 @@ static int reduce_database(int dirfd, alpm_pkghash_t **filecache)
     return 0;
 }
 
-static bool merge_database(alpm_pkghash_t *pkgcache, alpm_pkghash_t **filecache)
+static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest)
 {
     alpm_list_t *node;
     bool dirty = false;
 
-    for (node = pkgcache->list; node; node = node->next) {
+    for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
-        struct pkg *old = _alpm_pkghash_find(*filecache, pkg->name);
+        struct pkg *old = _alpm_pkghash_find(*dest, pkg->name);
         bool replace = false;
         int vercmp;
 
         /* if the package isn't in the cache, add it */
         if (!old) {
             printf("adding %s %s\n", pkg->name, pkg->version);
-            *filecache = _alpm_pkghash_add(*filecache, pkg);
+            *dest = _alpm_pkghash_add(*dest, pkg);
             dirty = true;
             continue;
         }
@@ -258,7 +248,7 @@ static bool merge_database(alpm_pkghash_t *pkgcache, alpm_pkghash_t **filecache)
         }
 
         if (replace) {
-            *filecache = _alpm_pkghash_replace(*filecache, pkg, old);
+            *dest = _alpm_pkghash_replace(*dest, pkg, old);
             package_free(old);
             dirty = true;
         }
@@ -276,27 +266,26 @@ static bool merge_database(alpm_pkghash_t *pkgcache, alpm_pkghash_t **filecache)
 
 int main(int argc, char *argv[])
 {
-    struct repo repo;
-    const char *dbname;
+    const char *rootname;
 
     parse_args(&argc, &argv);
-    dbname = argv[0];
+    rootname = argv[0];
 
     if (argc != 1)
         errx(1, "incorrect number of arguments provided");
 
-    load_repo(&repo, dbname);
+    load_repo(rootname);
 
-    alpm_pkghash_t *pkgcache = get_filecache(repo.poolfd);
+    alpm_pkghash_t *pkgcache = get_filecache(poolfd);
     if (!pkgcache)
         err(EXIT_FAILURE, "failed to get filecache");
 
-    reduce_database(repo.poolfd, &repo.filecache);
+    reduce_database(poolfd, &filecache);
 
-    if (merge_database(pkgcache, &repo.filecache))
-        repo.state = REPO_DIRTY;
+    if (merge_database(pkgcache, &filecache))
+        state = REPO_DIRTY;
 
-    switch (repo.state) {
+    switch (state) {
     case REPO_NEW:
         printf("repo empty!\n");
         return 1;
@@ -306,12 +295,12 @@ int main(int argc, char *argv[])
     case REPO_DIRTY:
         colon_printf("Writing databases to disk...\n");
 
-        printf("writing %s...\n", repo.dbname);
-        write_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS, repo.poolfd);
+        printf("writing %s...\n", dbname);
+        write_db(dbname, DB_DESC | DB_DEPENDS);
 
         if (files) {
-            printf("writing %s...\n", repo.filesname);
-            write_db(&repo, repo.filesname, DB_FILES, repo.poolfd);
+            printf("writing %s...\n", filesname);
+            write_db(filesname, DB_FILES);
         }
 
         printf("repo updated successfully\n");
