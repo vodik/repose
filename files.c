@@ -79,17 +79,8 @@ static struct pkg *load_pkg(int dirfd, const char *filename)
     /*     /1* alpm_pkg_free_metadata(pkg); *1/ */
     /*     return NULL; */
     /* } */
+
     pkg->filename = strdup(filename);
-
-    /* safe_asprintf(&pkg->signame, "%s.sig", filename); */
-
-    /* sigfd = openat(repo->poolfd, pkg->signame, O_RDONLY); */
-    /* if (sigfd < 0) { */
-    /*     if (errno != ENOENT) */
-    /*         err(EXIT_FAILURE, "failed to open %s", pkg->signame); */
-    /* } else { */
-    /*     read_pkg_signature(sigfd, pkg); */
-    /* } */
 
     return pkg;
 }
