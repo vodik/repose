@@ -17,17 +17,19 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _ALPM_PKGHASH_H
-#define _ALPM_PKGHASH_H
+#pragma once
 
 #include <stdlib.h>
 
 #include <alpm.h>
 #include <alpm_list.h>
-#include "alpm_metadata.h"
+#include "package.h"
+/* #include "alpm_metadata.h" */
+
+typedef struct __alpm_pkghash_t alpm_pkghash_t;
 
 /**
- * @brief A hash table for holding alpm_pkg_meta_t objects.
+ * @brief A hash table for holding struct pkg objects.
  *
  * A combination of a hash table and a list, allowing for fast look-up
  * by package name but also iteration over the packages.
@@ -45,18 +47,14 @@ struct __alpm_pkghash_t {
 	unsigned int limit;
 };
 
-/* typedef struct __alpm_pkghash_t alpm_pkghash_t; */
-
 unsigned long _alpm_hash_sdbm(const char *str);
 
 alpm_pkghash_t *_alpm_pkghash_create(unsigned int size);
 
-alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg);
-alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg);
-alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg, alpm_pkg_meta_t **data);
+alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, struct pkg *pkg);
+alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, struct pkg *pkg);
+alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, struct pkg *pkg, struct pkg **data);
 
 void _alpm_pkghash_free(alpm_pkghash_t *hash);
 
-alpm_pkg_meta_t *_alpm_pkghash_find(alpm_pkghash_t *hash, const char *name);
-
-#endif /* _ALPM_PKGHASH_H */
+struct pkg *_alpm_pkghash_find(alpm_pkghash_t *hash, const char *name);

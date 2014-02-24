@@ -20,7 +20,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "alpm_metadata.h"
+/* #include "alpm_metadata.h" */
 #include "pkghash.h"
 /* #include "util.h" */
 
@@ -41,8 +41,8 @@ unsigned long _alpm_hash_sdbm(const char *str)
 
 static int _alpm_pkg_cmp(const void *p1, const void *p2)
 {
-	const alpm_pkg_meta_t *pkg1 = p1;
-	const alpm_pkg_meta_t *pkg2 = p2;
+	const struct pkg *pkg1 = p1;
+	const struct pkg *pkg2 = p2;
 	return strcmp(pkg1->name, pkg2->name);
 }
 
@@ -173,7 +173,7 @@ static alpm_pkghash_t *rehash(alpm_pkghash_t *oldhash)
 
 	for(i = 0; i < oldhash->buckets; i++) {
 		if(oldhash->hash_table[i] != NULL) {
-			alpm_pkg_meta_t *package = oldhash->hash_table[i]->data;
+			struct pkg *package = oldhash->hash_table[i]->data;
 			unsigned int position = get_hash_position(package->name_hash, newhash);
 
 			newhash->hash_table[position] = oldhash->hash_table[i];
@@ -188,7 +188,7 @@ static alpm_pkghash_t *rehash(alpm_pkghash_t *oldhash)
 	return newhash;
 }
 
-static alpm_pkghash_t *pkghash_add_pkg(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg,
+static alpm_pkghash_t *pkghash_add_pkg(alpm_pkghash_t *hash, struct pkg *pkg,
 		int sorted)
 {
 	alpm_list_t *ptr;
@@ -224,12 +224,12 @@ static alpm_pkghash_t *pkghash_add_pkg(alpm_pkghash_t *hash, alpm_pkg_meta_t *pk
 	return hash;
 }
 
-alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg)
+alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, struct pkg *pkg)
 {
 	return pkghash_add_pkg(hash, pkg, 0);
 }
 
-alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg)
+alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, struct pkg *pkg)
 {
 	return pkghash_add_pkg(hash, pkg, 1);
 }
@@ -246,7 +246,7 @@ static unsigned int move_one_entry(alpm_pkghash_t *hash,
 	 * 'start' we can stop this madness. */
 	while(end != start) {
 		alpm_list_t *i = hash->hash_table[end];
-		alpm_pkg_meta_t *info = i->data;
+		struct pkg *info = i->data;
 		unsigned int new_position = get_hash_position(info->name_hash, hash);
 
 		if(new_position == start) {
@@ -272,8 +272,8 @@ static unsigned int move_one_entry(alpm_pkghash_t *hash,
  *
  * @return the resultant hash
  */
-alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg,
-		alpm_pkg_meta_t **data)
+alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, struct pkg *pkg,
+		struct pkg **data)
 {
 	alpm_list_t *i;
 	unsigned int position;
@@ -288,7 +288,7 @@ alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, alpm_pkg_meta_t *pkg,
 
 	position = pkg->name_hash % hash->buckets;
 	while((i = hash->hash_table[position]) != NULL) {
-		alpm_pkg_meta_t *info = i->data;
+		struct pkg *info = i->data;
 
 		if(info->name_hash == pkg->name_hash &&
 					strcmp(info->name, pkg->name) == 0) {
@@ -350,7 +350,7 @@ void _alpm_pkghash_free(alpm_pkghash_t *hash)
 	free(hash);
 }
 
-alpm_pkg_meta_t *_alpm_pkghash_find(alpm_pkghash_t *hash, const char *name)
+struct pkg *_alpm_pkghash_find(alpm_pkghash_t *hash, const char *name)
 {
 	alpm_list_t *lp;
 	unsigned long name_hash;
@@ -365,7 +365,7 @@ alpm_pkg_meta_t *_alpm_pkghash_find(alpm_pkghash_t *hash, const char *name)
 	position = name_hash % hash->buckets;
 
 	while((lp = hash->hash_table[position]) != NULL) {
-		alpm_pkg_meta_t *info = lp->data;
+		struct pkg *info = lp->data;
 
 		if(info->name_hash == name_hash && strcmp(info->name, name) == 0) {
 			return info;

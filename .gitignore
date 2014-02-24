@@ -1,0 +1,6 @@
+/repose
+*.o
+*.db
+*.files
+*.pyc
+__pycache__/

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "repose.h"
-#include "alpm/pkghash.h"
+#include "pkghash.h"
 
 enum contents {
     DB_DESC    = 1,
@@ -9,7 +8,5 @@ enum contents {
     DB_FILES   = 1 << 3
 };
 
-void compile_database(repo_t *repo, file_t *db, int contents);
-int load_database(repo_t *repo, file_t *db);
-void sign_database(repo_t *repo, file_t *db, const char *key);
-void repo_database_reduce(repo_t *repo);
+int load_database(int fd, alpm_pkghash_t **pkgcache);
+int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression, int poolfd);
