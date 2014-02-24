@@ -35,5 +35,6 @@ typedef struct pkg {
 } pkg_t;
 
 int load_package(pkg_t *pkg, int fd);
+int load_package_signature(struct pkg *pkg, int fd);
 int load_package_files(pkg_t *pkg, int fd);
 void package_free(pkg_t *pkg);

@@ -7,11 +7,14 @@
 #include <err.h>
 #include <archive.h>
 #include <archive_entry.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "memblock.h"
 #include "util.h"
 #include "reader.h"
 #include "pkghash.h"
+#include "base64.h"
 
 static void pkginfo_assignment(const char *key, const char *value, pkg_t *pkg)
 {
@@ -111,6 +114,25 @@ int load_package(pkg_t *pkg, int fd)
     pkg->size = memblock.len;
     pkg->name_hash = _alpm_hash_sdbm(pkg->name);
 
+    return 0;
+}
+
+int load_package_signature(struct pkg *pkg, int dirfd)
+{
+    struct memblock_t memblock;
+    _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
+    _cleanup_close_ int fd = openat(dirfd, signame, O_RDONLY);
+
+    if (fd < 0)
+        return -1;
+
+    if (memblock_open_fd(&memblock, fd) < 0)
+        return -1;
+
+    base64_encode((unsigned char **)&pkg->base64sig,
+                  (const unsigned char *)memblock.mem, memblock.len);
+
+    memblock_close(&memblock);
     return 0;
 }
 
