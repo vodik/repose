@@ -19,6 +19,7 @@
 #include "pkghash.h"
 #include <alpm_list.h>
 #include <sys/utsname.h>
+#include "filters.h"
 
 enum state {
     REPO_NEW,
@@ -26,6 +27,7 @@ enum state {
     REPO_DIRTY
 };
 
+static bool drop = false;
 static enum state state = REPO_NEW;
 static const char *dbname = NULL, *filesname = NULL, *arch = NULL;
 static alpm_pkghash_t *filecache = NULL;
@@ -115,6 +117,7 @@ static void parse_args(int *argc, char **argv[])
         { "help",     no_argument,       0, 'h' },
         { "version",  no_argument,       0, 'v' },
         { "files",    no_argument,       0, 'f' },
+        { "drop",     no_argument,       0, 'd' },
         { "root",     required_argument, 0, 'r' },
         { "pool",     required_argument, 0, 'p' },
         { "arch",     required_argument, 0, 'm' },
@@ -128,7 +131,7 @@ static void parse_args(int *argc, char **argv[])
     };
 
     for (;;) {
-        int opt = getopt_long(*argc, *argv, "hvfr:p:m:jJzZ", opts, NULL);
+        int opt = getopt_long(*argc, *argv, "hvfdr:p:m:jJzZ", opts, NULL);
         if (opt < 0)
             break;
 
@@ -141,6 +144,9 @@ static void parse_args(int *argc, char **argv[])
             exit(EXIT_SUCCESS);
         case 'f':
             files = true;
+            break;
+        case 'd':
+            drop = true;
             break;
         case 'r':
             root = optarg;
@@ -257,11 +263,30 @@ static int reduce_database(int dirfd, alpm_pkghash_t **cache)
             printf("dropping %s\n", pkg->name);
             *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
             package_free(pkg);
-            continue;
+            state = REPO_DIRTY;
         }
     }
 
     return 0;
+}
+
+static void drop_from_database(alpm_pkghash_t **cache, alpm_list_t *targets)
+{
+    alpm_list_t *node;
+
+    if (!targets)
+        return;
+
+    for (node = (*cache)->list; node; node = node->next) {
+        struct pkg *pkg = node->data;
+
+        if (match_targets(pkg, targets)) {
+            printf("dropping %s\n", pkg->name);
+            *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
+            package_free(pkg);
+            state = REPO_DIRTY;
+        }
+    }
 }
 
 static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest)
@@ -346,14 +371,18 @@ int main(int argc, char *argv[])
 
     load_repo(rootname);
 
-    alpm_pkghash_t *pkgcache = get_filecache(poolfd, targets, arch);
-    if (!pkgcache)
-        err(EXIT_FAILURE, "failed to get filecache");
+    if (drop) {
+        drop_from_database(&filecache, targets);
+    } else {
+        alpm_pkghash_t *pkgcache = get_filecache(poolfd, targets, arch);
+        if (!pkgcache)
+            err(EXIT_FAILURE, "failed to get filecache");
 
-    reduce_database(poolfd, &filecache);
+        reduce_database(poolfd, &filecache);
 
-    if (merge_database(pkgcache, &filecache))
-        state = REPO_DIRTY;
+        if (merge_database(pkgcache, &filecache))
+            state = REPO_DIRTY;
+    }
 
     switch (state) {
     case REPO_NEW:

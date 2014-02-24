@@ -9,6 +9,7 @@
 #include <fnmatch.h>
 
 #include "pkghash.h"
+#include "filters.h"
 #include "util.h"
 
 static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pkg)
@@ -39,28 +40,6 @@ static size_t filecache_size(DIR *dirp)
 
     rewinddir(dirp);
     return size;
-}
-
-static bool match_target_r(struct pkg *pkg, const char *target, const char *fullname)
-{
-    if (streq(target, pkg->filename))
-        return true;
-    else if (streq(target, pkg->name))
-        return true;
-    return fnmatch(target, fullname, 0) == 0;
-}
-
-static bool match_targets(struct pkg *pkg, alpm_list_t *targets)
-{
-    const alpm_list_t *node;
-    bool ret = false;
-
-    _cleanup_free_ char *fullname = joinstring(pkg->name, "-", pkg->version, NULL);
-
-    for (node = targets; node && !ret; node = node->next)
-        ret = match_target_r(pkg, node->data, fullname);
-
-    return ret;
 }
 
 static struct pkg *load_pkg(int dirfd, const char *filename, const char *arch)
