@@ -12,7 +12,7 @@ CFLAGS := -std=c99 \
 	-DREPOSE_VERSION=\"$(VERSION)\" \
 	$(CFLAGS)
 
-LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl -lpthread -tcmalloc
+LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl -lpthread
 PREFIX = /usr
 
 all: repose
