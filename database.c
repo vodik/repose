@@ -131,19 +131,18 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
     struct db_entry e;
 
     if (parse_db_entry(pathname, &e) < 0)
-        return;
+        goto cleanup;
 
-    if (e.type == NULL)
-        return;
+    if (e.type) {
+        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, &_likely_pkg);
+        if (pkg == NULL)
+            goto cleanup;
 
-    struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, &_likely_pkg);
-    if (pkg == NULL)
-        return;
+        if (streq(e.type, "desc") || streq(e.type, "depends") || streq(e.type, "files"))
+            read_desc(archive, pkg);
+    }
 
-    /* if (streq(e.type, "desc")) */
-    if (streq(e.type, "desc") || streq(e.type, "depends") || streq(e.type, "files"))
-        read_desc(archive, pkg);
-
+cleanup:
     free(e.name);
 }
 
