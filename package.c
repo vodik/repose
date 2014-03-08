@@ -101,7 +101,7 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
 
 int load_package(pkg_t *pkg, int fd)
 {
-    struct archive *archive = archive_read_new();
+    _cleanup_archive_read_ struct archive *archive = archive_read_new();
     struct memblock_t memblock;
 
     if (memblock_open_fd(&memblock, fd) < 0) {
@@ -155,7 +155,7 @@ int load_package_signature(struct pkg *pkg, int dirfd)
 
 int load_package_files(struct pkg *pkg, int fd)
 {
-    struct archive *archive = archive_read_new();
+    _cleanup_archive_read_ struct archive *archive = archive_read_new();
     struct memblock_t memblock;
 
     if (memblock_open_fd(&memblock, fd) < 0) {

@@ -162,6 +162,9 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
             db_read_pkg(pkgcache, db.archive, entry);
     }
 
+    archive_read_close(db.archive);
+    archive_read_free(db.archive);
+
     return 0;
 }
 

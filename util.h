@@ -38,7 +38,9 @@ static inline void fclosep(FILE **fp)  { if (*fp) fclose(*fp); }
 static inline void closedirp(DIR **dp) { if (*dp) closedir(*dp); }
 static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 
-static inline void archive_freep(struct archive **archive) {
+#define _cleanup_archive_read_ _cleanup_(archive_read_freep)
+
+static inline void archive_read_freep(struct archive **archive) {
     if (*archive) {
         archive_read_close(*archive);
         archive_read_free(*archive);
