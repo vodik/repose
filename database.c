@@ -95,15 +95,15 @@ static int parse_db_entry(const char *entryname, struct db_entry *entry)
 }
 
 static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry *e,
-                                      struct pkg **likely_pkg)
+                                      struct pkg *likely_pkg)
 {
     struct pkg *pkg;
 
-    if (likely_pkg && *likely_pkg) {
+    if (likely_pkg) {
         unsigned long pkgname_hash = _alpm_hash_sdbm(e->name);
 
-        if (pkgname_hash == (*likely_pkg)->name_hash && streq((*likely_pkg)->name, e->name))
-            return *likely_pkg;
+        if (pkgname_hash == likely_pkg->name_hash && streq(likely_pkg->name, e->name))
+            return likely_pkg;
     }
 
     pkg = _alpm_pkghash_find(*pkgcache, e->name);
@@ -120,7 +120,6 @@ static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry
         *pkgcache = _alpm_pkghash_add_sorted(*pkgcache, pkg);
     }
 
-    *likely_pkg = pkg;
     return pkg;
 }
 
@@ -134,12 +133,14 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
         goto cleanup;
 
     if (e.type) {
-        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, &_likely_pkg);
+        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, _likely_pkg);
         if (pkg == NULL)
             goto cleanup;
 
         if (streq(e.type, "desc") || streq(e.type, "depends") || streq(e.type, "files"))
             read_desc(archive, pkg);
+
+        _likely_pkg = pkg;
     }
 
 cleanup:
