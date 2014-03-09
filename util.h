@@ -38,15 +38,6 @@ static inline void fclosep(FILE **fp)  { if (*fp) fclose(*fp); }
 static inline void closedirp(DIR **dp) { if (*dp) closedir(*dp); }
 static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 
-#define _cleanup_archive_read_ _cleanup_(archive_read_freep)
-
-static inline void archive_read_freep(struct archive **archive) {
-    if (*archive) {
-        archive_read_close(*archive);
-        archive_read_free(*archive);
-    }
-}
-
 static inline void *zero(void *s, size_t n) { return memset(s, 0, n); }
 static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2) == 0; }
 

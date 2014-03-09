@@ -23,7 +23,6 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <err.h>
-#include <fnmatch.h>
 
 #include "pkghash.h"
 #include "filters.h"
@@ -90,10 +89,6 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
 
     while ((dp = readdir(dirp))) {
         if (!(dp->d_type & DT_REG))
-            continue;
-
-        if (fnmatch("*.pkg.tar*", dp->d_name, FNM_CASEFOLD) != 0 ||
-            fnmatch("*.sig",      dp->d_name, FNM_CASEFOLD) == 0)
             continue;
 
         struct pkg *pkg = load_pkg(dirfd, dp->d_name, arch);

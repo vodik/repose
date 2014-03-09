@@ -101,7 +101,7 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
 
 int load_package(pkg_t *pkg, int fd)
 {
-    _cleanup_archive_read_ struct archive *archive = archive_read_new();
+    struct archive *archive = archive_read_new();
     struct memblock_t memblock;
 
     if (memblock_open_fd(&memblock, fd) < 0) {
@@ -128,6 +128,9 @@ int load_package(pkg_t *pkg, int fd)
             found_pkginfo = true;
         }
     }
+
+    archive_read_close(archive);
+    archive_read_free(archive);
 
     if (found_pkginfo) {
         pkg->size = memblock.len;
@@ -159,7 +162,7 @@ int load_package_signature(struct pkg *pkg, int dirfd)
 
 int load_package_files(struct pkg *pkg, int fd)
 {
-    _cleanup_archive_read_ struct archive *archive = archive_read_new();
+    struct archive *archive = archive_read_new();
     struct memblock_t memblock;
 
     if (memblock_open_fd(&memblock, fd) < 0) {
@@ -182,6 +185,9 @@ int load_package_files(struct pkg *pkg, int fd)
         if (!streq(entry_name, ".PKGINFO") || !streq(entry_name, ".MTREE"))
             pkg->files = alpm_list_add(pkg->files, strdup(entry_name));
     }
+
+    archive_read_close(archive);
+    archive_read_free(archive);
 
     return 0;
 }
