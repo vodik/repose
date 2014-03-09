@@ -71,7 +71,7 @@ static struct pkg *load_pkg(int dirfd, const char *filename, const char *arch)
 
     load_package(pkg, pkgfd);
 
-    if (arch && !streq(pkg->arch, arch) && !streq(pkg->arch, "any")) {
+    if (arch && pkg->arch && !streq(pkg->arch, arch) && !streq(pkg->arch, "any")) {
         package_free(pkg);
         return NULL;
     }
