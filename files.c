@@ -69,16 +69,18 @@ static struct pkg *load_pkg(int dirfd, const char *filename, const char *arch)
     struct pkg *pkg = malloc(sizeof(pkg_t));
     zero(pkg, sizeof(pkg_t));
 
-    load_package(pkg, pkgfd);
+    if (load_package(pkg, pkgfd) < 0)
+        goto error;
 
-    if (arch && pkg->arch && !streq(pkg->arch, arch) && !streq(pkg->arch, "any")) {
-        package_free(pkg);
-        return NULL;
-    }
+    if (arch && pkg->arch && !streq(pkg->arch, arch) && !streq(pkg->arch, "any"))
+        goto error;
 
     pkg->filename = strdup(filename);
-
     return pkg;
+
+error:
+    package_free(pkg);
+    return NULL;
 }
 
 static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *dirp,

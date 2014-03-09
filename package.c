@@ -117,21 +117,25 @@ int load_package(pkg_t *pkg, int fd)
         return -1;
     }
 
+    bool found_pkginfo = false;
     struct archive_entry *entry;
-    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
+    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK && !found_pkginfo) {
         const char *entry_name = archive_entry_pathname(entry);
         const mode_t mode = archive_entry_mode(entry);
 
         if (S_ISREG(mode) && streq(entry_name, ".PKGINFO")) {
             read_pkginfo(archive, pkg);
-            break;
+            found_pkginfo = true;
         }
     }
 
-    pkg->size = memblock.len;
-    pkg->name_hash = _alpm_hash_sdbm(pkg->name);
+    if (found_pkginfo) {
+        pkg->size = memblock.len;
+        pkg->name_hash = _alpm_hash_sdbm(pkg->name);
+        return 0;
+    }
 
-    return 0;
+    return -1;
 }
 
 int load_package_signature(struct pkg *pkg, int dirfd)
