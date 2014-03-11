@@ -53,6 +53,8 @@ static bool rebuild = false, files = false;
 static int compression = ARCHIVE_COMPRESSION_NONE;
 static struct utsname uts;
 
+static char *pool = NULL;
+
 static _printf_(1,2) void colon_printf(const char *fmt, ...)
 {
     va_list args;
@@ -128,7 +130,7 @@ static _noreturn_ void elephant(void)
 
 static void parse_args(int *argc, char **argv[])
 {
-    char *root = ".", *pool = NULL;
+    char *root = ".";
 
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
@@ -242,6 +244,22 @@ static int write_db(const char *name, int what)
         err(EXIT_FAILURE, "failed to write %s", name);
 
     return 0;
+}
+
+static void link_db(void)
+{
+    alpm_list_t *node;
+
+    if (!pool)
+        return;
+
+    for (node = filecache->list; node; node = node->next) {
+        struct pkg *pkg = node->data;
+
+        _cleanup_free_ char *link = joinstring(pool, "/", pkg->filename, NULL);
+        if (symlinkat(link, rootfd, pkg->filename) < 0)
+            warn("failed to make symlink to %s", link);
+    }
 }
 
 static int load_repo(const char *rootname)
@@ -364,12 +382,11 @@ static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest)
 
 static alpm_list_t *parse_targets(char *targets[], int count)
 {
-    alpm_list_t *list = NULL;
     int i;
+    alpm_list_t *list = NULL;
 
-    for (i = 0; i < count; ++i) {
+    for (i = 0; i < count; ++i)
         list = alpm_list_add(list, targets[i]);
-    }
 
     return list;
 }
@@ -413,6 +430,7 @@ int main(int argc, char *argv[])
 
         printf("writing %s...\n", dbname);
         write_db(dbname, DB_DESC | DB_DEPENDS);
+        link_db();
 
         if (files) {
             printf("writing %s...\n", filesname);
