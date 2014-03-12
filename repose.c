@@ -376,6 +376,7 @@ static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest)
 
         if (replace) {
             *dest = _alpm_pkghash_replace(*dest, pkg, old);
+            delete_link(pkg, rootfd);
             package_free(old);
             dirty = true;
         }
