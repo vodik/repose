@@ -131,8 +131,6 @@ static _noreturn_ void elephant(void)
 
 static void parse_args(int *argc, char **argv[])
 {
-    char *root = ".";
-
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
         { "version",  no_argument,       0, 'v' },
@@ -169,7 +167,9 @@ static void parse_args(int *argc, char **argv[])
             drop = true;
             break;
         case 'r':
-            root = optarg;
+            rootfd = open(optarg, O_RDONLY | O_DIRECTORY);
+            if (rootfd < 0)
+                err(EXIT_FAILURE, "failed to open root directory %s", optarg);
             break;
         case 'p':
             pool = optarg;
@@ -200,10 +200,6 @@ static void parse_args(int *argc, char **argv[])
 
     *argc -= optind;
     *argv += optind;
-
-    rootfd = open(root, O_RDONLY | O_DIRECTORY);
-    if (rootfd < 0)
-        err(EXIT_FAILURE, "failed to open root directory %s", root);
 
     if (pool) {
         poolfd = open(pool, O_RDONLY | O_DIRECTORY);
