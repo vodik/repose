@@ -4,14 +4,14 @@ _arguments -s \
   {-h,--help}'[display this help and exit]' \
   {-v,--version}'[display version]' \
   {-f,--files}'[generate complementing files database]' \
-  {-d,--drop}'[drop package from database]' \
-  {-r,--root=-}'[repository root directory]' \
+  {-d,--drop}'[drop package from database]:packages:_files -g "*.pkg.tar*~*.sig(.,@)"' \
+  {-r,--root=-}'[repository root directory]:root:_directories' \
   {-p,--pool=-}'[set the pool to find packages in it]:pool:_directories' \
-  {-a,--arch=-}'[the primary architecture of the database]:arch:(i686 x86_64)$
+  {-a,--arch=-}'[the primary architecture of the database]:arch:(i686 x86_64)' \
   {-j,--bzip2}'[compress the database with bzip2]' \
   {-J,--xz}'[compress the database with xz]' \
   {-z,--gzip}'[compress the database with gzip]' \
   {-Z,--compress}'[compress the database with LZ]' \
   '--rebuild[force rebuild the repo]' \
-  '1:database:_files -g "*.db*~(.,@)"' \
-  '*::package files:_files -g "*.pkg.tar*~(.,@)"'
+  '1:database:_files -g "*.db*~*.sig(.,@)(\:r)"' \
+  '*::packages:_files -g "*.pkg.tar*~*.sig(.,@)"'
