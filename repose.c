@@ -37,6 +37,7 @@
 #include <alpm_list.h>
 #include <sys/utsname.h>
 #include "filters.h"
+#include <sys/stat.h>
 
 enum state {
     REPO_NEW,
@@ -246,6 +247,23 @@ static int write_db(const char *name, int what)
     return 0;
 }
 
+static inline int make_link(const struct pkg *pkg, int dirfd, const char *source)
+{
+    _cleanup_free_ char *link = joinstring(source, "/", pkg->filename, NULL);
+    return symlinkat(link, dirfd, pkg->filename);
+}
+
+static inline int delete_link(const struct pkg *pkg, int dirfd)
+{
+    struct stat buf;
+    if (fstatat(dirfd, pkg->filename, &buf, AT_SYMLINK_NOFOLLOW) < 0)
+        return errno != ENOENT ? -1 : 0;
+
+    if (buf.st_mode & S_IFLNK)
+        return unlinkat(dirfd, pkg->filename, 0);
+    return 0;
+}
+
 static void link_db(void)
 {
     alpm_list_t *node;
@@ -253,13 +271,8 @@ static void link_db(void)
     if (!pool)
         return;
 
-    for (node = filecache->list; node; node = node->next) {
-        struct pkg *pkg = node->data;
-
-        _cleanup_free_ char *link = joinstring(pool, "/", pkg->filename, NULL);
-        if (symlinkat(link, rootfd, pkg->filename) < 0)
-            warn("failed to make symlink to %s", link);
-    }
+    for (node = filecache->list; node; node = node->next)
+        make_link(node->data, rootfd, pool);
 }
 
 static int load_repo(const char *rootname)
@@ -297,6 +310,7 @@ static int reduce_database(int dirfd, alpm_pkghash_t **cache)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
             printf("dropping %s\n", pkg->name);
             *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
+            delete_link(pkg, rootfd);
             package_free(pkg);
             state = REPO_DIRTY;
         }
@@ -318,6 +332,7 @@ static void drop_from_database(alpm_pkghash_t **cache, alpm_list_t *targets)
         if (match_targets(pkg, targets)) {
             printf("dropping %s\n", pkg->name);
             *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
+            delete_link(pkg, rootfd);
             package_free(pkg);
             state = REPO_DIRTY;
         }
