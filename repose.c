@@ -255,7 +255,7 @@ static inline int delete_link(const struct pkg *pkg, int dirfd)
     if (fstatat(dirfd, pkg->filename, &buf, AT_SYMLINK_NOFOLLOW) < 0)
         return errno != ENOENT ? -1 : 0;
 
-    if (buf.st_mode & S_IFLNK)
+    if (S_ISLNK(buf.st_mode))
         return unlinkat(dirfd, pkg->filename, 0);
     return 0;
 }
