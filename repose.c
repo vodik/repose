@@ -53,6 +53,7 @@ static int rootfd, poolfd;
 static bool rebuild = false, files = false;
 static int compression = ARCHIVE_COMPRESSION_NONE;
 static struct utsname uts;
+static bool make_compat = false;
 
 static char *pool = NULL;
 
@@ -145,7 +146,8 @@ static void parse_args(int *argc, char **argv[])
         { "gzip",     no_argument,       0, 'z' },
         { "compress", no_argument,       0, 'Z' },
         { "rebuild",  no_argument,       0, 0x100 },
-        { "elephant", no_argument,       0, 0x101 },
+        { "compat",   no_argument,       0, 0x101 },
+        { "elephant", no_argument,       0, 0x102 },
         { 0, 0, 0, 0 }
     };
 
@@ -192,6 +194,9 @@ static void parse_args(int *argc, char **argv[])
             rebuild = true;
             break;
         case 0x101:
+            make_compat = true;
+            break;
+        case 0x102:
             elephant();
             break;
         }
@@ -216,6 +221,26 @@ static void parse_args(int *argc, char **argv[])
         uname(&uts);
         arch = uts.machine;
     }
+}
+
+static inline int make_link(const struct pkg *pkg, int dirfd, const char *source)
+{
+    _cleanup_free_ char *link = joinstring(source, "/", pkg->filename, NULL);
+    return symlinkat(link, dirfd, pkg->filename);
+}
+
+static inline int compat_link(int rootdb, const char *reponame, int compression)
+{
+    static const char *ext[] = {
+        [ARCHIVE_FILTER_NONE]     = "",
+        [ARCHIVE_FILTER_BZIP2]    = ".bz2",
+        [ARCHIVE_FILTER_XZ]       = ".xz",
+        [ARCHIVE_FILTER_GZIP]     = ".gz",
+        [ARCHIVE_FILTER_COMPRESS] = ".Z"
+    };
+
+    _cleanup_free_ char *link = joinstring(reponame, ".tar", ext[compression], NULL);
+    return symlinkat(reponame, rootdb, link);
 }
 
 static int load_db(const char *name)
@@ -243,13 +268,12 @@ static int write_db(const char *name, int what)
     if (save_database(dbfd, filecache, what, compression, poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", name);
 
-    return 0;
-}
+    if (make_compat && compat_link(rootfd, name, compression) < 0) {
+        if (errno != EEXIST)
+            warn("failed to make compatability symlink to %s", name);
+    }
 
-static inline int make_link(const struct pkg *pkg, int dirfd, const char *source)
-{
-    _cleanup_free_ char *link = joinstring(source, "/", pkg->filename, NULL);
-    return symlinkat(link, dirfd, pkg->filename);
+    return 0;
 }
 
 static inline int delete_link(const struct pkg *pkg, int dirfd)
