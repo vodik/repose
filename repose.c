@@ -33,11 +33,12 @@
 #include "util.h"
 #include "base64.h"
 
-#include "pkghash.h"
 #include <alpm_list.h>
 #include <sys/utsname.h>
-#include "filters.h"
 #include <sys/stat.h>
+#include "pkghash.h"
+#include "filters.h"
+#include "termio.h"
 
 enum state {
     REPO_NEW,
@@ -56,20 +57,6 @@ static struct utsname uts;
 static bool make_compat = false;
 
 static char *pool = NULL;
-
-static _printf_(1,2) void colon_printf(const char *fmt, ...)
-{
-    va_list args;
-
-    va_start(args, fmt);
-    /* fputs(cfg.colstr.colon, stdout); */
-    fputs(":: ", stdout);
-    vprintf(fmt, args);
-    /* fputs(cfg.colstr.nocolor, stdout); */
-    va_end(args);
-
-    fflush(stdout);
-}
 
 static _noreturn_ void usage(FILE *out)
 {
@@ -441,6 +428,9 @@ int main(int argc, char *argv[])
         errx(1, "incorrect number of arguments provided");
 
     alpm_list_t *targets = parse_targets(argv + 1, argc - 1);
+
+    if (isatty(fileno(stdout)))
+        enable_colors();
 
     load_repo(rootname);
 
