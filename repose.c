@@ -40,16 +40,13 @@
 #include "filters.h"
 #include "termio.h"
 
+static struct utsname uts;
+
 enum state {
     REPO_NEW,
     REPO_CLEAN,
     REPO_DIRTY
 };
-
-static bool drop = false;
-static const char *arch = NULL;
-static struct utsname uts;
-static bool make_compat = false;
 
 struct repo {
     enum state state;
@@ -62,6 +59,7 @@ struct repo {
     char *filesname;
 
     int compression;
+    bool compat;
     alpm_pkghash_t *cache;
 };
 
@@ -153,7 +151,7 @@ static int render_db(struct repo *repo, const char *name, enum contents what)
     if (save_database(dbfd, repo->cache, what, repo->compression, repo->poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", name);
 
-    if (make_compat && compat_link(repo->rootfd, name, repo->compression) < 0) {
+    if (repo->compat && compat_link(repo->rootfd, name, repo->compression) < 0) {
         if (errno != EEXIST)
             warn("failed to make compatability symlink to %s", name);
     }
@@ -355,7 +353,8 @@ static void init_repo(struct repo *repo, const char *reponame, bool files, bool 
 int main(int argc, char *argv[])
 {
     const char *rootname;
-    bool files = false, rebuild = false;
+    const char *arch = NULL;
+    bool files = false, rebuild = false, drop = false;
 
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
@@ -424,7 +423,7 @@ int main(int argc, char *argv[])
             rebuild = true;
             break;
         case 0x101:
-            make_compat = true;
+            repo.compat = true;
             break;
         case 0x102:
             elephant();
