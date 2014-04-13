@@ -51,7 +51,6 @@ static enum state state = REPO_NEW;
 static const char *dbname = NULL, *filesname = NULL, *arch = NULL;
 static alpm_pkghash_t *filecache = NULL;
 static bool rebuild = false, files = false;
-static int compression = ARCHIVE_COMPRESSION_NONE;
 static struct utsname uts;
 static bool make_compat = false;
 
@@ -59,6 +58,7 @@ struct repo {
     const char *pool;
     int rootfd;
     int poolfd;
+    int compression;
 };
 
 static _noreturn_ void usage(FILE *out)
@@ -169,16 +169,16 @@ static void parse_args(int *argc, char **argv[], struct repo *repo)
             arch = optarg;
             break;
         case 'j':
-            compression = ARCHIVE_FILTER_BZIP2;
+            repo->compression = ARCHIVE_FILTER_BZIP2;
             break;
         case 'J':
-            compression = ARCHIVE_FILTER_XZ;
+            repo->compression = ARCHIVE_FILTER_XZ;
             break;
         case 'z':
-            compression = ARCHIVE_FILTER_GZIP;
+            repo->compression = ARCHIVE_FILTER_GZIP;
             break;
         case 'Z':
-            compression = ARCHIVE_FILTER_COMPRESS;
+            repo->compression = ARCHIVE_FILTER_COMPRESS;
             break;
         case 0x100:
             rebuild = true;
@@ -255,10 +255,10 @@ static int write_db(const char *name, int what, struct repo *repo)
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", name);
 
-    if (save_database(dbfd, filecache, what, compression, repo->poolfd) < 0)
+    if (save_database(dbfd, filecache, what, repo->compression, repo->poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", name);
 
-    if (make_compat && compat_link(repo->rootfd, name, compression) < 0) {
+    if (make_compat && compat_link(repo->rootfd, name, repo->compression) < 0) {
         if (errno != EEXIST)
             warn("failed to make compatability symlink to %s", name);
     }
@@ -423,7 +423,10 @@ static alpm_list_t *parse_targets(char *targets[], int count)
 int main(int argc, char *argv[])
 {
     const char *rootname;
-    struct repo repo = { };
+
+    struct repo repo = {
+        .compression = ARCHIVE_COMPRESSION_NONE
+    };
 
     parse_args(&argc, &argv, &repo);
     rootname = argv[0];
