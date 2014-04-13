@@ -49,7 +49,6 @@ enum state {
 static bool drop = false;
 static const char *dbname = NULL, *filesname = NULL, *arch = NULL;
 static alpm_pkghash_t *filecache = NULL;
-static bool rebuild = false, files = false;
 static struct utsname uts;
 static bool make_compat = false;
 
@@ -58,7 +57,10 @@ struct repo {
     const char *pool;
     int rootfd;
     int poolfd;
+
     int compression;
+    bool rebuild;
+    bool files;
 };
 
 static _noreturn_ void usage(FILE *out)
@@ -154,7 +156,7 @@ static void parse_args(int *argc, char **argv[], struct repo *repo)
             printf("%s %s\n",  program_invocation_short_name, REPOSE_VERSION);
             exit(EXIT_SUCCESS);
         case 'f':
-            files = true;
+            repo->files = true;
             break;
         case 'd':
             drop = true;
@@ -181,7 +183,7 @@ static void parse_args(int *argc, char **argv[], struct repo *repo)
             repo->compression = ARCHIVE_FILTER_COMPRESS;
             break;
         case 0x100:
-            rebuild = true;
+            repo->rebuild = true;
             break;
         case 0x101:
             make_compat = true;
@@ -294,12 +296,12 @@ static int load_repo(const char *rootname, struct repo *repo)
     filesname = joinstring(rootname, ".files", NULL);
     filecache = _alpm_pkghash_create(100);
 
-    if (rebuild)
+    if (repo->rebuild)
         return 0;
 
     load_db(dbname, repo);
     if (load_db(filesname, repo) == 0)
-        files = true;
+        repo->files = true;
 
     return 0;
 }
@@ -469,7 +471,7 @@ int main(int argc, char *argv[])
         render_db(&repo, dbname, DB_DESC | DB_DEPENDS);
         link_db(&repo);
 
-        if (files) {
+        if (repo.files) {
             printf("writing %s...\n", filesname);
             render_db(&repo, filesname, DB_FILES);
         }
