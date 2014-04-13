@@ -50,13 +50,16 @@ static bool drop = false;
 static enum state state = REPO_NEW;
 static const char *dbname = NULL, *filesname = NULL, *arch = NULL;
 static alpm_pkghash_t *filecache = NULL;
-static int rootfd, poolfd;
 static bool rebuild = false, files = false;
 static int compression = ARCHIVE_COMPRESSION_NONE;
 static struct utsname uts;
 static bool make_compat = false;
 
-static char *pool = NULL;
+struct repo {
+    const char *pool;
+    int rootfd;
+    int poolfd;
+};
 
 static _noreturn_ void usage(FILE *out)
 {
@@ -117,7 +120,7 @@ static _noreturn_ void elephant(void)
     exit(ret);
 }
 
-static void parse_args(int *argc, char **argv[])
+static void parse_args(int *argc, char **argv[], struct repo *repo)
 {
     const char *root = ".";
     static const struct option opts[] = {
@@ -160,7 +163,7 @@ static void parse_args(int *argc, char **argv[])
             root = optarg;
             break;
         case 'p':
-            pool = optarg;
+            repo->pool = optarg;
             break;
         case 'm':
             arch = optarg;
@@ -192,16 +195,16 @@ static void parse_args(int *argc, char **argv[])
     *argc -= optind;
     *argv += optind;
 
-    rootfd = open(root, O_RDONLY | O_DIRECTORY);
-    if (rootfd < 0)
+    repo->rootfd = open(root, O_RDONLY | O_DIRECTORY);
+    if (repo->rootfd < 0)
         err(EXIT_FAILURE, "failed to open root directory %s", root);
 
-    if (pool) {
-        poolfd = open(pool, O_RDONLY | O_DIRECTORY);
-        if (poolfd < 0)
-            err(EXIT_FAILURE, "failed to open pool directory %s", pool);
+    if (repo->pool) {
+        repo->poolfd = open(repo->pool, O_RDONLY | O_DIRECTORY);
+        if (repo->poolfd < 0)
+            err(EXIT_FAILURE, "failed to open pool directory %s", repo->pool);
     } else {
-        poolfd = rootfd;
+        repo->poolfd = repo->rootfd;
     }
 
     if (!arch) {
@@ -216,7 +219,7 @@ static inline int make_link(const struct pkg *pkg, int dirfd, const char *source
     return symlinkat(link, dirfd, pkg->filename);
 }
 
-static inline int compat_link(int rootdb, const char *reponame, int compression)
+static inline int compat_link(int rootdb, const char *reponame, int c)
 {
     static const char *ext[] = {
         [ARCHIVE_FILTER_NONE]     = "",
@@ -226,13 +229,13 @@ static inline int compat_link(int rootdb, const char *reponame, int compression)
         [ARCHIVE_FILTER_COMPRESS] = ".Z"
     };
 
-    _cleanup_free_ char *link = joinstring(reponame, ".tar", ext[compression], NULL);
+    _cleanup_free_ char *link = joinstring(reponame, ".tar", ext[c], NULL);
     return symlinkat(reponame, rootdb, link);
 }
 
-static int load_db(const char *name)
+static int load_db(const char *name, struct repo *repo)
 {
-    _cleanup_close_ int dbfd = openat(rootfd, name, O_RDONLY);
+    _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_RDONLY);
     if (dbfd < 0) {
         if (errno != ENOENT)
             err(EXIT_FAILURE, "failed to open database %s", name);
@@ -246,16 +249,16 @@ static int load_db(const char *name)
     return 0;
 }
 
-static int write_db(const char *name, int what)
+static int write_db(const char *name, int what, struct repo *repo)
 {
-    _cleanup_close_ int dbfd = openat(rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", name);
 
-    if (save_database(dbfd, filecache, what, compression, poolfd) < 0)
+    if (save_database(dbfd, filecache, what, compression, repo->poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", name);
 
-    if (make_compat && compat_link(rootfd, name, compression) < 0) {
+    if (make_compat && compat_link(repo->rootfd, name, compression) < 0) {
         if (errno != EEXIST)
             warn("failed to make compatability symlink to %s", name);
     }
@@ -274,18 +277,18 @@ static inline int delete_link(const struct pkg *pkg, int dirfd)
     return 0;
 }
 
-static void link_db(void)
+static void link_db(struct repo *repo)
 {
     alpm_list_t *node;
 
-    if (!pool)
+    if (!repo->pool)
         return;
 
     for (node = filecache->list; node; node = node->next)
-        make_link(node->data, rootfd, pool);
+        make_link(node->data, repo->rootfd, repo->pool);
 }
 
-static int load_repo(const char *rootname)
+static int load_repo(const char *rootname, struct repo *repo)
 {
     dbname    = joinstring(rootname, ".db", NULL);
     filesname = joinstring(rootname, ".files", NULL);
@@ -294,8 +297,8 @@ static int load_repo(const char *rootname)
     if (rebuild)
         return 0;
 
-    load_db(dbname);
-    if (load_db(filesname) == 0)
+    load_db(dbname, repo);
+    if (load_db(filesname, repo) == 0)
         files = true;
 
     return 0;
@@ -308,7 +311,7 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struc
     return _alpm_pkghash_add(cache, new);
 }
 
-static int reduce_database(int dirfd, alpm_pkghash_t **cache)
+static int reduce_database(int dirfd, alpm_pkghash_t **cache, struct repo *repo)
 {
     alpm_list_t *node;
 
@@ -320,7 +323,7 @@ static int reduce_database(int dirfd, alpm_pkghash_t **cache)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
             printf("dropping %s\n", pkg->name);
             *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
-            delete_link(pkg, rootfd);
+            delete_link(pkg, repo->rootfd);
             package_free(pkg);
             state = REPO_DIRTY;
         }
@@ -329,7 +332,7 @@ static int reduce_database(int dirfd, alpm_pkghash_t **cache)
     return 0;
 }
 
-static void drop_from_database(alpm_pkghash_t **cache, alpm_list_t *targets)
+static void drop_from_database(alpm_pkghash_t **cache, alpm_list_t *targets, struct repo *repo)
 {
     alpm_list_t *node;
 
@@ -342,14 +345,14 @@ static void drop_from_database(alpm_pkghash_t **cache, alpm_list_t *targets)
         if (match_targets(pkg, targets)) {
             printf("dropping %s\n", pkg->name);
             *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
-            delete_link(pkg, rootfd);
+            delete_link(pkg, repo->rootfd);
             package_free(pkg);
             state = REPO_DIRTY;
         }
     }
 }
 
-static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest)
+static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest, struct repo *repo)
 {
     alpm_list_t *node;
     bool dirty = false;
@@ -390,7 +393,7 @@ static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest)
 
         if (replace) {
             *dest = _alpm_pkghash_replace(*dest, pkg, old);
-            delete_link(pkg, rootfd);
+            delete_link(pkg, repo->rootfd);
             package_free(old);
             dirty = true;
         }
@@ -420,8 +423,9 @@ static alpm_list_t *parse_targets(char *targets[], int count)
 int main(int argc, char *argv[])
 {
     const char *rootname;
+    struct repo repo = { };
 
-    parse_args(&argc, &argv);
+    parse_args(&argc, &argv, &repo);
     rootname = argv[0];
 
     if (argc == 0)
@@ -432,18 +436,18 @@ int main(int argc, char *argv[])
     if (isatty(fileno(stdout)))
         enable_colors();
 
-    load_repo(rootname);
+    load_repo(rootname, &repo);
 
     if (drop) {
-        drop_from_database(&filecache, targets);
+        drop_from_database(&filecache, targets, &repo);
     } else {
-        alpm_pkghash_t *pkgcache = get_filecache(poolfd, targets, arch);
+        alpm_pkghash_t *pkgcache = get_filecache(repo.poolfd, targets, arch);
         if (!pkgcache)
             err(EXIT_FAILURE, "failed to get filecache");
 
-        reduce_database(poolfd, &filecache);
+        reduce_database(repo.poolfd, &filecache, &repo);
 
-        if (merge_database(pkgcache, &filecache))
+        if (merge_database(pkgcache, &filecache, &repo))
             state = REPO_DIRTY;
     }
 
@@ -458,12 +462,12 @@ int main(int argc, char *argv[])
         colon_printf("Writing databases to disk...\n");
 
         printf("writing %s...\n", dbname);
-        write_db(dbname, DB_DESC | DB_DEPENDS);
-        link_db();
+        write_db(dbname, DB_DESC | DB_DEPENDS, &repo);
+        link_db(&repo);
 
         if (files) {
             printf("writing %s...\n", filesname);
-            write_db(filesname, DB_FILES);
+            write_db(filesname, DB_FILES, &repo);
         }
 
         printf("repo updated successfully\n");
