@@ -144,22 +144,6 @@ static inline int compat_link(int rootdb, const char *reponame, int compression)
     return symlinkat(reponame, rootdb, link);
 }
 
-static int load_db(struct repo *repo, const char *name)
-{
-    _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_RDONLY);
-    if (dbfd < 0) {
-        if (errno != ENOENT)
-            err(EXIT_FAILURE, "failed to open database %s", name);
-        return -1;
-    } else if (load_database(dbfd, &filecache) < 0) {
-        warn("failed to open %s database", name);
-    } else {
-        repo->state = REPO_CLEAN;
-    }
-
-    return 0;
-}
-
 static int render_db(struct repo *repo, const char *name, enum contents what)
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
@@ -315,7 +299,24 @@ static alpm_list_t *parse_targets(char *targets[], int count)
     return list;
 }
 
-static void init_repo(struct repo *repo, const char *reponame, bool files)
+static int load_db(struct repo *repo, const char *filename)
+{
+    _cleanup_close_ int dbfd = openat(repo->rootfd, filename, O_RDONLY);
+    if (dbfd < 0) {
+        if (errno != ENOENT)
+            err(EXIT_FAILURE, "failed to open database %s", filename);
+        return -1;
+    }
+
+    if (load_database(dbfd, &filecache) < 0) {
+        warn("failed to open %s database", filename);
+        return -1;
+    }
+
+    return 0;
+}
+
+static void init_repo(struct repo *repo, const char *reponame, bool files, bool load_cache)
 {
     repo->rootfd = open(repo->root, O_RDONLY | O_DIRECTORY);
     if (repo->rootfd < 0)
@@ -330,7 +331,23 @@ static void init_repo(struct repo *repo, const char *reponame, bool files)
     }
 
     repo->dbname    = joinstring(reponame, ".db", NULL);
-    repo->filesname = files ? joinstring(reponame, ".files", NULL) : NULL;
+    repo->filesname = joinstring(reponame, ".files", NULL);
+
+    if (!files && faccessat(repo->rootfd, repo->filesname, F_OK, 0) < 0) {
+        if (errno == ENOENT) {
+            free(repo->filesname);
+            repo->filesname = NULL;
+        } else {
+            err(EXIT_FAILURE, "countn't access %s", repo->filesname);
+        }
+    }
+
+    if (!load_cache)
+        return;
+
+    load_db(repo, repo->dbname);
+    if (repo->filesname)
+        load_db(repo, repo->filesname);
 }
 
 int main(int argc, char *argv[])
@@ -422,25 +439,16 @@ int main(int argc, char *argv[])
     if (isatty(fileno(stdout)))
         enable_colors();
 
-    rootname = argv[0];
-    init_repo(&repo, rootname, files);
-
     if (!arch) {
         uname(&uts);
         arch = uts.machine;
     }
 
+    rootname = argv[0];
+    init_repo(&repo, rootname, files, !rebuild);
+
     alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
     filecache = _alpm_pkghash_create(100);
-
-    if (!rebuild) {
-        load_db(&repo, repo.dbname);
-
-        if (repo.filesname && load_db(&repo, repo.filesname) < 0) {
-            free(repo.filesname);
-            repo.filesname = NULL;
-        }
-    }
 
     if (drop) {
         drop_from_repo(&repo, &filecache, targets);
