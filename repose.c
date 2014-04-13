@@ -345,9 +345,11 @@ static void init_repo(struct repo *repo, const char *reponame, bool files, bool 
     if (!load_cache)
         return;
 
-    load_db(repo, repo->dbname);
+    if (load_db(repo, repo->dbname) < 0)
+        return;
     if (repo->filesname)
         load_db(repo, repo->filesname);
+    repo->state = REPO_CLEAN;
 }
 
 int main(int argc, char *argv[])
