@@ -235,7 +235,7 @@ static inline int compat_link(int rootdb, const char *reponame, int compression)
     return symlinkat(reponame, rootdb, link);
 }
 
-static int load_db(const char *name, struct repo *repo)
+static int load_db(struct repo *repo, const char *name)
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_RDONLY);
     if (dbfd < 0) {
@@ -299,8 +299,8 @@ static int load_repo(const char *rootname, struct repo *repo)
     if (repo->rebuild)
         return 0;
 
-    load_db(dbname, repo);
-    if (load_db(filesname, repo) == 0)
+    load_db(repo, dbname)
+    if (load_db(repo, filesname) == 0)
         repo->files = true;
 
     return 0;
