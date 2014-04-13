@@ -287,20 +287,9 @@ static void compile_database_entry(struct archive *archive, struct archive_entry
         compile_files_entry(pkg, buf, poolfd);
         record_entry(archive, e, entry, "files", buf);
     }
-
-    /* if (repo->root != repo->pool) { */
-    /*     _cleanup_free_ char *full_pkgpath; */
-
-    /*     if (asprintf(&full_pkgpath, "%s/%s", repo->pool, pkg->filename) < 0) { */
-    /*         warn("failed to malloc pkg fullpath"); */
-    /*         return; */
-    /*     } */
-
-    /*     symlinkat(full_pkgpath, repo->rootfd, pkg->filename); */
-    /* } */
 }
 
-int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression, int poolfd)
+int save_database(int fd, alpm_pkghash_t *pkgcache, enum contents what, int compression, int poolfd)
 {
     struct archive *archive = archive_write_new();
     struct archive_entry *entry = archive_entry_new();

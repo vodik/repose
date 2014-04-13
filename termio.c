@@ -1,5 +1,6 @@
 #include "termio.h"
 
+#include <stdarg.h>
 #include "util.h"
 
 #define NOCOLOR     "\033[0m"
