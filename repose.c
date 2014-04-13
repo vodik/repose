@@ -48,7 +48,6 @@ enum state {
 
 static bool drop = false;
 static const char *arch = NULL;
-static alpm_pkghash_t *filecache = NULL;
 static struct utsname uts;
 static bool make_compat = false;
 
@@ -63,6 +62,7 @@ struct repo {
     char *filesname;
 
     int compression;
+    alpm_pkghash_t *cache;
 };
 
 static _noreturn_ void usage(FILE *out)
@@ -150,7 +150,7 @@ static int render_db(struct repo *repo, const char *name, enum contents what)
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", name);
 
-    if (save_database(dbfd, filecache, what, repo->compression, repo->poolfd) < 0)
+    if (save_database(dbfd, repo->cache, what, repo->compression, repo->poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", name);
 
     if (make_compat && compat_link(repo->rootfd, name, repo->compression) < 0) {
@@ -179,7 +179,7 @@ static void link_db(struct repo *repo)
     if (!repo->pool)
         return;
 
-    for (node = filecache->list; node; node = node->next)
+    for (node = repo->cache->list; node; node = node->next)
         make_link(node->data, repo->rootfd, repo->pool);
 }
 
@@ -190,18 +190,18 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struc
     return _alpm_pkghash_add(cache, new);
 }
 
-static int reduce_repo(struct repo *repo, alpm_pkghash_t **cache)
+static int reduce_repo(struct repo *repo)
 {
     alpm_list_t *node;
 
-    for (node = (*cache)->list; node; node = node->next) {
+    for (node = repo->cache->list; node; node = node->next) {
         struct pkg *pkg = node->data;
 
         if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
             if (errno != ENOENT)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
             printf("dropping %s\n", pkg->name);
-            *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
+            repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
             repo->state = REPO_DIRTY;
@@ -211,19 +211,19 @@ static int reduce_repo(struct repo *repo, alpm_pkghash_t **cache)
     return 0;
 }
 
-static void drop_from_repo(struct repo *repo, alpm_pkghash_t **cache, alpm_list_t *targets)
+static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
 {
     alpm_list_t *node;
 
     if (!targets)
         return;
 
-    for (node = (*cache)->list; node; node = node->next) {
+    for (node = repo->cache->list; node; node = node->next) {
         struct pkg *pkg = node->data;
 
         if (match_targets(pkg, targets)) {
             printf("dropping %s\n", pkg->name);
-            *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
+            repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
             repo->state = REPO_DIRTY;
@@ -231,21 +231,21 @@ static void drop_from_repo(struct repo *repo, alpm_pkghash_t **cache, alpm_list_
     }
 }
 
-static bool update_repo(struct repo *repo, alpm_pkghash_t *src, alpm_pkghash_t **dest)
+static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
 {
     alpm_list_t *node;
     bool dirty = false;
 
     for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
-        struct pkg *old = _alpm_pkghash_find(*dest, pkg->name);
+        struct pkg *old = _alpm_pkghash_find(repo->cache, pkg->name);
         bool replace = false;
         int vercmp;
 
         /* if the package isn't in the cache, add it */
         if (!old) {
             printf("adding %s %s\n", pkg->name, pkg->version);
-            *dest = _alpm_pkghash_add(*dest, pkg);
+            repo->cache = _alpm_pkghash_add(repo->cache, pkg);
             dirty = true;
             continue;
         }
@@ -271,7 +271,7 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src, alpm_pkghash_t *
         }
 
         if (replace) {
-            *dest = _alpm_pkghash_replace(*dest, pkg, old);
+            repo->cache = _alpm_pkghash_replace(repo->cache, pkg, old);
             delete_link(pkg, repo->rootfd);
             package_free(old);
             dirty = true;
@@ -308,7 +308,7 @@ static int load_db(struct repo *repo, const char *filename)
         return -1;
     }
 
-    if (load_database(dbfd, &filecache) < 0) {
+    if (load_database(dbfd, &repo->cache) < 0) {
         warn("failed to open %s database", filename);
         return -1;
     }
@@ -341,6 +341,8 @@ static void init_repo(struct repo *repo, const char *reponame, bool files, bool 
             err(EXIT_FAILURE, "countn't access %s", repo->filesname);
         }
     }
+
+    repo->cache = _alpm_pkghash_create(100);
 
     if (!load_cache)
         return;
@@ -448,18 +450,17 @@ int main(int argc, char *argv[])
     init_repo(&repo, rootname, files, !rebuild);
 
     alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
-    filecache = _alpm_pkghash_create(100);
 
     if (drop) {
-        drop_from_repo(&repo, &filecache, targets);
+        drop_from_repo(&repo, targets);
     } else {
-        alpm_pkghash_t *pkgcache = get_filecache(repo.poolfd, targets, arch);
-        if (!pkgcache)
+        alpm_pkghash_t *filecache = get_filecache(repo.poolfd, targets, arch);
+        if (!filecache)
             err(EXIT_FAILURE, "failed to get filecache");
 
-        reduce_repo(&repo, &filecache);
+        reduce_repo(&repo);
 
-        if (update_repo(&repo, pkgcache, &filecache))
+        if (update_repo(&repo, filecache))
             repo.state = REPO_DIRTY;
     }
 
