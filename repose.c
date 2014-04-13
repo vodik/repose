@@ -41,6 +41,7 @@
 #include "termio.h"
 
 static struct utsname uts;
+static int verbose = 0;
 
 enum state {
     REPO_NEW,
@@ -68,7 +69,8 @@ static _noreturn_ void usage(FILE *out)
     fprintf(out, "usage: %s [options] <database> [pkgs|deltas ...]\n", program_invocation_short_name);
     fputs("Options\n"
           " -h, --help            display this help and exit\n"
-          " -v, --version         display version\n"
+          " -V, --version         display version\n"
+          " -v, --verbose         verbose output\n"
           " -f, --files           also build the .files database\n"
           " -r, --root=PATH       set the root for the repository\n"
           " -p, --pool=PATH       set the pool to find packages in\n"
@@ -198,7 +200,10 @@ static int reduce_repo(struct repo *repo)
         if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
             if (errno != ENOENT)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
-            printf("dropping %s\n", pkg->name);
+
+            if (verbose)
+                printf("dropping %s\n", pkg->name);
+
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
@@ -220,7 +225,9 @@ static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
         struct pkg *pkg = node->data;
 
         if (match_targets(pkg, targets)) {
-            printf("dropping %s\n", pkg->name);
+            if (verbose)
+                printf("dropping %s\n", pkg->name);
+
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
@@ -242,7 +249,9 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
 
         /* if the package isn't in the cache, add it */
         if (!old) {
-            printf("adding %s %s\n", pkg->name, pkg->version);
+            if (verbose)
+                printf("adding %s %s\n", pkg->name, pkg->version);
+
             repo->cache = _alpm_pkghash_add(repo->cache, pkg);
             dirty = true;
             continue;
@@ -252,15 +261,21 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
 
         switch(vercmp) {
             case 1:
-                printf("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
+                if (verbose)
+                    printf("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
+
                 replace = true;
                 break;
             case 0:
                 if (pkg->builddate > old->builddate) {
-                    printf("updating %s %s [newer build]\n", pkg->name, pkg->version);
+                    if (verbose)
+                        printf("updating %s %s [newer build]\n", pkg->name, pkg->version);
+
                     replace = true;
                 } else if (old->base64sig == NULL && pkg->base64sig) {
-                    printf("adding signature for %s\n", pkg->name);
+                    if (verbose)
+                        printf("adding signature for %s\n", pkg->name);
+
                     replace = true;
                 }
                 break;
@@ -360,7 +375,8 @@ int main(int argc, char *argv[])
 
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
-        { "version",  no_argument,       0, 'v' },
+        { "version",  no_argument,       0, 'V' },
+        { "verbose",  no_argument,       0, 'v' },
         { "files",    no_argument,       0, 'f' },
         { "drop",     no_argument,       0, 'd' },
         { "root",     required_argument, 0, 'r' },
@@ -383,7 +399,7 @@ int main(int argc, char *argv[])
     };
 
     for (;;) {
-        int opt = getopt_long(argc, argv, "hvfdr:p:m:jJzZ", opts, NULL);
+        int opt = getopt_long(argc, argv, "hVvfdr:p:m:jJzZ", opts, NULL);
         if (opt < 0)
             break;
 
@@ -391,9 +407,11 @@ int main(int argc, char *argv[])
         case 'h':
             usage(stdout);
             break;
-        case 'v':
+        case 'V':
             printf("%s %s\n",  program_invocation_short_name, REPOSE_VERSION);
             exit(EXIT_SUCCESS);
+        case 'v':
+            verbose += 1;
         case 'f':
             files = true;
             break;
@@ -467,24 +485,27 @@ int main(int argc, char *argv[])
 
     switch (repo.state) {
     case REPO_NEW:
-        printf("repo empty!\n");
-        return 1;
+        if (verbose)
+            printf("repo empty!\n");
+        break;
     case REPO_CLEAN:
-        printf("repo does not need updating\n");
+        if (verbose)
+            printf("repo does not need updating\n");
         break;
     case REPO_DIRTY:
-        colon_printf("Writing databases to disk...\n");
+        /* colon_printf("Writing databases to disk...\n"); */
 
-        printf("writing %s...\n", repo.dbname);
+        if (verbose)
+            printf("writing %s...\n", repo.dbname);
         render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
-        link_db(&repo);
 
         if (repo.filesname) {
-            printf("writing %s...\n", repo.filesname);
+            if (verbose)
+                printf("writing %s...\n", repo.filesname);
             render_db(&repo, repo.filesname, DB_FILES);
         }
 
-        printf("repo updated successfully\n");
+        link_db(&repo);
         break;
     default:
         break;
