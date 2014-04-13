@@ -47,7 +47,7 @@ enum state {
 };
 
 static bool drop = false;
-static const char *dbname = NULL, *filesname = NULL, *arch = NULL;
+static const char *arch = NULL;
 static alpm_pkghash_t *filecache = NULL;
 static struct utsname uts;
 static bool make_compat = false;
@@ -57,6 +57,9 @@ struct repo {
     const char *pool;
     int rootfd;
     int poolfd;
+
+    char *dbname;
+    char *filesname;
 
     int compression;
     bool rebuild;
@@ -290,22 +293,6 @@ static void link_db(struct repo *repo)
         make_link(node->data, repo->rootfd, repo->pool);
 }
 
-static int load_repo(const char *rootname, struct repo *repo)
-{
-    dbname    = joinstring(rootname, ".db", NULL);
-    filesname = joinstring(rootname, ".files", NULL);
-    filecache = _alpm_pkghash_create(100);
-
-    if (repo->rebuild)
-        return 0;
-
-    load_db(repo, dbname)
-    if (load_db(repo, filesname) == 0)
-        repo->files = true;
-
-    return 0;
-}
-
 static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new,
                                                     struct pkg *old)
 {
@@ -428,7 +415,7 @@ int main(int argc, char *argv[])
 
     struct repo repo = {
         .state       = REPO_NEW,
-        .compression = ARCHIVE_COMPRESSION_NONE
+        .compression = ARCHIVE_COMPRESSION_NONE,
     };
 
     parse_args(&argc, &argv, &repo);
@@ -442,7 +429,19 @@ int main(int argc, char *argv[])
     if (isatty(fileno(stdout)))
         enable_colors();
 
-    load_repo(rootname, &repo);
+    repo.dbname    = joinstring(rootname, ".db", NULL);
+    repo.filesname = joinstring(rootname, ".files", NULL);
+
+    filecache = _alpm_pkghash_create(100);
+
+    if (!repo.rebuild) {
+        load_db(&repo, repo.dbname);
+
+        if (load_db(&repo, repo.filesname) < 0) {
+            free(repo.filesname);
+            repo.filesname = NULL;
+        }
+    }
 
     if (drop) {
         drop_from_repo(&repo, &filecache, targets);
@@ -467,13 +466,13 @@ int main(int argc, char *argv[])
     case REPO_DIRTY:
         colon_printf("Writing databases to disk...\n");
 
-        printf("writing %s...\n", dbname);
-        render_db(&repo, dbname, DB_DESC | DB_DEPENDS);
+        printf("writing %s...\n", repo.dbname);
+        render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
         link_db(&repo);
 
-        if (repo.files) {
-            printf("writing %s...\n", filesname);
-            render_db(&repo, filesname, DB_FILES);
+        if (repo.filesname) {
+            printf("writing %s...\n", repo.filesname);
+            render_db(&repo, repo.filesname, DB_FILES);
         }
 
         printf("repo updated successfully\n");
