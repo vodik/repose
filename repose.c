@@ -54,6 +54,7 @@ static bool make_compat = false;
 
 struct repo {
     enum state state;
+    const char *root;
     const char *pool;
     int rootfd;
     int poolfd;
@@ -314,9 +315,26 @@ static alpm_list_t *parse_targets(char *targets[], int count)
     return list;
 }
 
+static void init_repo(struct repo *repo, const char *reponame, bool files)
+{
+    repo->rootfd = open(repo->root, O_RDONLY | O_DIRECTORY);
+    if (repo->rootfd < 0)
+        err(EXIT_FAILURE, "failed to open root directory %s", repo->root);
+
+    if (repo->pool) {
+        repo->poolfd = open(repo->pool, O_RDONLY | O_DIRECTORY);
+        if (repo->poolfd < 0)
+            err(EXIT_FAILURE, "failed to open pool directory %s", repo->pool);
+    } else {
+        repo->poolfd = repo->rootfd;
+    }
+
+    repo->dbname    = joinstring(reponame, ".db", NULL);
+    repo->filesname = files ? joinstring(reponame, ".files", NULL) : NULL;
+}
+
 int main(int argc, char *argv[])
 {
-    const char *root = ".";
     const char *rootname;
     bool files = false, rebuild = false;
 
@@ -340,6 +358,7 @@ int main(int argc, char *argv[])
 
     struct repo repo = {
         .state       = REPO_NEW,
+        .root        = ".",
         .compression = ARCHIVE_COMPRESSION_NONE,
     };
 
@@ -362,7 +381,7 @@ int main(int argc, char *argv[])
             drop = true;
             break;
         case 'r':
-            root = optarg;
+            repo.root = optarg;
             break;
         case 'p':
             repo.pool = optarg;
@@ -394,38 +413,24 @@ int main(int argc, char *argv[])
         }
     }
 
+    argv += optind;
+    argc -= optind;
+
     if (argc == 0)
         errx(1, "incorrect number of arguments provided");
 
-    repo.rootfd = open(root, O_RDONLY | O_DIRECTORY);
-    if (repo.rootfd < 0)
-        err(EXIT_FAILURE, "failed to open root directory %s", root);
+    if (isatty(fileno(stdout)))
+        enable_colors();
 
-    if (repo.pool) {
-        repo.poolfd = open(repo.pool, O_RDONLY | O_DIRECTORY);
-        if (repo.poolfd < 0)
-            err(EXIT_FAILURE, "failed to open pool directory %s", repo.pool);
-    } else {
-        repo.poolfd = repo.rootfd;
-    }
+    rootname = argv[0];
+    init_repo(&repo, rootname, files);
 
     if (!arch) {
         uname(&uts);
         arch = uts.machine;
     }
 
-    argv += optind;
-    argc -= optind;
-
-    rootname = argv[0];
     alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
-
-    if (isatty(fileno(stdout)))
-        enable_colors();
-
-    repo.dbname    = joinstring(rootname, ".db", NULL);
-    repo.filesname = files ? joinstring(rootname, ".files", NULL) : NULL;
-
     filecache = _alpm_pkghash_create(100);
 
     if (!rebuild) {
