@@ -62,8 +62,6 @@ struct repo {
     char *filesname;
 
     int compression;
-    bool rebuild;
-    bool files;
 };
 
 static _noreturn_ void usage(FILE *out)
@@ -123,99 +121,6 @@ static _noreturn_ void elephant(void)
     }
 
     exit(ret);
-}
-
-static void parse_args(int *argc, char **argv[], struct repo *repo)
-{
-    const char *root = ".";
-    static const struct option opts[] = {
-        { "help",     no_argument,       0, 'h' },
-        { "version",  no_argument,       0, 'v' },
-        { "files",    no_argument,       0, 'f' },
-        { "drop",     no_argument,       0, 'd' },
-        { "root",     required_argument, 0, 'r' },
-        { "pool",     required_argument, 0, 'p' },
-        { "arch",     required_argument, 0, 'm' },
-        { "bzip2",    no_argument,       0, 'j' },
-        { "xz",       no_argument,       0, 'J' },
-        { "gzip",     no_argument,       0, 'z' },
-        { "compress", no_argument,       0, 'Z' },
-        { "rebuild",  no_argument,       0, 0x100 },
-        { "compat",   no_argument,       0, 0x101 },
-        { "elephant", no_argument,       0, 0x102 },
-        { 0, 0, 0, 0 }
-    };
-
-    for (;;) {
-        int opt = getopt_long(*argc, *argv, "hvfdr:p:m:jJzZ", opts, NULL);
-        if (opt < 0)
-            break;
-
-        switch (opt) {
-        case 'h':
-            usage(stdout);
-            break;
-        case 'v':
-            printf("%s %s\n",  program_invocation_short_name, REPOSE_VERSION);
-            exit(EXIT_SUCCESS);
-        case 'f':
-            repo->files = true;
-            break;
-        case 'd':
-            drop = true;
-            break;
-        case 'r':
-            root = optarg;
-            break;
-        case 'p':
-            repo->pool = optarg;
-            break;
-        case 'm':
-            arch = optarg;
-            break;
-        case 'j':
-            repo->compression = ARCHIVE_FILTER_BZIP2;
-            break;
-        case 'J':
-            repo->compression = ARCHIVE_FILTER_XZ;
-            break;
-        case 'z':
-            repo->compression = ARCHIVE_FILTER_GZIP;
-            break;
-        case 'Z':
-            repo->compression = ARCHIVE_FILTER_COMPRESS;
-            break;
-        case 0x100:
-            repo->rebuild = true;
-            break;
-        case 0x101:
-            make_compat = true;
-            break;
-        case 0x102:
-            elephant();
-            break;
-        }
-    }
-
-    *argc -= optind;
-    *argv += optind;
-
-    repo->rootfd = open(root, O_RDONLY | O_DIRECTORY);
-    if (repo->rootfd < 0)
-        err(EXIT_FAILURE, "failed to open root directory %s", root);
-
-    if (repo->pool) {
-        repo->poolfd = open(repo->pool, O_RDONLY | O_DIRECTORY);
-        if (repo->poolfd < 0)
-            err(EXIT_FAILURE, "failed to open pool directory %s", repo->pool);
-    } else {
-        repo->poolfd = repo->rootfd;
-    }
-
-    if (!arch) {
-        uname(&uts);
-        arch = uts.machine;
-    }
 }
 
 static inline int make_link(const struct pkg *pkg, int dirfd, const char *source)
@@ -411,33 +316,122 @@ static alpm_list_t *parse_targets(char *targets[], int count)
 
 int main(int argc, char *argv[])
 {
+    const char *root = ".";
     const char *rootname;
+    bool files = false, rebuild = false;
+
+    static const struct option opts[] = {
+        { "help",     no_argument,       0, 'h' },
+        { "version",  no_argument,       0, 'v' },
+        { "files",    no_argument,       0, 'f' },
+        { "drop",     no_argument,       0, 'd' },
+        { "root",     required_argument, 0, 'r' },
+        { "pool",     required_argument, 0, 'p' },
+        { "arch",     required_argument, 0, 'm' },
+        { "bzip2",    no_argument,       0, 'j' },
+        { "xz",       no_argument,       0, 'J' },
+        { "gzip",     no_argument,       0, 'z' },
+        { "compress", no_argument,       0, 'Z' },
+        { "rebuild",  no_argument,       0, 0x100 },
+        { "compat",   no_argument,       0, 0x101 },
+        { "elephant", no_argument,       0, 0x102 },
+        { 0, 0, 0, 0 }
+    };
 
     struct repo repo = {
         .state       = REPO_NEW,
         .compression = ARCHIVE_COMPRESSION_NONE,
     };
 
-    parse_args(&argc, &argv, &repo);
-    rootname = argv[0];
+    for (;;) {
+        int opt = getopt_long(argc, argv, "hvfdr:p:m:jJzZ", opts, NULL);
+        if (opt < 0)
+            break;
+
+        switch (opt) {
+        case 'h':
+            usage(stdout);
+            break;
+        case 'v':
+            printf("%s %s\n",  program_invocation_short_name, REPOSE_VERSION);
+            exit(EXIT_SUCCESS);
+        case 'f':
+            files = true;
+            break;
+        case 'd':
+            drop = true;
+            break;
+        case 'r':
+            root = optarg;
+            break;
+        case 'p':
+            repo.pool = optarg;
+            break;
+        case 'm':
+            arch = optarg;
+            break;
+        case 'j':
+            repo.compression = ARCHIVE_FILTER_BZIP2;
+            break;
+        case 'J':
+            repo.compression = ARCHIVE_FILTER_XZ;
+            break;
+        case 'z':
+            repo.compression = ARCHIVE_FILTER_GZIP;
+            break;
+        case 'Z':
+            repo.compression = ARCHIVE_FILTER_COMPRESS;
+            break;
+        case 0x100:
+            rebuild = true;
+            break;
+        case 0x101:
+            make_compat = true;
+            break;
+        case 0x102:
+            elephant();
+            break;
+        }
+    }
 
     if (argc == 0)
         errx(1, "incorrect number of arguments provided");
 
-    alpm_list_t *targets = parse_targets(argv + 1, argc - 1);
+    repo.rootfd = open(root, O_RDONLY | O_DIRECTORY);
+    if (repo.rootfd < 0)
+        err(EXIT_FAILURE, "failed to open root directory %s", root);
+
+    if (repo.pool) {
+        repo.poolfd = open(repo.pool, O_RDONLY | O_DIRECTORY);
+        if (repo.poolfd < 0)
+            err(EXIT_FAILURE, "failed to open pool directory %s", repo.pool);
+    } else {
+        repo.poolfd = repo.rootfd;
+    }
+
+    if (!arch) {
+        uname(&uts);
+        arch = uts.machine;
+    }
+
+    argv += optind;
+    argc -= optind;
+
+    rootname = argv[0];
+    alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
 
     if (isatty(fileno(stdout)))
         enable_colors();
 
     repo.dbname    = joinstring(rootname, ".db", NULL);
-    repo.filesname = joinstring(rootname, ".files", NULL);
+    repo.filesname = files ? joinstring(rootname, ".files", NULL) : NULL;
 
     filecache = _alpm_pkghash_create(100);
 
-    if (!repo.rebuild) {
+    if (!rebuild) {
         load_db(&repo, repo.dbname);
 
-        if (load_db(&repo, repo.filesname) < 0) {
+        if (repo.filesname && load_db(&repo, repo.filesname) < 0) {
             free(repo.filesname);
             repo.filesname = NULL;
         }
