@@ -26,4 +26,4 @@ enum contents {
 };
 
 int load_database(int fd, alpm_pkghash_t **pkgcache);
-int save_database(int fd, alpm_pkghash_t *pkgcache, int what, int compression, int poolfd);
+int save_database(int fd, alpm_pkghash_t *pkgcache, enum contents what, int compression, int poolfd);

@@ -249,7 +249,7 @@ static int load_db(const char *name, struct repo *repo)
     return 0;
 }
 
-static int write_db(const char *name, int what, struct repo *repo)
+static int render_db(struct repo *repo, const char *name, enum contents what)
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (dbfd < 0)
@@ -311,14 +311,14 @@ static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struc
     return _alpm_pkghash_add(cache, new);
 }
 
-static int reduce_database(int dirfd, alpm_pkghash_t **cache, struct repo *repo)
+static int reduce_repo(struct repo *repo, alpm_pkghash_t **cache)
 {
     alpm_list_t *node;
 
     for (node = (*cache)->list; node; node = node->next) {
         struct pkg *pkg = node->data;
 
-        if (faccessat(dirfd, pkg->filename, F_OK, 0) < 0) {
+        if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
             if (errno != ENOENT)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
             printf("dropping %s\n", pkg->name);
@@ -332,7 +332,7 @@ static int reduce_database(int dirfd, alpm_pkghash_t **cache, struct repo *repo)
     return 0;
 }
 
-static void drop_from_database(alpm_pkghash_t **cache, alpm_list_t *targets, struct repo *repo)
+static void drop_from_repo(struct repo *repo, alpm_pkghash_t **cache, alpm_list_t *targets)
 {
     alpm_list_t *node;
 
@@ -352,7 +352,7 @@ static void drop_from_database(alpm_pkghash_t **cache, alpm_list_t *targets, str
     }
 }
 
-static bool merge_database(alpm_pkghash_t *src, alpm_pkghash_t **dest, struct repo *repo)
+static bool update_repo(struct repo *repo, alpm_pkghash_t *src, alpm_pkghash_t **dest)
 {
     alpm_list_t *node;
     bool dirty = false;
@@ -442,15 +442,15 @@ int main(int argc, char *argv[])
     load_repo(rootname, &repo);
 
     if (drop) {
-        drop_from_database(&filecache, targets, &repo);
+        drop_from_repo(&repo, &filecache, targets);
     } else {
         alpm_pkghash_t *pkgcache = get_filecache(repo.poolfd, targets, arch);
         if (!pkgcache)
             err(EXIT_FAILURE, "failed to get filecache");
 
-        reduce_database(repo.poolfd, &filecache, &repo);
+        reduce_repo(&repo, &filecache);
 
-        if (merge_database(pkgcache, &filecache, &repo))
+        if (update_repo(&repo, pkgcache, &filecache))
             state = REPO_DIRTY;
     }
 
@@ -465,12 +465,12 @@ int main(int argc, char *argv[])
         colon_printf("Writing databases to disk...\n");
 
         printf("writing %s...\n", dbname);
-        write_db(dbname, DB_DESC | DB_DEPENDS, &repo);
+        render_db(&repo, dbname, DB_DESC | DB_DEPENDS);
         link_db(&repo);
 
         if (files) {
             printf("writing %s...\n", filesname);
-            write_db(filesname, DB_FILES, &repo);
+            render_db(&repo, filesname, DB_FILES);
         }
 
         printf("repo updated successfully\n");
