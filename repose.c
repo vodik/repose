@@ -219,7 +219,7 @@ static inline int make_link(const struct pkg *pkg, int dirfd, const char *source
     return symlinkat(link, dirfd, pkg->filename);
 }
 
-static inline int compat_link(int rootdb, const char *reponame, int c)
+static inline int compat_link(int rootdb, const char *reponame, int compression)
 {
     static const char *ext[] = {
         [ARCHIVE_FILTER_NONE]     = "",
@@ -229,7 +229,7 @@ static inline int compat_link(int rootdb, const char *reponame, int c)
         [ARCHIVE_FILTER_COMPRESS] = ".Z"
     };
 
-    _cleanup_free_ char *link = joinstring(reponame, ".tar", ext[c], NULL);
+    _cleanup_free_ char *link = joinstring(reponame, ".tar", ext[compression], NULL);
     return symlinkat(reponame, rootdb, link);
 }
 
