@@ -47,7 +47,6 @@ enum state {
 };
 
 static bool drop = false;
-static enum state state = REPO_NEW;
 static const char *dbname = NULL, *filesname = NULL, *arch = NULL;
 static alpm_pkghash_t *filecache = NULL;
 static bool rebuild = false, files = false;
@@ -55,6 +54,7 @@ static struct utsname uts;
 static bool make_compat = false;
 
 struct repo {
+    enum state state;
     const char *pool;
     int rootfd;
     int poolfd;
@@ -243,7 +243,7 @@ static int load_db(const char *name, struct repo *repo)
     } else if (load_database(dbfd, &filecache) < 0) {
         warn("failed to open %s database", name);
     } else {
-        state = REPO_CLEAN;
+        repo->state = REPO_CLEAN;
     }
 
     return 0;
@@ -325,7 +325,7 @@ static int reduce_repo(struct repo *repo, alpm_pkghash_t **cache)
             *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
-            state = REPO_DIRTY;
+            repo->state = REPO_DIRTY;
         }
     }
 
@@ -347,7 +347,7 @@ static void drop_from_repo(struct repo *repo, alpm_pkghash_t **cache, alpm_list_
             *cache = _alpm_pkghash_remove(*cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
-            state = REPO_DIRTY;
+            repo->state = REPO_DIRTY;
         }
     }
 }
@@ -425,6 +425,7 @@ int main(int argc, char *argv[])
     const char *rootname;
 
     struct repo repo = {
+        .state       = REPO_NEW,
         .compression = ARCHIVE_COMPRESSION_NONE
     };
 
@@ -451,10 +452,10 @@ int main(int argc, char *argv[])
         reduce_repo(&repo, &filecache);
 
         if (update_repo(&repo, pkgcache, &filecache))
-            state = REPO_DIRTY;
+            repo.state = REPO_DIRTY;
     }
 
-    switch (state) {
+    switch (repo.state) {
     case REPO_NEW:
         printf("repo empty!\n");
         return 1;
