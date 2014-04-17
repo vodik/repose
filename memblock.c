@@ -34,6 +34,7 @@ int memblock_open_fd(struct memblock_t *memblock, int fd)
         .mem = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0)
     };
 
+    madvise(memblock->mem, memblock->len, MADV_WILLNEED | MADV_SEQUENTIAL);
     return memblock->mem == MAP_FAILED ? -errno : 0;
 }
 
