@@ -2,12 +2,13 @@
 
 _arguments -s \
   {-h,--help}'[display this help and exit]' \
-  {-v,--version}'[display version]' \
+  {-V,--version}'[display version]' \
+  {-v,--verbose}'[verbose output]' \
   {-f,--files}'[generate complementing files database]' \
   {-d,--drop}'[drop package from database]:packages:_files -g "*.pkg.tar*~*.sig(.,@)"' \
   {-r,--root=-}'[repository root directory]:root:_directories' \
   {-p,--pool=-}'[set the pool to find packages in it]:pool:_directories' \
-  {-a,--arch=-}'[the primary architecture of the database]:arch:(i686 x86_64)' \
+  {-m,--arch=-}'[the primary architecture of the database]:arch:(i686 x86_64)' \
   {-j,--bzip2}'[compress the database with bzip2]' \
   {-J,--xz}'[compress the database with xz]' \
   {-z,--gzip}'[compress the database with gzip]' \
