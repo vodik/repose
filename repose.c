@@ -72,6 +72,7 @@ static _noreturn_ void usage(FILE *out)
           " -V, --version         display version\n"
           " -v, --verbose         verbose output\n"
           " -f, --files           also build the .files database\n"
+          " -d, --drop            drop the specified package from the db\n"
           " -r, --root=PATH       set the root for the repository\n"
           " -p, --pool=PATH       set the pool to find packages in\n"
           " -m, --arch=ARCH       the architecture of the database\n"
