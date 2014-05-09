@@ -71,7 +71,7 @@ static struct pkg *load_pkg(int dirfd, const char *filename, const char *arch)
     if (load_package(pkg, pkgfd) < 0)
         goto error;
 
-    if (arch && pkg->arch && !streq(pkg->arch, arch) && !streq(pkg->arch, "any"))
+    if (arch && pkg->arch && !match_arch(pkg, arch))
         goto error;
 
     pkg->filename = strdup(filename);

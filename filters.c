@@ -20,7 +20,7 @@
 #include <fnmatch.h>
 #include "util.h"
 
-bool match_target_r(struct pkg *pkg, const char *target, const char *fullname)
+bool match_target(struct pkg *pkg, const char *target, const char *fullname)
 {
     if (streq(target, pkg->filename))
         return true;
@@ -32,12 +32,11 @@ bool match_target_r(struct pkg *pkg, const char *target, const char *fullname)
 bool match_targets(struct pkg *pkg, alpm_list_t *targets)
 {
     const alpm_list_t *node;
+    _cleanup_free_ char *fullname = joinstring(pkg->name, "-", pkg->version, NULL);
     bool ret = false;
 
-    _cleanup_free_ char *fullname = joinstring(pkg->name, "-", pkg->version, NULL);
-
     for (node = targets; node && !ret; node = node->next)
-        ret = match_target_r(pkg, node->data, fullname);
+        ret = match_target(pkg, node->data, fullname);
 
     return ret;
 }
