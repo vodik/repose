@@ -368,6 +368,14 @@ static void init_repo(struct repo *repo, const char *reponame, bool files, bool 
     repo->state = REPO_CLEAN;
 }
 
+static char *get_rootname(char *name)
+{
+    char *sep = strrchr(name, '.');
+    if (sep && streq(sep, ".db"))
+        *sep = 0;
+    return name;
+}
+
 int main(int argc, char *argv[])
 {
     const char *rootname;
@@ -466,7 +474,7 @@ int main(int argc, char *argv[])
         arch = uts.machine;
     }
 
-    rootname = argv[0];
+    rootname = get_rootname(argv[0]);
     init_repo(&repo, rootname, files, !rebuild);
 
     alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
