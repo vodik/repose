@@ -38,7 +38,6 @@
 #include <sys/stat.h>
 #include "pkghash.h"
 #include "filters.h"
-#include "termio.h"
 
 static struct utsname uts;
 static int verbose = 0;
@@ -465,9 +464,6 @@ int main(int argc, char *argv[])
 
     if (argc == 0)
         errx(1, "incorrect number of arguments provided");
-
-    if (isatty(fileno(stdout)))
-        enable_colors();
 
     if (!arch) {
         uname(&uts);
