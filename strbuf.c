@@ -51,12 +51,10 @@ int buffer_init(buffer_t *buf, size_t reserve)
 {
     zero(buf, sizeof(buffer_t));
 
-    if (reserve) {
-        if (buffer_extendby(buf, reserve) < 0)
-            return -errno;
-        buf->data[buf->len] = '\0';
-    }
+    if (reserve && buffer_extendby(buf, reserve) < 0)
+        return -errno;
 
+    buf->data[buf->len] = '\0';
     return 0;
 }
 
