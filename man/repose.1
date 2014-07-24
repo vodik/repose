@@ -1,0 +1,54 @@
+.TH repose "1" "July 23" "repose" "User Commands"
+.SH NAME
+repose \- an Archlinux repository compiler
+.SH SYNOPSIS
+\fBrepose\fP [options] <database> [pkgs|deltas ...]
+.SH DESCRIPTION
+\fBrepose\fP create and manipulates Archlinux repositories, automating
+their generation from a directory of packages. It scans the filesystem
+packages and for changes in those packages and compiles them into
+databases \fBpacman\fR understands.
+.SH OPTIONS
+.PP
+.IP "\fB\-h\fR, \fB\-\-help\fR"
+Display help message.
+.IP "\fB\-V\fR, \fB\-\-version\fR"
+Display version information.
+.IP "\fB\-v\fR, \fB\-\-verbose\fR"
+Produce verbose output. When scanning for changes, \fBrepose\fP will
+list every package that'll be added, dropped, or updated and will also
+list each database that's serialized to disk.
+.IP "\fB\-f\fR, \fB\-\-files\fR"
+In addition to building the repository database, build a files database
+usable by \fBpkgfile\fR and keep it in sync with the main database. If
+this flag is not provided by a files database is found, this flag is
+implied.
+.IP "\fB\-d, \fB\-\-drop\fR"
+Instead of adding the specified set of packages, instead drop them from the
+database.
+.IP "\fB\-r\fR \fIPATH\fR, \fB\-\-root\fR=\fIPATH\fR"
+Set the root of the repository where the database files will live. If
+the pool directory different from the root directory, maintain symlinks
+between the two so that the root directory also contains a link to all
+packages referenced by the repository. The default value if it isn't
+overridden is the current working directory.
+.IP "\fB\-p\fR \fIPATH\fR, \fB\-\-pool\fR=\fIPATH\fR"
+Set the pool for the repository. The pool is where \fBrepose\fR will
+scan for new, changed, or missing packages to update the repository
+database. The default value if it isn't overridden is the current
+working directory.
+.IP "\fB\-m\fR \fIARCH\fR, \fB\-\-arch\fR=\fIARCH\fR"
+Set the primary architecture of the database. The database will only
+contain packages found for the architecture set in \fIARCH\fR or marked
+as 'any'. If this argument is not provided, the machines architecture is
+assumed.
+.IP "\fB\-j\fR, \fB\-\-bzip2\fR"
+Compress the resulting database with bzip2(1).
+.IP "\fB\-J\fR, \fB\-\-xz\fR"
+Compress the resulting database with xz(1).
+.IP "\fB\-z\fR, \fB\-\-gzip\fR"
+Compress the resulting database with gzip(1).
+.IP "\fB\-Z\fR, \fB\-\-compress\fR"
+Compress the resulting database with compress(1).
+.IP "\fB\-\-rebuild\fR"
+Rather than attempting to update the existing database, rebuild it.

@@ -12,6 +12,7 @@ CFLAGS := -std=c11 \
 	-DREPOSE_VERSION=\"$(VERSION)\" \
 	$(CFLAGS)
 
+VPATH = src
 LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
 PREFIX = /usr
 
@@ -26,7 +27,7 @@ repose: repose.o database.o package.o memblock.o util.o files.o \
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose
 	install -Dm644 _repose $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_repose
-	# install -Dm644 repose.1 $(DESTDIR)/usr/share/man/man1/repose.1
+	install -Dm644 man/repose.1 $(DESTDIR)$(PREFIX)/share/man/man1/repose.1
 
 clean:
 	$(RM) repose *.o parsers/*.o
