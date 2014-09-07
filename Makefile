@@ -18,7 +18,7 @@ PREFIX = /usr
 
 all: repose
 repose: repose.o database.o package.o memblock.o util.o files.o \
-	pkghash.o strbuf.o base64.o filters.o \
+	pkghash.o strbuf.o base64.o filters.o signing.o \
 	reader.o desc.o
 
 # parsers/desc.c: parsers/desc.rl
