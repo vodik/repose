@@ -338,7 +338,8 @@ static int load_db(struct repo *repo, const char *filename)
     return 0;
 }
 
-static void init_repo(struct repo *repo, const char *reponame, bool files, bool load_cache)
+static void init_repo(struct repo *repo, const char *reponame, bool files,
+                      bool sign, bool load_cache)
 {
     repo->rootfd = open(repo->root, O_RDONLY | O_DIRECTORY);
     if (repo->rootfd < 0)
@@ -388,14 +389,15 @@ int main(int argc, char *argv[])
 {
     const char *rootname;
     const char *arch = NULL;
-    bool files = false, rebuild = false, drop = false;
+    bool files = false, sign = false, rebuild = false, drop = false;
 
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
         { "version",  no_argument,       0, 'V' },
+        { "drop",     no_argument,       0, 'd' },
         { "verbose",  no_argument,       0, 'v' },
         { "files",    no_argument,       0, 'f' },
-        { "drop",     no_argument,       0, 'd' },
+        { "sign",     no_argument,       0, 's' },
         { "root",     required_argument, 0, 'r' },
         { "pool",     required_argument, 0, 'p' },
         { "arch",     required_argument, 0, 'm' },
@@ -416,7 +418,7 @@ int main(int argc, char *argv[])
     };
 
     for (;;) {
-        int opt = getopt_long(argc, argv, "hVvfdr:p:m:jJzZ", opts, NULL);
+        int opt = getopt_long(argc, argv, "hVvdfsr:p:m:jJzZ", opts, NULL);
         if (opt < 0)
             break;
 
@@ -430,11 +432,14 @@ int main(int argc, char *argv[])
         case 'v':
             verbose += 1;
             break;
+        case 'd':
+            drop = true;
+            break;
         case 'f':
             files = true;
             break;
-        case 'd':
-            drop = true;
+        case 's':
+            sign = true;
             break;
         case 'r':
             repo.root = optarg;
@@ -481,7 +486,7 @@ int main(int argc, char *argv[])
     }
 
     rootname = get_rootname(argv[0]);
-    init_repo(&repo, rootname, files, !rebuild);
+    init_repo(&repo, rootname, files, sign, !rebuild);
 
     alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
 
