@@ -429,6 +429,7 @@ int main(int argc, char *argv[])
             exit(EXIT_SUCCESS);
         case 'v':
             verbose += 1;
+            break;
         case 'f':
             files = true;
             break;
