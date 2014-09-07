@@ -506,8 +506,6 @@ int main(int argc, char *argv[])
         trace("repo does not need updating\n");
         break;
     case REPO_DIRTY:
-        /* colon_printf("Writing databases to disk...\n"); */
-
         trace("writing %s...\n", repo.dbname);
         render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
 
