@@ -63,6 +63,16 @@ struct repo {
     alpm_pkghash_t *cache;
 };
 
+static _printf_(1,2) void trace(const char *fmt, ...)
+{
+    if (verbose) {
+        va_list ap;
+        va_start(ap, fmt);
+        vprintf(fmt, ap);
+        va_end(ap);
+    }
+}
+
 static _noreturn_ void usage(FILE *out)
 {
     fprintf(out, "usage: %s [options] <database> [pkgs|deltas ...]\n", program_invocation_short_name);
@@ -201,8 +211,7 @@ static int reduce_repo(struct repo *repo)
             if (errno != ENOENT)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
 
-            if (verbose)
-                printf("dropping %s\n", pkg->name);
+            trace("dropping %s\n", pkg->name);
 
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
@@ -225,8 +234,7 @@ static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
         struct pkg *pkg = node->data;
 
         if (match_targets(pkg, targets)) {
-            if (verbose)
-                printf("dropping %s\n", pkg->name);
+            trace("dropping %s\n", pkg->name);
 
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
@@ -249,8 +257,7 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
 
         /* if the package isn't in the cache, add it */
         if (!old) {
-            if (verbose)
-                printf("adding %s %s\n", pkg->name, pkg->version);
+            trace("adding %s %s\n", pkg->name, pkg->version);
 
             repo->cache = _alpm_pkghash_add(repo->cache, pkg);
             dirty = true;
@@ -261,20 +268,17 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
 
         switch(vercmp) {
             case 1:
-                if (verbose)
-                    printf("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
+                trace("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
 
                 replace = true;
                 break;
             case 0:
                 if (pkg->builddate > old->builddate) {
-                    if (verbose)
-                        printf("updating %s %s [newer build]\n", pkg->name, pkg->version);
+                    trace("updating %s %s [newer build]\n", pkg->name, pkg->version);
 
                     replace = true;
                 } else if (old->base64sig == NULL && pkg->base64sig) {
-                    if (verbose)
-                        printf("adding signature for %s\n", pkg->name);
+                    trace("adding signature for %s\n", pkg->name);
 
                     replace = true;
                 }
@@ -490,23 +494,19 @@ int main(int argc, char *argv[])
 
     switch (repo.state) {
     case REPO_NEW:
-        if (verbose)
-            printf("repo empty!\n");
+        trace("repo empty!\n");
         break;
     case REPO_CLEAN:
-        if (verbose)
-            printf("repo does not need updating\n");
+        trace("repo does not need updating\n");
         break;
     case REPO_DIRTY:
         /* colon_printf("Writing databases to disk...\n"); */
 
-        if (verbose)
-            printf("writing %s...\n", repo.dbname);
+        trace("writing %s...\n", repo.dbname);
         render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
 
         if (repo.filesname) {
-            if (verbose)
-                printf("writing %s...\n", repo.filesname);
+            trace("writing %s...\n", repo.filesname);
             render_db(&repo, repo.filesname, DB_FILES);
         }
 
