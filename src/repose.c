@@ -132,7 +132,7 @@ static _noreturn_ void elephant(void)
         exit(EXIT_SUCCESS);
     }
 
-    exit(ret);
+    exit(EXIT_FAILURE);
 }
 
 static inline int make_link(const struct pkg *pkg, int dirfd, const char *source)
