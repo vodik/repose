@@ -143,6 +143,7 @@ int load_package(pkg_t *pkg, int fd)
 
 int load_package_signature(struct pkg *pkg, int dirfd)
 {
+    struct stat st;
     struct memblock_t memblock;
     _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
     _cleanup_close_ int fd = openat(dirfd, signame, O_RDONLY);
@@ -150,11 +151,17 @@ int load_package_signature(struct pkg *pkg, int dirfd)
     if (fd < 0)
         return -1;
 
+    if (fstat(fd, &st) < 0)
+        return -1;
+
     if (memblock_open_fd(&memblock, fd) < 0)
         return -1;
 
     base64_encode((unsigned char **)&pkg->base64sig,
                   (const unsigned char *)memblock.mem, memblock.len);
+
+    if (st.st_mtime > pkg->mtime)
+        st.st_mtime = pkg->mtime;
 
     memblock_close(&memblock);
     return 0;

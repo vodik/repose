@@ -38,6 +38,7 @@ typedef struct pkg {
     size_t size;
     size_t isize;
     time_t builddate;
+    time_t mtime;
 
     alpm_list_t *groups;
     alpm_list_t *licenses;

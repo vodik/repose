@@ -74,6 +74,11 @@ static struct pkg *load_pkg(int dirfd, const char *filename, const char *arch)
     if (arch && pkg->arch && !match_arch(pkg, arch))
         goto error;
 
+    struct stat st;
+    if (fstat(pkgfd, &st) < 0)
+        goto error;
+
+    pkg->mtime = st.st_mtime;
     pkg->filename = strdup(filename);
     return pkg;
 

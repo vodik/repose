@@ -41,6 +41,7 @@ struct db {
     struct memblock_t memblock;
     struct archive *archive;
     int filter;
+    time_t mtime;
 };
 
 struct db_entry {
@@ -53,9 +54,14 @@ struct pkg *_likely_pkg = NULL;
 
 static int open_db(struct db *db, int fd)
 {
+    struct stat st;
+    if (fstat(fd, &st) < 0)
+        return -1;
+
     *db = (struct db){
         .archive = archive_read_new(),
-        .filter  = ARCHIVE_COMPRESSION_NONE
+        .filter  = ARCHIVE_COMPRESSION_NONE,
+        .mtime   = st.st_mtime
     };
 
     if (memblock_open_fd(&db->memblock, fd) < 0) {
@@ -95,7 +101,7 @@ static int parse_db_entry(const char *entryname, struct db_entry *entry)
 }
 
 static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry *e,
-                                      struct pkg *likely_pkg)
+                                      struct pkg *likely_pkg, time_t mtime)
 {
     struct pkg *pkg;
 
@@ -114,7 +120,8 @@ static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry
         *pkg = (struct pkg){
             .name      = strdup(e->name),
             .version   = strdup(e->version),
-            .name_hash = _alpm_hash_sdbm(e->name)
+            .name_hash = _alpm_hash_sdbm(e->name),
+            .mtime     = mtime
         };
 
         *pkgcache = _alpm_pkghash_add_sorted(*pkgcache, pkg);
@@ -124,7 +131,7 @@ static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry
 }
 
 static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
-                        struct archive_entry *entry)
+                        struct archive_entry *entry, time_t mtime)
 {
     const char *pathname = archive_entry_pathname(entry);
     struct db_entry e;
@@ -133,7 +140,7 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
         goto cleanup;
 
     if (e.type) {
-        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, _likely_pkg);
+        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, _likely_pkg, mtime);
         if (pkg == NULL)
             goto cleanup;
 
@@ -159,7 +166,7 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
         const mode_t mode = archive_entry_mode(entry);
 
         if (S_ISREG(mode))
-            db_read_pkg(pkgcache, db.archive, entry);
+            db_read_pkg(pkgcache, db.archive, entry, db.mtime);
     }
 
     archive_read_close(db.archive);
