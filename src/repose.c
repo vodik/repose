@@ -63,10 +63,11 @@ struct repo {
     alpm_pkghash_t *cache;
 };
 
-static _printf_(1,2) void trace(const char *fmt, ...)
+static inline _printf_(1,2) void trace(const char *fmt, ...)
 {
     if (verbose) {
         va_list ap;
+
         va_start(ap, fmt);
         vprintf(fmt, ap);
         va_end(ap);
