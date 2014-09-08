@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include "pkghash.h"
 #include "filters.h"
+#include "signing.h"
 
 static struct utsname uts;
 static int verbose = 0;
@@ -56,7 +57,9 @@ struct repo {
     int poolfd;
 
     char *dbname;
+    char *dbsig;
     char *filesname;
+    char *filessig;
 
     int compression;
     bool compat;
@@ -155,7 +158,7 @@ static inline int compat_link(int rootdb, const char *reponame, int compression)
     return symlinkat(reponame, rootdb, link);
 }
 
-static int render_db(struct repo *repo, const char *name, enum contents what)
+static int render_db(struct repo *repo, const char *name, enum contents what, bool sign)
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (dbfd < 0)
@@ -167,6 +170,11 @@ static int render_db(struct repo *repo, const char *name, enum contents what)
     if (repo->compat && compat_link(repo->rootfd, name, repo->compression) < 0) {
         if (errno != EEXIST)
             warn("failed to make compatability symlink to %s", name);
+    }
+
+    if (sign) {
+        _cleanup_free_ char *sig = joinstring(name, ".sig", NULL);
+        gpgme_sign(repo->root, name, NULL);
     }
 
     return 0;
@@ -353,8 +361,10 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
         repo->poolfd = repo->rootfd;
     }
 
-    repo->dbname    = joinstring(reponame, ".db", NULL);
+    repo->dbname = joinstring(reponame, ".db", NULL);
+    repo->dbsig = joinstring(repo->dbname, ".sig", NULL);
     repo->filesname = joinstring(reponame, ".files", NULL);
+    repo->filessig = joinstring(repo->filesname, ".sig", NULL);
 
     if (!files && faccessat(repo->rootfd, repo->filesname, F_OK, 0) < 0) {
         if (errno == ENOENT) {
@@ -363,6 +373,34 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
         } else {
             err(EXIT_FAILURE, "countn't access %s", repo->filesname);
         }
+    }
+
+    if (repo->dbsig && faccessat(repo->rootfd, repo->dbsig, F_OK, 0) == 0) {
+        if (gpgme_verify(repo->dbname, repo->dbsig) < 0) {
+            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
+        } else {
+            trace("found a valid signature, will resign");
+            sign = true;
+        }
+    } else if (errno == ENOENT && !sign) {
+        free(repo->dbsig);
+        repo->dbsig = NULL;
+    } else if (errno != ENOENT) {
+        err(EXIT_FAILURE, "countn't access %s", repo->dbsig);
+    }
+
+    if (repo->filessig && faccessat(repo->rootfd, repo->filessig, F_OK, 0) == 0) {
+        if (gpgme_verify(repo->filesname, repo->filessig) < 0) {
+            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
+        } else {
+            trace("found a valid signature, will resign");
+            sign = true;
+        }
+    } else if (errno == ENOENT && !sign) {
+        free(repo->filessig);
+        repo->filessig = NULL;
+    } else if (errno != ENOENT) {
+        err(EXIT_FAILURE, "countn't access %s", repo->filessig);
     }
 
     repo->cache = _alpm_pkghash_create(100);
@@ -512,11 +550,11 @@ int main(int argc, char *argv[])
         break;
     case REPO_DIRTY:
         trace("writing %s...\n", repo.dbname);
-        render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
+        render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS, sign);
 
         if (repo.filesname) {
             trace("writing %s...\n", repo.filesname);
-            render_db(&repo, repo.filesname, DB_FILES);
+            render_db(&repo, repo.filesname, DB_FILES, sign);
         }
 
         link_db(&repo);
