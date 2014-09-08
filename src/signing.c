@@ -25,6 +25,25 @@
 #include <limits.h>
 #include <gpgme.h>
 
+#include "util.h"
+
+static void _noreturn_ _printf_(3,4) gpgme_err(int eval, gpgme_error_t err, const char *fmt, ...)
+{
+    fprintf(stderr, "%s: ", program_invocation_short_name);
+
+    if (fmt) {
+        va_list ap;
+
+        va_start(ap, fmt);
+        vfprintf(stderr, fmt, ap);
+        va_end(ap);
+        fprintf(stderr, ": ");
+    }
+
+    fprintf(stderr, "%s\n", gpgme_strerror(err));
+    exit(eval);
+}
+
 static int init_gpgme(void)
 {
     static int init = 0;
@@ -71,23 +90,23 @@ int gpgme_verify(const char *filepath, const char *sigpath)
 
     err = gpgme_new(&ctx);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "failed to call gpgme_new()");
+        gpgme_err(EXIT_FAILURE, err, "failed to call gpgme_new()");
 
     err = gpgme_data_new_from_file(&in, filepath, 1);
     if (err)
-        errx(EXIT_FAILURE, "error reading `%s': %s", filepath, gpgme_strerror(err));
+        gpgme_err(EXIT_FAILURE, err, "error reading %s", filepath);
 
     err = gpgme_data_new_from_file(&sig, sigpath, 1);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "error reading `%s': %s", filepath, gpgme_strerror(err));
+        gpgme_err(EXIT_FAILURE, err, "error reading %s", filepath);
 
     err = gpgme_op_verify(ctx, sig, in, NULL);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "failed to verify: %s", gpgme_strerror(err));
+        gpgme_err(EXIT_FAILURE, err, "failed to verify");
 
     result = gpgme_op_verify_result(ctx);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "failed to get results: %s", gpgme_strerror(err));
+        gpgme_err(EXIT_FAILURE, err, "failed to get results");
 
     sigs = result->signatures;
     if (gpgme_err_code(sigs->status) != GPG_ERR_NO_ERROR) {
@@ -129,18 +148,18 @@ void gpgme_sign(const char *root, const char *file, const char *key)
 
     err = gpgme_new(&ctx);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "failed to call gpgme_new()");
+        gpgme_err(EXIT_FAILURE, err, "failed to call gpgme_new()");
 
     if (key) {
         gpgme_key_t akey;
 
         err = gpgme_get_key(ctx, key, &akey, 1);
         if (err)
-            errx(EXIT_FAILURE, "failed to set key %s", key);
+            gpgme_err(EXIT_FAILURE, err, "failed to set key %s", key);
 
         err = gpgme_signers_add(ctx, akey);
         if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-            errx(EXIT_FAILURE, "failed to call gpgme_signers_add()");
+            gpgme_err(EXIT_FAILURE, err, "failed to call gpgme_signers_add()");
 
         gpgme_key_unref(akey);
     }
@@ -148,19 +167,19 @@ void gpgme_sign(const char *root, const char *file, const char *key)
     snprintf(filepath, PATH_MAX, "%s/%s", root, file);
     err = gpgme_data_new_from_file(&in, filepath, 1);
     if (err)
-        errx(EXIT_FAILURE, "error reading `%s': %s", file, gpgme_strerror(err));
+        gpgme_err(EXIT_FAILURE, err, "error reading %s", file);
 
     err = gpgme_data_new(&out);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        errx(EXIT_FAILURE, "failed to call gpgme_data_new()");
+        gpgme_err(EXIT_FAILURE, err, "failed to call gpgme_data_new()");
 
     err = gpgme_op_sign(ctx, in, out, GPGME_SIG_MODE_DETACH);
     if (err)
-        errx(EXIT_FAILURE, "signing failed: %s", gpgme_strerror(err));
+        gpgme_err(EXIT_FAILURE, err, "signing failed");
 
     result = gpgme_op_sign_result(ctx);
     if (!result)
-        errx(EXIT_FAILURE, "signaure failed?");
+        gpgme_err(EXIT_FAILURE, err, "signaure failed?");
 
     snprintf(filepath, PATH_MAX, "%s/%s.sig", root, file);
     FILE *fp = fopen(filepath, "w");
