@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
 #include <locale.h>
 #include <errno.h>
 #include <err.h>
@@ -135,7 +136,7 @@ int gpgme_verify(const char *filepath, const char *sigpath)
     return rc;
 }
 
-void gpgme_sign(const char *root, const char *file, const char *key)
+void gpgme_sign(int rootfd, const char *file, const char *key)
 {
     gpgme_error_t err;
     gpgme_ctx_t ctx;
@@ -164,8 +165,10 @@ void gpgme_sign(const char *root, const char *file, const char *key)
         gpgme_key_unref(akey);
     }
 
-    snprintf(filepath, PATH_MAX, "%s/%s", root, file);
-    err = gpgme_data_new_from_file(&in, filepath, 1);
+    /* snprintf(filepath, PATH_MAX, "%s/%s", root, file); */
+    _cleanup_close_ int fd = openat(rootfd, file, O_RDONLY);
+
+    err = gpgme_data_new_from_fd(&in, fd);
     if (err)
         gpgme_err(EXIT_FAILURE, err, "error reading %s", file);
 
@@ -181,8 +184,8 @@ void gpgme_sign(const char *root, const char *file, const char *key)
     if (!result)
         gpgme_err(EXIT_FAILURE, err, "signaure failed?");
 
-    snprintf(filepath, PATH_MAX, "%s/%s.sig", root, file);
-    FILE *fp = fopen(filepath, "w");
+    snprintf(filepath, PATH_MAX, "%s.sig", file);
+    _cleanup_close_ int sigfd = openat(rootfd, filepath, O_WRONLY);
 
     char buf[BUFSIZ];
     int ret;
@@ -192,7 +195,7 @@ void gpgme_sign(const char *root, const char *file, const char *key)
         return;
 
     while ((ret = gpgme_data_read(out, buf, BUFSIZ)) > 0)
-        fwrite(buf, 1, ret, fp);
+        write(sigfd, buf, ret);
 
     gpgme_data_release(out);
     gpgme_data_release(in);

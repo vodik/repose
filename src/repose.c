@@ -173,8 +173,7 @@ static int render_db(struct repo *repo, const char *name, enum contents what, bo
     }
 
     if (sign) {
-        _cleanup_free_ char *sig = joinstring(name, ".sig", NULL);
-        gpgme_sign(repo->root, name, NULL);
+        gpgme_sign(repo->rootfd, name, NULL);
     }
 
     return 0;
