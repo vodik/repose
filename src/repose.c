@@ -352,7 +352,7 @@ static void check_signature(struct repo *repo, const char *name)
         if (gpgme_verify(repo->rootfd, name) < 0) {
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
         } else {
-            trace("found a valid signature, will resign");
+            trace("found a valid signature, will resign...\n");
             repo->sign = true;
         }
     } else if (errno != ENOENT) {
