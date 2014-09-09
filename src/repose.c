@@ -57,12 +57,11 @@ struct repo {
     int poolfd;
 
     char *dbname;
-    char *dbsig;
     char *filesname;
-    char *filessig;
 
     int compression;
     bool compat;
+    bool sign;
     alpm_pkghash_t *cache;
 };
 
@@ -158,7 +157,7 @@ static inline int compat_link(int rootdb, const char *reponame, int compression)
     return symlinkat(reponame, rootdb, link);
 }
 
-static int render_db(struct repo *repo, const char *name, enum contents what, bool sign)
+static int render_db(struct repo *repo, const char *name, enum contents what)
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (dbfd < 0)
@@ -172,7 +171,7 @@ static int render_db(struct repo *repo, const char *name, enum contents what, bo
             warn("failed to make compatability symlink to %s", name);
     }
 
-    if (sign) {
+    if (repo->sign) {
         gpgme_sign(repo->rootfd, name, NULL);
     }
 
@@ -345,8 +344,24 @@ static int load_db(struct repo *repo, const char *filename)
     return 0;
 }
 
+static void check_signature(struct repo *repo, const char *name)
+{
+    _cleanup_free_ char *sig = joinstring(name, ".sig", NULL);
+
+    if (faccessat(repo->rootfd, sig, F_OK, 0) == 0) {
+        if (gpgme_verify(repo->rootfd, name) < 0) {
+            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
+        } else {
+            trace("found a valid signature, will resign");
+            repo->sign = true;
+        }
+    } else if (errno != ENOENT) {
+        err(EXIT_FAILURE, "countn't access %s", name);
+    }
+}
+
 static void init_repo(struct repo *repo, const char *reponame, bool files,
-                      bool sign, bool load_cache)
+                      bool load_cache)
 {
     repo->rootfd = open(repo->root, O_RDONLY | O_DIRECTORY);
     if (repo->rootfd < 0)
@@ -361,9 +376,7 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
     }
 
     repo->dbname = joinstring(reponame, ".db", NULL);
-    repo->dbsig = joinstring(repo->dbname, ".sig", NULL);
     repo->filesname = joinstring(reponame, ".files", NULL);
-    repo->filessig = joinstring(repo->filesname, ".sig", NULL);
 
     if (!files && faccessat(repo->rootfd, repo->filesname, F_OK, 0) < 0) {
         if (errno == ENOENT) {
@@ -374,32 +387,9 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
         }
     }
 
-    if (repo->dbsig && faccessat(repo->rootfd, repo->dbsig, F_OK, 0) == 0) {
-        if (gpgme_verify(repo->rootfd, repo->dbname) < 0) {
-            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
-        } else {
-            trace("found a valid signature, will resign");
-            sign = true;
-        }
-    } else if (errno == ENOENT && !sign) {
-        free(repo->dbsig);
-        repo->dbsig = NULL;
-    } else if (errno != ENOENT) {
-        err(EXIT_FAILURE, "countn't access %s", repo->dbsig);
-    }
-
-    if (repo->filessig && faccessat(repo->rootfd, repo->filessig, F_OK, 0) == 0) {
-        if (gpgme_verify(repo->rootfd, repo->filesname) < 0) {
-            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
-        } else {
-            trace("found a valid signature, will resign");
-            sign = true;
-        }
-    } else if (errno == ENOENT && !sign) {
-        free(repo->filessig);
-        repo->filessig = NULL;
-    } else if (errno != ENOENT) {
-        err(EXIT_FAILURE, "countn't access %s", repo->filessig);
+    if (repo->sign) {
+        check_signature(repo, repo->dbname);
+        check_signature(repo, repo->filesname);
     }
 
     repo->cache = _alpm_pkghash_create(100);
@@ -426,7 +416,7 @@ int main(int argc, char *argv[])
 {
     const char *rootname;
     const char *arch = NULL;
-    bool files = false, sign = false, rebuild = false, drop = false;
+    bool files = false, rebuild = false, drop = false;
 
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
@@ -452,6 +442,8 @@ int main(int argc, char *argv[])
         .state       = REPO_NEW,
         .root        = ".",
         .compression = ARCHIVE_COMPRESSION_NONE,
+        .compat      = false,
+        .sign        = false
     };
 
     for (;;) {
@@ -476,7 +468,7 @@ int main(int argc, char *argv[])
             files = true;
             break;
         case 's':
-            sign = true;
+            repo.sign = true;
             break;
         case 'r':
             repo.root = optarg;
@@ -523,7 +515,7 @@ int main(int argc, char *argv[])
     }
 
     rootname = get_rootname(argv[0]);
-    init_repo(&repo, rootname, files, sign, !rebuild);
+    init_repo(&repo, rootname, files, !rebuild);
 
     alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
 
@@ -549,11 +541,11 @@ int main(int argc, char *argv[])
         break;
     case REPO_DIRTY:
         trace("writing %s...\n", repo.dbname);
-        render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS, sign);
+        render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
 
         if (repo.filesname) {
             trace("writing %s...\n", repo.filesname);
-            render_db(&repo, repo.filesname, DB_FILES, sign);
+            render_db(&repo, repo.filesname, DB_FILES);
         }
 
         link_db(&repo);
