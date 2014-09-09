@@ -95,7 +95,7 @@ int gpgme_verify(int rootfd, const char *file)
         return -1;
 
     _cleanup_free_ char *sigfile = sig_for(file);
-    _cleanup_close_ int sigfd = openat(rootfd, sigfile, O_WRONLY);
+    _cleanup_close_ int sigfd = openat(rootfd, sigfile, O_RDONLY);
     _cleanup_close_ int fd = openat(rootfd, file, O_RDONLY);
 
     err = gpgme_new(&ctx);
@@ -171,7 +171,7 @@ void gpgme_sign(int rootfd, const char *file, const char *key)
     }
 
     _cleanup_free_ char *sigfile = sig_for(file);
-    _cleanup_close_ int sigfd = openat(rootfd, sigfile, O_WRONLY);
+    _cleanup_close_ int sigfd = openat(rootfd, sigfile, O_CREAT | O_WRONLY, 00644);
     _cleanup_close_ int fd = openat(rootfd, file, O_RDONLY);
 
     err = gpgme_data_new_from_fd(&in, fd);
