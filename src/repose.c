@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include "pkghash.h"
 #include "filters.h"
+#include "signing.h"
 
 static struct utsname uts;
 static int verbose = 0;
@@ -60,6 +61,7 @@ struct repo {
 
     int compression;
     bool compat;
+    bool sign;
     alpm_pkghash_t *cache;
 };
 
@@ -167,6 +169,10 @@ static int render_db(struct repo *repo, const char *name, enum contents what)
     if (repo->compat && compat_link(repo->rootfd, name, repo->compression) < 0) {
         if (errno != EEXIST)
             warn("failed to make compatability symlink to %s", name);
+    }
+
+    if (repo->sign) {
+        gpgme_sign(repo->rootfd, name, NULL);
     }
 
     return 0;
@@ -338,7 +344,24 @@ static int load_db(struct repo *repo, const char *filename)
     return 0;
 }
 
-static void init_repo(struct repo *repo, const char *reponame, bool files, bool load_cache)
+static void check_signature(struct repo *repo, const char *name)
+{
+    _cleanup_free_ char *sig = joinstring(name, ".sig", NULL);
+
+    if (faccessat(repo->rootfd, sig, F_OK, 0) == 0) {
+        if (gpgme_verify(repo->rootfd, name) < 0) {
+            errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
+        } else {
+            trace("found a valid signature, will resign...\n");
+            repo->sign = true;
+        }
+    } else if (errno != ENOENT) {
+        err(EXIT_FAILURE, "countn't access %s", name);
+    }
+}
+
+static void init_repo(struct repo *repo, const char *reponame, bool files,
+                      bool load_cache)
 {
     repo->rootfd = open(repo->root, O_RDONLY | O_DIRECTORY);
     if (repo->rootfd < 0)
@@ -352,7 +375,7 @@ static void init_repo(struct repo *repo, const char *reponame, bool files, bool 
         repo->poolfd = repo->rootfd;
     }
 
-    repo->dbname    = joinstring(reponame, ".db", NULL);
+    repo->dbname = joinstring(reponame, ".db", NULL);
     repo->filesname = joinstring(reponame, ".files", NULL);
 
     if (!files && faccessat(repo->rootfd, repo->filesname, F_OK, 0) < 0) {
@@ -362,6 +385,11 @@ static void init_repo(struct repo *repo, const char *reponame, bool files, bool 
         } else {
             err(EXIT_FAILURE, "countn't access %s", repo->filesname);
         }
+    }
+
+    if (repo->sign) {
+        check_signature(repo, repo->dbname);
+        check_signature(repo, repo->filesname);
     }
 
     repo->cache = _alpm_pkghash_create(100);
@@ -393,9 +421,10 @@ int main(int argc, char *argv[])
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
         { "version",  no_argument,       0, 'V' },
+        { "drop",     no_argument,       0, 'd' },
         { "verbose",  no_argument,       0, 'v' },
         { "files",    no_argument,       0, 'f' },
-        { "drop",     no_argument,       0, 'd' },
+        { "sign",     no_argument,       0, 's' },
         { "root",     required_argument, 0, 'r' },
         { "pool",     required_argument, 0, 'p' },
         { "arch",     required_argument, 0, 'm' },
@@ -413,10 +442,12 @@ int main(int argc, char *argv[])
         .state       = REPO_NEW,
         .root        = ".",
         .compression = ARCHIVE_COMPRESSION_NONE,
+        .compat      = false,
+        .sign        = false
     };
 
     for (;;) {
-        int opt = getopt_long(argc, argv, "hVvfdr:p:m:jJzZ", opts, NULL);
+        int opt = getopt_long(argc, argv, "hVvdfsr:p:m:jJzZ", opts, NULL);
         if (opt < 0)
             break;
 
@@ -430,11 +461,14 @@ int main(int argc, char *argv[])
         case 'v':
             verbose += 1;
             break;
+        case 'd':
+            drop = true;
+            break;
         case 'f':
             files = true;
             break;
-        case 'd':
-            drop = true;
+        case 's':
+            repo.sign = true;
             break;
         case 'r':
             repo.root = optarg;
