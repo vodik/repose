@@ -45,6 +45,11 @@ static void _noreturn_ _printf_(3,4) gpgme_err(int eval, gpgme_error_t err, cons
     exit(eval);
 }
 
+static inline char *sig_for(const char *file)
+{
+    return joinstring(file, ".sig", NULL);
+}
+
 static int init_gpgme(void)
 {
     static int init = 0;
@@ -77,7 +82,7 @@ static int init_gpgme(void)
     return 0;
 }
 
-int gpgme_verify(const char *filepath, const char *sigpath)
+int gpgme_verify(int rootfd, const char *file)
 {
     gpgme_error_t err;
     gpgme_ctx_t ctx;
@@ -89,26 +94,27 @@ int gpgme_verify(const char *filepath, const char *sigpath)
     if (init_gpgme() < 0)
         return -1;
 
+    _cleanup_free_ char *sigfile = sig_for(file);
+    _cleanup_close_ int sigfd = openat(rootfd, sigfile, O_WRONLY);
+    _cleanup_close_ int fd = openat(rootfd, file, O_RDONLY);
+
     err = gpgme_new(&ctx);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
         gpgme_err(EXIT_FAILURE, err, "failed to call gpgme_new()");
 
-    err = gpgme_data_new_from_file(&in, filepath, 1);
+    err = gpgme_data_new_from_fd(&in, fd);
     if (err)
-        gpgme_err(EXIT_FAILURE, err, "error reading %s", filepath);
+        gpgme_err(EXIT_FAILURE, err, "error reading %s", file);
 
-    err = gpgme_data_new_from_file(&sig, sigpath, 1);
+    err = gpgme_data_new_from_fd(&sig, sigfd);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        gpgme_err(EXIT_FAILURE, err, "error reading %s", filepath);
+        gpgme_err(EXIT_FAILURE, err, "error reading %s", sigfile);
 
     err = gpgme_op_verify(ctx, sig, in, NULL);
     if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
         gpgme_err(EXIT_FAILURE, err, "failed to verify");
 
     result = gpgme_op_verify_result(ctx);
-    if (gpg_err_code(err) != GPG_ERR_NO_ERROR)
-        gpgme_err(EXIT_FAILURE, err, "failed to get results");
-
     sigs = result->signatures;
     if (gpgme_err_code(sigs->status) != GPG_ERR_NO_ERROR) {
         warnx("unexpected signature status: %s", gpgme_strerror(sigs->status));
@@ -142,7 +148,6 @@ void gpgme_sign(int rootfd, const char *file, const char *key)
     gpgme_ctx_t ctx;
     gpgme_data_t in, out;
     gpgme_sign_result_t result;
-    char filepath[PATH_MAX];
 
     if (init_gpgme() < 0)
         return;
@@ -165,7 +170,8 @@ void gpgme_sign(int rootfd, const char *file, const char *key)
         gpgme_key_unref(akey);
     }
 
-    /* snprintf(filepath, PATH_MAX, "%s/%s", root, file); */
+    _cleanup_free_ char *sigfile = sig_for(file);
+    _cleanup_close_ int sigfd = openat(rootfd, sigfile, O_WRONLY);
     _cleanup_close_ int fd = openat(rootfd, file, O_RDONLY);
 
     err = gpgme_data_new_from_fd(&in, fd);
@@ -183,9 +189,6 @@ void gpgme_sign(int rootfd, const char *file, const char *key)
     result = gpgme_op_sign_result(ctx);
     if (!result)
         gpgme_err(EXIT_FAILURE, err, "signaure failed?");
-
-    snprintf(filepath, PATH_MAX, "%s.sig", file);
-    _cleanup_close_ int sigfd = openat(rootfd, filepath, O_WRONLY);
 
     char buf[BUFSIZ];
     int ret;

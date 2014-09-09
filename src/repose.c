@@ -375,7 +375,7 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
     }
 
     if (repo->dbsig && faccessat(repo->rootfd, repo->dbsig, F_OK, 0) == 0) {
-        if (gpgme_verify(repo->dbname, repo->dbsig) < 0) {
+        if (gpgme_verify(repo->rootfd, repo->dbname) < 0) {
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
         } else {
             trace("found a valid signature, will resign");
@@ -389,7 +389,7 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
     }
 
     if (repo->filessig && faccessat(repo->rootfd, repo->filessig, F_OK, 0) == 0) {
-        if (gpgme_verify(repo->filesname, repo->filessig) < 0) {
+        if (gpgme_verify(repo->rootfd, repo->filesname) < 0) {
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
         } else {
             trace("found a valid signature, will resign");
