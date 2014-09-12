@@ -36,16 +36,6 @@ int file_from_fd(struct file_t *file, int fd)
     return file->mmap == MAP_FAILED ? -errno : 0;
 }
 
-int file_open(struct file_t *file, const char *filename)
-{
-    int ret = 0, fd = open(filename, O_RDONLY);
-    if (fd < 0)
-        return -errno;
-
-    ret = file_from_fd(file, fd);
-    return ret;
-}
-
 int file_close(struct file_t *file)
 {
     close(file->fd);

@@ -26,6 +26,5 @@ struct file_t {
     char *mmap;
 };
 
-int file_from_fd(struct file_t *memblock, int fd);
-int file_open(struct file_t *memblock, const char *filename);
-int file_close(struct file_t *memblock);
+int file_from_fd(struct file_t *file, int fd);
+int file_close(struct file_t *file);
