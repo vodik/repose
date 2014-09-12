@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <locale.h>
 #include <errno.h>
@@ -53,7 +54,6 @@ static inline char *sig_for(const char *file)
 static int init_gpgme(void)
 {
     static int init = 0;
-    const char *version; // *sigdir;
     gpgme_error_t err;
     gpgme_engine_info_t enginfo;
 
@@ -63,7 +63,7 @@ static int init_gpgme(void)
 
     /* calling gpgme_check_version() returns the current version and runs
      * some internal library setup code */
-    version = gpgme_check_version(NULL);
+    gpgme_check_version(NULL);
     gpgme_set_locale(NULL, LC_CTYPE, setlocale(LC_CTYPE, NULL));
 #ifdef LC_MESSAGES
     gpgme_set_locale(NULL, LC_MESSAGES, setlocale(LC_MESSAGES, NULL));
