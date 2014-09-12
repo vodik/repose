@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "memblock.h"
+#include "file.h"
 #include "util.h"
 #include "reader.h"
 #include "pkghash.h"

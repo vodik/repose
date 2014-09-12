@@ -29,7 +29,7 @@
 #include <err.h>
 #include <time.h>
 
-#include "memblock.h"
+#include "file.h"
 #include "pkghash.h"
 #include "util.h"
 #include "desc.h"

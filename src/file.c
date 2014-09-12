@@ -15,7 +15,7 @@
  * Copyright (C) Simon Gomizelj, 2014
  */
 
-#include "memblock.h"
+#include "file.h"
 
 #include <stdio.h>
 #include <unistd.h>
