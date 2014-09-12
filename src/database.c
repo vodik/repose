@@ -38,7 +38,7 @@
 
 struct db {
     int fd;
-    struct memblock_t memblock;
+    struct file_t file;
     struct archive *archive;
     int filter;
     time_t mtime;
@@ -54,25 +54,19 @@ struct pkg *_likely_pkg = NULL;
 
 static int open_db(struct db *db, int fd)
 {
-    struct stat st;
-    if (fstat(fd, &st) < 0)
+    *db = (struct db){.filter  = ARCHIVE_COMPRESSION_NONE};
+
+    if (file_from_fd(&db->file, fd) < 0)
         return -1;
 
-    *db = (struct db){
-        .archive = archive_read_new(),
-        .filter  = ARCHIVE_COMPRESSION_NONE,
-        .mtime   = st.st_mtime
-    };
-
-    if (memblock_open_fd(&db->memblock, fd) < 0) {
-        archive_read_free(db->archive);
-        return -1;
-    }
+    db->fd = db->file.fd;
+    db->archive = archive_read_new();
+    db->mtime = db->file.st.st_mtime;
 
     archive_read_support_filter_all(db->archive);
     archive_read_support_format_all(db->archive);
 
-    if (archive_read_open_memory(db->archive, db->memblock.mem, db->memblock.len) != ARCHIVE_OK) {
+    if (archive_read_open_memory(db->archive, db->file.mmap, db->file.st.st_size) != ARCHIVE_OK) {
         archive_read_free(db->archive);
         return -1;
     }

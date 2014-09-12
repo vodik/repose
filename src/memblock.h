@@ -18,12 +18,14 @@
 #pragma once
 
 #include <stddef.h>
+#include <sys/stat.h>
 
-struct memblock_t {
-    char *mem;
-    size_t len;
+struct file_t {
+    int fd;
+    struct stat st;
+    char *mmap;
 };
 
-int memblock_open_fd(struct memblock_t *memblock, int fd);
-int memblock_open_file(struct memblock_t *memblock, const char *filename);
-int memblock_close(struct memblock_t *memblock);
+int file_from_fd(struct file_t *memblock, int fd);
+int file_open(struct file_t *memblock, const char *filename);
+int file_close(struct file_t *memblock);

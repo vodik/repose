@@ -24,34 +24,30 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-int memblock_open_fd(struct memblock_t *memblock, int fd)
+int file_from_fd(struct file_t *file, int fd)
 {
-    struct stat st;
-    fstat(fd, &st);
+    *file = (struct file_t){.fd = fd};
 
-    *memblock = (struct memblock_t){
-        .len = st.st_size,
-        .mem = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0)
-    };
+    fstat(fd, &file->st);
 
-    madvise(memblock->mem, memblock->len, MADV_WILLNEED | MADV_SEQUENTIAL);
-    return memblock->mem == MAP_FAILED ? -errno : 0;
+    file->mmap = mmap(NULL, file->st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+    madvise(file->mmap, file->st.st_size, MADV_WILLNEED | MADV_SEQUENTIAL);
+
+    return file->mmap == MAP_FAILED ? -errno : 0;
 }
 
-int memblock_open_file(struct memblock_t *memblock, const char *filename)
+int file_open(struct file_t *file, const char *filename)
 {
     int ret = 0, fd = open(filename, O_RDONLY);
     if (fd < 0)
         return -errno;
 
-    ret = memblock_open_fd(memblock, fd);
-    close(fd);
+    ret = file_from_fd(file, fd);
     return ret;
 }
 
-int memblock_close(struct memblock_t *memblock)
+int file_close(struct file_t *file)
 {
-    if (memblock->mem != MAP_FAILED)
-        return munmap(memblock->mem, memblock->len);
-    return 0;
+    close(file->fd);
+    return file->mmap != MAP_FAILED ? munmap(file->mmap, file->st.st_size) : 0;
 }
