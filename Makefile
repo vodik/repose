@@ -17,7 +17,7 @@ LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
 PREFIX = /usr
 
 all: repose
-repose: repose.o database.o package.o memblock.o util.o files.o \
+repose: repose.o database.o package.o file.o util.o files.o \
 	pkghash.o strbuf.o base64.o filters.o signing.o \
 	reader.o desc.o
 

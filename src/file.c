@@ -15,15 +15,29 @@
  * Copyright (C) Simon Gomizelj, 2014
  */
 
-#pragma once
+#include "file.h"
 
-#include <stddef.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
-struct memblock_t {
-    char *mem;
-    size_t len;
-};
+int file_from_fd(struct file_t *file, int fd)
+{
+    *file = (struct file_t){.fd = fd};
 
-int memblock_open_fd(struct memblock_t *memblock, int fd);
-int memblock_open_file(struct memblock_t *memblock, const char *filename);
-int memblock_close(struct memblock_t *memblock);
+    fstat(fd, &file->st);
+
+    file->mmap = mmap(NULL, file->st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+    madvise(file->mmap, file->st.st_size, MADV_WILLNEED | MADV_SEQUENTIAL);
+
+    return file->mmap == MAP_FAILED ? -errno : 0;
+}
+
+int file_close(struct file_t *file)
+{
+    close(file->fd);
+    return file->mmap != MAP_FAILED ? munmap(file->mmap, file->st.st_size) : 0;
+}

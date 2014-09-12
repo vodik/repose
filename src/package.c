@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "memblock.h"
+#include "file.h"
 #include "util.h"
 #include "reader.h"
 #include "pkghash.h"
@@ -101,18 +101,18 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
 
 int load_package(pkg_t *pkg, int fd)
 {
-    struct archive *archive = archive_read_new();
-    struct memblock_t memblock;
+    struct archive *archive;
+    struct file_t file;
 
-    if (memblock_open_fd(&memblock, fd) < 0) {
-        archive_read_free(archive);
+    if (file_from_fd(&file, fd) < 0) {
         return -1;
     }
 
+    archive = archive_read_new();
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    if (archive_read_open_memory(archive, memblock.mem, memblock.len) != ARCHIVE_OK) {
+    if (archive_read_open_memory(archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
         archive_read_free(archive);
         return -1;
     }
@@ -133,7 +133,7 @@ int load_package(pkg_t *pkg, int fd)
     archive_read_free(archive);
 
     if (found_pkginfo) {
-        pkg->size = memblock.len;
+        pkg->size = file.st.st_size;
         pkg->name_hash = _alpm_hash_sdbm(pkg->name);
         return 0;
     }
@@ -143,44 +143,39 @@ int load_package(pkg_t *pkg, int fd)
 
 int load_package_signature(struct pkg *pkg, int dirfd)
 {
-    struct stat st;
-    struct memblock_t memblock;
+    struct file_t file;
     _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
     _cleanup_close_ int fd = openat(dirfd, signame, O_RDONLY);
 
     if (fd < 0)
         return -1;
 
-    if (fstat(fd, &st) < 0)
-        return -1;
-
-    if (memblock_open_fd(&memblock, fd) < 0)
+    if (file_from_fd(&file, fd) < 0)
         return -1;
 
     base64_encode((unsigned char **)&pkg->base64sig,
-                  (const unsigned char *)memblock.mem, memblock.len);
+                  (const unsigned char *)file.mmap, file.st.st_size);
 
-    if (st.st_mtime > pkg->mtime)
-        st.st_mtime = pkg->mtime;
+    if (file.st.st_mtime > pkg->mtime)
+        file.st.st_mtime = pkg->mtime;
 
-    memblock_close(&memblock);
+    file_close(&file);
     return 0;
 }
 
 int load_package_files(struct pkg *pkg, int fd)
 {
-    struct archive *archive = archive_read_new();
-    struct memblock_t memblock;
+    struct archive *archive;
+    struct file_t file;
 
-    if (memblock_open_fd(&memblock, fd) < 0) {
-        archive_read_free(archive);
+    if (file_from_fd(&file, fd) < 0)
         return -1;
-    }
 
+    archive = archive_read_new();
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    if (archive_read_open_memory(archive, memblock.mem, memblock.len) != ARCHIVE_OK) {
+    if (archive_read_open_memory(archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
         archive_read_free(archive);
         return -1;
     }
