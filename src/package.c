@@ -134,6 +134,7 @@ int load_package(pkg_t *pkg, int fd)
 
     if (found_pkginfo) {
         pkg->size = file.st.st_size;
+        pkg->mtime = file.st.st_mtime;
         pkg->name_hash = _alpm_hash_sdbm(pkg->name);
         return 0;
     }
