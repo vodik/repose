@@ -15,7 +15,7 @@
  * Copyright (C) Simon Gomizelj, 2014
  */
 
-#include "files.h"
+#include "filecache.h"
 
 #include <stdlib.h>
 #include <stdio.h>
