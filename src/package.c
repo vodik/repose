@@ -198,7 +198,6 @@ int load_package_files(struct pkg *pkg, int fd)
 void package_free(pkg_t *pkg)
 {
     free(pkg->filename);
-    /* free(pkg->signame); */
     free(pkg->name);
     free(pkg->version);
     free(pkg->desc);

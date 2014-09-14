@@ -26,7 +26,7 @@
 
 int file_from_fd(struct file_t *file, int fd)
 {
-    *file = (struct file_t){.fd = fd};
+    *file = (struct file_t){ .fd = fd };
 
     fstat(fd, &file->st);
 

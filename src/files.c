@@ -44,7 +44,7 @@ static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pk
     return cache;
 }
 
-static size_t filecache_size(DIR *dirp)
+static size_t get_filecache_size(DIR *dirp)
 {
     struct dirent *entry;
     size_t size = 0;
@@ -58,7 +58,7 @@ static size_t filecache_size(DIR *dirp)
     return size;
 }
 
-static struct pkg *load_pkg(int dirfd, const char *filename, const char *arch)
+static struct pkg *load_from_file(int dirfd, const char *filename, const char *arch)
 {
     int pkgfd = openat(dirfd, filename, O_RDONLY);
     if (pkgfd < 0) {
@@ -91,7 +91,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
         if (!(dp->d_type & DT_REG))
             continue;
 
-        struct pkg *pkg = load_pkg(dirfd, dp->d_name, arch);
+        struct pkg *pkg = load_from_file(dirfd, dp->d_name, arch);
         if (!pkg)
             continue;
 
@@ -115,7 +115,7 @@ alpm_pkghash_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch)
     if (!dirp)
         err(EXIT_FAILURE, "fdopendir failed");
 
-    size_t size = filecache_size(dirp);
+    size_t size = get_filecache_size(dirp);
     alpm_pkghash_t *cache = _alpm_pkghash_create(size);
 
     return scan_for_targets(cache, dirfd, dirp, targets, arch);

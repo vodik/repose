@@ -54,7 +54,7 @@ struct pkg *_likely_pkg = NULL;
 
 static int open_db(struct db *db, int fd)
 {
-    *db = (struct db){.filter  = ARCHIVE_COMPRESSION_NONE};
+    *db = (struct db){ .filter  = ARCHIVE_COMPRESSION_NONE };
 
     if (file_from_fd(&db->file, fd) < 0)
         return -1;
@@ -86,7 +86,7 @@ static int parse_db_entry(const char *entryname, struct db_entry *entry)
     if (*dash != '-')
         return -EINVAL;
 
-    /* ->name, ->version and ->type share the same memory */
+    /* name, version and type share the same memory */
     entry->name[dash - entry->name] = entry->name[slash - entry->name] = '\0';
     entry->type = slash ? slash + 1 : NULL;
     entry->version = &entry->name[dash - entry->name + 1];
@@ -118,8 +118,8 @@ static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry
 
         *pkg = (struct pkg){
             .name      = strdup(e->name),
-            .version   = strdup(e->version),
             .name_hash = _alpm_hash_sdbm(e->name),
+            .version   = strdup(e->version),
             .mtime     = mtime
         };
 
