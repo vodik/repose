@@ -94,6 +94,11 @@ static int parse_db_entry(const char *entryname, struct db_entry *entry)
     return 0;
 }
 
+static inline void free_db_entry(struct db_entry *e)
+{
+    free(e->name);
+}
+
 static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry *e,
                                       struct pkg *likely_pkg, time_t mtime)
 {
@@ -145,7 +150,7 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
     }
 
 cleanup:
-    free(e.name);
+    free_db_entry(&e);
 }
 
 int load_database(int fd, alpm_pkghash_t **pkgcache)
