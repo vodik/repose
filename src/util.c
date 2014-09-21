@@ -66,19 +66,6 @@ char *joinstring(const char *root, ...)
     return ret;
 }
 
-size_t memcspn(const void *s, size_t n, const char *reject)
-{
-    size_t i;
-    char table[1 << CHAR_BIT] = { 0 };
-    const unsigned char *buf = s;
-
-    while (*reject)
-        table[(int)*reject++] = 1;
-
-    for (i = 0; i < n && !table[buf[i]]; i++);
-    return i;
-}
-
 int xstrtol(const char *str, long *out)
 {
     char *end = NULL;

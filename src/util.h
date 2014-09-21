@@ -41,19 +41,10 @@ static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 static inline void *zero(void *s, size_t n) { return memset(s, 0, n); }
 static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2) == 0; }
 
-static inline size_t strip_newline(char *str)
-{
-    size_t len = strcspn(str, "\n");
-    str[len] = '\0';
-    return len;
-}
-
 char *joinstring(const char *root, ...);
 
 int xstrtol(const char *str, long *out);
 int xstrtoul(const char *str, unsigned long *out);
-
-size_t memcspn(const void *s, size_t n, const char *reject);
 
 char *compute_md5sum(int dirfd, char *filename);
 char *compute_sha256sum(int dirfd, char *filename);
