@@ -111,104 +111,58 @@ static char *hex_representation(unsigned char *bytes, size_t size)
     return str;
 }
 
-/** Compute the MD5 message digest of a file.
- * @param path file path of file to compute  MD5 digest of
- * @param output string to hold computed MD5 digest
- * @return 0 on success, 1 on file open error, 2 on file read error
- */
-static int md5_file(int fd, unsigned char output[16])
+static char *md5_fd(int fd)
 {
-	MD5_CTX ctx;
-	unsigned char *buf;
-	ssize_t n;
+    MD5_CTX ctx;
+    unsigned char buf[BUFSIZ], output[16];
+    ssize_t n;
 
-	/* MALLOC(buf, (size_t)ALPM_BUFFER_SIZE, return 1); */
-	buf = malloc(BUFSIZ);
+    MD5_Init(&ctx);
 
-	MD5_Init(&ctx);
+    while ((n = read(fd, buf, sizeof(buf))) > 0 || errno == EINTR) {
+        if (n < 0)
+            continue;
+        MD5_Update(&ctx, buf, n);
+    }
 
-	while((n = read(fd, buf, BUFSIZ)) > 0 || errno == EINTR) {
-		if(n < 0) {
-			continue;
-		}
-		MD5_Update(&ctx, buf, n);
-	}
-
-	free(buf);
-
-	if(n < 0) {
-		return 2;
-	}
-
-	MD5_Final(output, &ctx);
-	return 0;
-}
-
-/* third param is so we match the PolarSSL definition */
-/** Compute the SHA-224 or SHA-256 message digest of a file.
- * @param path file path of file to compute SHA2 digest of
- * @param output string to hold computed SHA2 digest
- * @param is224 use SHA-224 instead of SHA-256
- * @return 0 on success, 1 on file open error, 2 on file read error
- */
-static int sha2_file(int fd, unsigned char output[32], int is224)
-{
-	SHA256_CTX ctx;
-	unsigned char *buf;
-	ssize_t n;
-
-	/* MALLOC(buf, (size_t)ALPM_BUFFER_SIZE, return 1); */
-	buf = malloc(BUFSIZ);
-
-	if(is224) {
-		SHA224_Init(&ctx);
-	} else {
-		SHA256_Init(&ctx);
-	}
-
-	while((n = read(fd, buf, BUFSIZ)) > 0 || errno == EINTR) {
-		if(n < 0) {
-			continue;
-		}
-		if(is224) {
-			SHA224_Update(&ctx, buf, n);
-		} else {
-			SHA256_Update(&ctx, buf, n);
-		}
-	}
-
-	free(buf);
-
-	if(n < 0) {
-		return 2;
-	}
-
-	if(is224) {
-		SHA224_Final(output, &ctx);
-	} else {
-		SHA256_Final(output, &ctx);
-	}
-	return 0;
-}
-
-char *compute_md5sum(int dirfd, char *filename)
-{
-    unsigned char output[16];
-    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
-
-    if (md5_file(fd, output) > 0)
+    if (n < 0)
         return NULL;
+
+    MD5_Final(output, &ctx);
     return hex_representation(output, 16);
 }
 
-char *compute_sha256sum(int dirfd, char *filename)
+static char *sha2_fd(int fd)
 {
-    unsigned char output[32];
-    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
+    SHA256_CTX ctx;
+    unsigned char buf[BUFSIZ], output[32];
+    ssize_t n;
 
-    if (sha2_file(fd, output, 0) > 0)
+    SHA256_Init(&ctx);
+
+    while ((n = read(fd, buf, sizeof(buf))) > 0 || errno == EINTR) {
+        if (n < 0)
+            continue;
+        SHA256_Update(&ctx, buf, n);
+    }
+
+    if (n < 0)
         return NULL;
+
+    SHA256_Final(output, &ctx);
     return hex_representation(output, 32);
+}
+
+char *md5_file(int dirfd, char *filename)
+{
+    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
+    return md5_fd(fd);
+}
+
+char *sha256_file(int dirfd, char *filename)
+{
+    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
+    return sha2_fd(fd);
 }
 
 char *strstrip(char *s)

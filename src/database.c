@@ -220,9 +220,9 @@ static void compile_desc_entry(struct pkg *pkg, buffer_t *buf, int poolfd)
     write_long(buf,   "ISIZE",     (long)pkg->isize);
 
     if (!pkg->md5sum)
-        pkg->md5sum = compute_md5sum(poolfd, pkg->filename);
+        pkg->md5sum = md5_file(poolfd, pkg->filename);
     if (!pkg->sha256sum)
-        pkg->sha256sum = compute_sha256sum(poolfd, pkg->filename);
+        pkg->sha256sum = sha256_file(poolfd, pkg->filename);
     if (!pkg->base64sig)
         load_package_signature(pkg, poolfd);
 
