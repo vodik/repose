@@ -21,9 +21,6 @@ repose: repose.o database.o package.o file.o util.o filecache.o \
 	pkghash.o strbuf.o base64.o filters.o signing.o \
 	reader.o desc.o
 
-# parsers/desc.c: parsers/desc.rl
-# 	ragel -T1 -C $< -o $@
-
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose
 	install -Dm644 _repose $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_repose
