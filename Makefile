@@ -27,6 +27,6 @@ install: repose
 	install -Dm644 man/repose.1 $(DESTDIR)$(PREFIX)/share/man/man1/repose.1
 
 clean:
-	$(RM) repose *.o parsers/*.o
+	$(RM) repose *.o
 
 .PHONY: clean install uninstall
