@@ -71,19 +71,17 @@ void read_desc(struct archive *archive, struct pkg *pkg)
         if (streq(buf, "%FILENAME%")) {
             read_desc_entry(reader, &pkg->filename);
         } else if (streq(buf, "%NAME%")) {
-            read_desc_entry(reader, &pkg->name);
-            /* read_desc_entry(reader, buf, entry_size, &temp); */
-            /* if (!streq(temp, pkg->name)) */
-            /*     errx(EXIT_FAILURE, "database entry name and desc record are mismatched!"); */
-            /* free(temp); */
+            _cleanup_free_ char *temp = NULL;
+            read_desc_entry(reader, &temp);
+            if (!streq(temp, pkg->name))
+                errx(EXIT_FAILURE, "database entry %%NAME%% and desc record are mismatched!");
         } else if (streq(buf, "%BASE%")) {
             read_desc_entry(reader, &pkg->base);
         } else if (streq(buf, "%VERSION%")) {
-            read_desc_entry(reader, &pkg->version);
-            /* read_desc_entry(reader, buf, entry_size, &temp); */
-            /* if (!streq(temp, pkg->version)) */
-            /*     errx(EXIT_FAILURE, "database entry version and desc record are mismatched!"); */
-            /* free(temp); */
+            _cleanup_free_ char *temp = NULL;
+            read_desc_entry(reader, &temp);
+            if (!streq(temp, pkg->version))
+                errx(EXIT_FAILURE, "database entry %%VERSION%% and desc record are mismatched!");
         } else if (streq(buf, "%DESC%")) {
             read_desc_entry(reader, &pkg->desc);
         } else if (streq(buf, "%GROUPS%")) {
