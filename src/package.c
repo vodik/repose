@@ -191,7 +191,6 @@ int load_package_files(struct pkg *pkg, int fd)
 
     archive_read_close(archive);
     archive_read_free(archive);
-
     return 0;
 }
 
