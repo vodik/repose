@@ -208,6 +208,8 @@ void package_free(pkg_t *pkg)
     free(pkg->base64sig);
     free(pkg->arch);
 
+    alpm_list_free_inner(pkg->groups, free);
+    alpm_list_free(pkg->groups);
     alpm_list_free_inner(pkg->licenses, free);
     alpm_list_free(pkg->licenses);
     alpm_list_free_inner(pkg->depends, free);
