@@ -168,7 +168,6 @@ char *sha256_file(int dirfd, char *filename)
 char *strstrip(char *s)
 {
     char *e;
-
     s += strspn(s, WHITESPACE);
 
     for (e = strchr(s, 0); e > s; --e) {
