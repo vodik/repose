@@ -109,25 +109,6 @@ int xstrtoul(const char *str, unsigned long *out)
     return 0;
 }
 
-int realize(const char *path, char **root, const char **name)
-{
-    char *real = realpath(path, NULL);
-    if (!real)
-        return -errno;
-
-    char *slash = strrchr(real, '/');
-    if (slash) {
-        *root = real;
-        *slash = '\0';
-        *name = slash + 1;
-    } else {
-        *root = NULL;
-        *name = path;
-    }
-
-    return 0;
-}
-
 static char *hex_representation(unsigned char *bytes, size_t size)
 {
     static const char *hex_digits = "0123456789abcdef";

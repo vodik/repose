@@ -55,8 +55,6 @@ int xstrtoul(const char *str, unsigned long *out);
 
 size_t memcspn(const void *s, size_t n, const char *reject);
 
-int realize(const char *path, char **root, const char **name);
-
 char *compute_md5sum(int dirfd, char *filename);
 char *compute_sha256sum(int dirfd, char *filename);
 
