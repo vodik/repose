@@ -114,6 +114,8 @@ static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
 
     if (!pkg) {
         pkg = malloc(sizeof(struct pkg));
+        if (!pkg)
+            return NULL;
 
         *pkg = (struct pkg){
             .name      = strdup(e->name),
@@ -129,26 +131,30 @@ static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
     return pkg;
 }
 
-static void db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
+static int db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
                         struct archive_entry *entry)
 {
     const char *pathname = archive_entry_pathname(entry);
     struct db_entry e;
 
-    if (parse_db_entry(pathname, &e) < 0)
-        goto cleanup;
+    if (parse_db_entry(pathname, &e) < 0) {
+        free_db_entry(&e);
+        return -1;
+    }
 
     if (e.type) {
         struct pkg *pkg = load_pkg_for_entry(db, pkgcache, &e);
-        if (pkg == NULL)
-            goto cleanup;
+        if (pkg == NULL) {
+            free_db_entry(&e);
+            return -1;
+        }
 
         if (streq(e.type, "desc") || streq(e.type, "depends") || streq(e.type, "files"))
             read_desc(db->archive, pkg);
     }
 
-cleanup:
     free_db_entry(&e);
+    return 0;
 }
 
 int load_database(int fd, alpm_pkghash_t **pkgcache)
@@ -162,8 +168,8 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
     while (archive_read_next_header(db.archive, &entry) == ARCHIVE_OK) {
         const mode_t mode = archive_entry_mode(entry);
 
-        if (S_ISREG(mode))
-            db_read_pkg(&db, pkgcache, entry);
+        if (S_ISREG(mode) && db_read_pkg(&db, pkgcache, entry) < 0)
+            return -1;
     }
 
     archive_read_close(db.archive);
