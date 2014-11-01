@@ -42,6 +42,7 @@ struct db {
     struct archive *archive;
     int filter;
     time_t mtime;
+    struct pkg *likely_pkg;
 };
 
 struct db_entry {
@@ -49,8 +50,6 @@ struct db_entry {
     const char *type;
     const char *version;
 };
-
-struct pkg *_likely_pkg = NULL;
 
 static int open_db(struct db *db, int fd)
 {
@@ -139,14 +138,14 @@ static void db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
         goto cleanup;
 
     if (e.type) {
-        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, _likely_pkg, db->mtime);
+        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, db->likely_pkg, db->mtime);
         if (pkg == NULL)
             goto cleanup;
 
         if (streq(e.type, "desc") || streq(e.type, "depends") || streq(e.type, "files"))
             read_desc(db->archive, pkg);
 
-        _likely_pkg = pkg;
+        db->likely_pkg = pkg;
     }
 
 cleanup:
