@@ -129,8 +129,8 @@ static struct pkg *load_pkg_for_entry(alpm_pkghash_t **pkgcache, struct db_entry
     return pkg;
 }
 
-static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
-                        struct archive_entry *entry, time_t mtime)
+static void db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
+                        struct archive_entry *entry)
 {
     const char *pathname = archive_entry_pathname(entry);
     struct db_entry e;
@@ -139,12 +139,12 @@ static void db_read_pkg(alpm_pkghash_t **pkgcache, struct archive *archive,
         goto cleanup;
 
     if (e.type) {
-        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, _likely_pkg, mtime);
+        struct pkg *pkg = load_pkg_for_entry(pkgcache, &e, _likely_pkg, db->mtime);
         if (pkg == NULL)
             goto cleanup;
 
         if (streq(e.type, "desc") || streq(e.type, "depends") || streq(e.type, "files"))
-            read_desc(archive, pkg);
+            read_desc(db->archive, pkg);
 
         _likely_pkg = pkg;
     }
@@ -165,7 +165,7 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
         const mode_t mode = archive_entry_mode(entry);
 
         if (S_ISREG(mode))
-            db_read_pkg(pkgcache, db.archive, entry, db.mtime);
+            db_read_pkg(&db, pkgcache, entry);
     }
 
     archive_read_close(db.archive);
