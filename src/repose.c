@@ -399,8 +399,10 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
 
     if (load_db(repo, repo->dbname) < 0)
         return;
+
     if (repo->filesname)
         load_db(repo, repo->filesname);
+
     repo->state = REPO_CLEAN;
 }
 
