@@ -86,9 +86,11 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
         if (nbytes_r < 0)
             break;
 
-        /* FIXME: not really handling comments properly */
-        if (line[0] == '#')
+        // skip blank lines and comments
+        nbytes_r = strcspn(line, "#");
+        if (nbytes_r == 0)
             continue;
+        line[nbytes_r] = '\0';
 
         char *e = memchr(line, '=', nbytes_r);
         if (!e)
