@@ -81,17 +81,16 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
 
     for (;;) {
         nbytes_r = archive_fgets(reader, line, sizeof(line));
-        if (nbytes_r == 0)
-            continue;
         if (nbytes_r < 0)
             break;
 
-        // skip blank lines and comments
+        if (nbytes_r == 0)
+            continue;
         nbytes_r = strcspn(line, "#");
         if (nbytes_r == 0)
             continue;
-        line[nbytes_r] = '\0';
 
+        line[nbytes_r] = '\0';
         char *e = memchr(line, '=', nbytes_r);
         if (!e)
             err(EXIT_FAILURE, "failed to find '='");
