@@ -50,7 +50,7 @@ static size_t get_filecache_size(DIR *dirp)
     size_t size = 0;
 
     while ((entry = readdir(dirp)) != NULL) {
-        if (entry->d_type == DT_REG)
+        if (entry->d_type == DT_REG || entry->d_type == DT_UNKNOWN)
             ++size;
     }
 
@@ -88,7 +88,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
     const struct dirent *dp;
 
     while ((dp = readdir(dirp))) {
-        if (!(dp->d_type & DT_REG))
+        if (dp->d_type != DT_REG && dp->d_type != DT_UNKNOWN)
             continue;
 
         struct pkg *pkg = load_from_file(dirfd, dp->d_name, arch);
