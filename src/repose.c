@@ -383,7 +383,7 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
             free(repo->filesname);
             repo->filesname = NULL;
         } else {
-            err(EXIT_FAILURE, "countn't access %s", repo->filesname);
+            err(EXIT_FAILURE, "couldn't access %s", repo->filesname);
         }
     }
 
