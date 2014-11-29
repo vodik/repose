@@ -5,7 +5,7 @@ ifneq "$(GIT_DESC)" ""
 VERSION=$(GIT_DESC)
 endif
 
-CFLAGS := -std=c11 \
+CFLAGS := -std=c11 -g \
 	-Wall -Wextra -pedantic \
 	-Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes \
 	-D_GNU_SOURCE \
