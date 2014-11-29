@@ -60,7 +60,7 @@ static size_t get_filecache_size(DIR *dirp)
 
 static struct pkg *load_from_file(int dirfd, const char *filename, const char *arch)
 {
-    int pkgfd = openat(dirfd, filename, O_RDONLY);
+    _cleanup_close_ int pkgfd = openat(dirfd, filename, O_RDONLY);
     if (pkgfd < 0) {
         err(EXIT_FAILURE, "failed to open %s", filename);
     }
