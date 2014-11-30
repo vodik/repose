@@ -166,22 +166,23 @@ int load_package_signature(struct pkg *pkg, int dirfd)
 }
 
 static bool is_package_metadata(const char *entry_name) {
-  static const char *metadata_names[] = {
-    ".PKGINFO",
-    ".CHANGELOG",
-    ".MTREE",
-    ".INSTALL",
-  };
+    static const char *metadata_names[] = {
+        ".PKGINFO",
+        ".CHANGELOG",
+        ".MTREE",
+        ".INSTALL",
+        NULL
+    };
 
-  if (entry_name[0] != '.')
+    if (entry_name[0] != '.')
+        return false;
+
+    for (const char **n = metadata_names; *n; ++n) {
+        if (streq(entry_name, *n))
+            return true;
+    }
+
     return false;
-
-  for (const char **n = metadata_names; *n; ++n) {
-    if (streq(entry_name, *n))
-      return true;
-  }
-
-  return false;
 }
 
 int load_package_files(struct pkg *pkg, int fd)
