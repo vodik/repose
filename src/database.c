@@ -131,6 +131,23 @@ static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
     return pkg;
 }
 
+static bool is_database_metadata(const char *entry_name)
+{
+    static const char *metadata_names[] = {
+        "desc",
+        "depends",
+        "files",
+        NULL
+    };
+
+    for (const char **n = metadata_names; *n; ++n) {
+        if (streq(entry_name, *n))
+            return true;
+    }
+
+    return false;
+}
+
 static int db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
                         struct archive_entry *entry)
 {
@@ -142,15 +159,14 @@ static int db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
         return -1;
     }
 
-    if (e.type) {
+    if (e.type && is_database_metadata(e.type)) {
         struct pkg *pkg = load_pkg_for_entry(db, pkgcache, &e);
         if (pkg == NULL) {
             free_db_entry(&e);
             return -1;
         }
 
-        if (streq(e.type, "desc") || streq(e.type, "depends") || streq(e.type, "files"))
-            read_desc(db->archive, pkg);
+        read_desc(db->archive, pkg);
     }
 
     free_db_entry(&e);
