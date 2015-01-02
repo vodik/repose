@@ -65,6 +65,14 @@ struct repo {
     alpm_pkghash_t *cache;
 };
 
+static const char *archive_extension[] = {
+    [ARCHIVE_FILTER_NONE]     = "",
+    [ARCHIVE_FILTER_BZIP2]    = ".bz2",
+    [ARCHIVE_FILTER_XZ]       = ".xz",
+    [ARCHIVE_FILTER_GZIP]     = ".gz",
+    [ARCHIVE_FILTER_COMPRESS] = ".Z"
+};
+
 static inline _printf_(1,2) void trace(const char *fmt, ...)
 {
     if (verbose) {
@@ -143,36 +151,33 @@ static inline int make_link(const struct pkg *pkg, int dirfd, const char *source
     return symlinkat(link, dirfd, pkg->filename);
 }
 
-static inline int compat_link(int rootdb, const char *reponame, int compression)
-{
-    static const char *ext[] = {
-        [ARCHIVE_FILTER_NONE]     = "",
-        [ARCHIVE_FILTER_BZIP2]    = ".bz2",
-        [ARCHIVE_FILTER_XZ]       = ".xz",
-        [ARCHIVE_FILTER_GZIP]     = ".gz",
-        [ARCHIVE_FILTER_COMPRESS] = ".Z"
-    };
-
-    _cleanup_free_ char *link = joinstring(reponame, ".tar", ext[compression], NULL);
-    return symlinkat(reponame, rootdb, link);
-}
-
 static int render_db(struct repo *repo, const char *name, enum contents what)
 {
-    _cleanup_close_ int dbfd = openat(repo->rootfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    _cleanup_close_ int dbfd = -1;
+    _cleanup_free_ char *compat_name = NULL;
+    if (repo->compat)
+        compat_name = joinstring(name, ".tar",
+                                 archive_extension[repo->compression], NULL);
+
+    const char *repo_name = compat_name ? compat_name : name;
+
+    dbfd = openat(repo->rootfd, repo_name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", name);
 
     if (save_database(dbfd, repo->cache, what, repo->compression, repo->poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", name);
 
-    if (repo->compat && compat_link(repo->rootfd, name, repo->compression) < 0) {
-        if (errno != EEXIST)
-            warn("failed to make compatability symlink to %s", name);
-    }
+    if (repo->sign)
+        gpgme_sign(repo->rootfd, repo_name, NULL);
 
-    if (repo->sign) {
-        gpgme_sign(repo->rootfd, name, NULL);
+    if (repo->compat) {
+        symlinkat(repo_name, repo->rootfd, name);
+        if (repo->sign) {
+            _cleanup_free_ char *compat_sig = joinstring(compat_name, ".sig", NULL);
+            _cleanup_free_ char *signature = joinstring(name, ".sig", NULL);
+            symlinkat(compat_sig, repo->rootfd, signature);
+        }
     }
 
     return 0;
