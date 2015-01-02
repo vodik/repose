@@ -99,7 +99,7 @@ static inline void free_db_entry(struct db_entry *e)
 }
 
 static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
-                                      struct db_entry *e)
+                                      struct db_entry *e, bool allocate)
 {
     struct pkg *pkg;
 
@@ -112,7 +112,7 @@ static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
 
     pkg = _alpm_pkghash_find(*pkgcache, e->name);
 
-    if (!pkg) {
+    if (allocate && !pkg) {
         pkg = malloc(sizeof(struct pkg));
         if (!pkg)
             return NULL;
@@ -160,13 +160,16 @@ static int db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
     }
 
     if (e.type && is_database_metadata(e.type)) {
-        struct pkg *pkg = load_pkg_for_entry(db, pkgcache, &e);
-        if (pkg == NULL) {
+        bool is_files = streq(e.type, "files");
+
+        struct pkg *pkg = load_pkg_for_entry(db, pkgcache, &e, !is_files);
+        if (!is_files && pkg == NULL) {
             free_db_entry(&e);
             return -1;
         }
 
-        read_desc(db->archive, pkg);
+        if (pkg)
+            read_desc(db->archive, pkg);
     }
 
     free_db_entry(&e);
