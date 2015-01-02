@@ -99,7 +99,7 @@ static inline void free_db_entry(struct db_entry *e)
 }
 
 static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
-                                      struct db_entry *e)
+                                      struct db_entry *e, bool allocate)
 {
     struct pkg *pkg;
 
@@ -112,7 +112,7 @@ static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
 
     pkg = _alpm_pkghash_find(*pkgcache, e->name);
 
-    if (!pkg) {
+    if (allocate && !pkg) {
         pkg = malloc(sizeof(struct pkg));
         if (!pkg)
             return NULL;
@@ -160,13 +160,16 @@ static int db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
     }
 
     if (e.type && is_database_metadata(e.type)) {
-        struct pkg *pkg = load_pkg_for_entry(db, pkgcache, &e);
-        if (pkg == NULL) {
+        bool is_files = streq(e.type, "files");
+
+        struct pkg *pkg = load_pkg_for_entry(db, pkgcache, &e, !is_files);
+        if (!is_files && pkg == NULL) {
             free_db_entry(&e);
             return -1;
         }
 
-        read_desc(db->archive, pkg);
+        if (pkg)
+            read_desc(db->archive, pkg);
     }
 
     free_db_entry(&e);
@@ -273,21 +276,27 @@ static void compile_files_entry(struct pkg *pkg, buffer_t *buf, int poolfd)
     write_list(buf, "FILES", pkg->files);
 }
 
+static void archive_entry_populate(struct archive_entry *e, mode_t mode)
+{
+    time_t now = time(NULL);
+
+    archive_entry_set_perm(e, mode);
+    archive_entry_set_uname(e, getlogin());
+    archive_entry_set_gname(e, getlogin());
+    archive_entry_set_ctime(e, now, 0);
+    archive_entry_set_mtime(e, now, 0);
+    archive_entry_set_atime(e, now, 0);
+}
+
 static void record_entry(struct archive *archive, struct archive_entry *e,
                          const char *root, const char *entry, struct buffer *buf)
 {
     _cleanup_free_ char *entry_path = joinstring(root, "/", entry, NULL);
-    time_t now = time(NULL);
 
     archive_entry_set_pathname(e, entry_path);
     archive_entry_set_filetype(e, AE_IFREG);
+    archive_entry_populate(e, 0644);
     archive_entry_set_size(e, buf->len);
-
-    archive_entry_set_perm(e, 0644);
-    archive_entry_set_ctime(e, now, 0);
-    archive_entry_set_mtime(e, now, 0);
-    archive_entry_set_atime(e, now, 0);
-
     archive_write_header(archive, e);
     archive_write_data(archive, buf->data, buf->len);
 
@@ -295,11 +304,16 @@ static void record_entry(struct archive *archive, struct archive_entry *e,
     buffer_clear(buf);
 }
 
-
 static void compile_database_entry(struct archive *archive, struct archive_entry *e, struct pkg *pkg,
                                    int contents, struct buffer *buf, int poolfd)
 {
     _cleanup_free_ char *entry = joinstring(pkg->name, "-", pkg->version, NULL);
+
+    archive_entry_set_pathname(e, entry);
+    archive_entry_set_filetype(e, AE_IFDIR);
+    archive_entry_populate(e, 0755);
+    archive_write_header(archive, e);
+    archive_entry_clear(e);
 
     if (contents & DB_DESC) {
         compile_desc_entry(pkg, buf, poolfd);
