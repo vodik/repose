@@ -60,17 +60,8 @@ struct repo {
     char *filesname;
 
     int compression;
-    bool compat;
     bool sign;
     alpm_pkghash_t *cache;
-};
-
-static const char *archive_extension[] = {
-    [ARCHIVE_FILTER_NONE]     = "",
-    [ARCHIVE_FILTER_BZIP2]    = ".bz2",
-    [ARCHIVE_FILTER_XZ]       = ".xz",
-    [ARCHIVE_FILTER_GZIP]     = ".gz",
-    [ARCHIVE_FILTER_COMPRESS] = ".Z"
 };
 
 static inline _printf_(1,2) void trace(const char *fmt, ...)
@@ -151,34 +142,19 @@ static inline int make_link(const struct pkg *pkg, int dirfd, const char *source
     return symlinkat(link, dirfd, pkg->filename);
 }
 
-static int render_db(struct repo *repo, const char *name, enum contents what)
+static int render_db(struct repo *repo, const char *repo_name, enum contents what)
 {
     _cleanup_close_ int dbfd = -1;
-    _cleanup_free_ char *compat_name = NULL;
-    if (repo->compat)
-        compat_name = joinstring(name, ".tar",
-                                 archive_extension[repo->compression], NULL);
-
-    const char *repo_name = compat_name ? compat_name : name;
 
     dbfd = openat(repo->rootfd, repo_name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (dbfd < 0)
-        err(EXIT_FAILURE, "failed to open %s for writing", name);
+        err(EXIT_FAILURE, "failed to open %s for writing", repo_name);
 
     if (save_database(dbfd, repo->cache, what, repo->compression, repo->poolfd) < 0)
-        err(EXIT_FAILURE, "failed to write %s", name);
+        err(EXIT_FAILURE, "failed to write %s", repo_name);
 
     if (repo->sign)
         gpgme_sign(repo->rootfd, repo_name, NULL);
-
-    if (repo->compat) {
-        symlinkat(repo_name, repo->rootfd, name);
-        if (repo->sign) {
-            _cleanup_free_ char *compat_sig = joinstring(compat_name, ".sig", NULL);
-            _cleanup_free_ char *signature = joinstring(name, ".sig", NULL);
-            symlinkat(compat_sig, repo->rootfd, signature);
-        }
-    }
 
     return 0;
 }
@@ -440,8 +416,7 @@ int main(int argc, char *argv[])
         { "gzip",     no_argument,       0, 'z' },
         { "compress", no_argument,       0, 'Z' },
         { "rebuild",  no_argument,       0, 0x100 },
-        { "compat",   no_argument,       0, 0x101 },
-        { "elephant", no_argument,       0, 0x102 },
+        { "elephant", no_argument,       0, 0x101 },
         { 0, 0, 0, 0 }
     };
 
@@ -449,7 +424,6 @@ int main(int argc, char *argv[])
         .state       = REPO_NEW,
         .root        = ".",
         .compression = ARCHIVE_COMPRESSION_NONE,
-        .compat      = false,
         .sign        = false
     };
 
@@ -502,9 +476,6 @@ int main(int argc, char *argv[])
             rebuild = true;
             break;
         case 0x101:
-            repo.compat = true;
-            break;
-        case 0x102:
             elephant();
             break;
         }
