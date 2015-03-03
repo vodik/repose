@@ -263,15 +263,12 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
             case 0:
                 if (pkg->mtime > old->mtime) {
                     trace("updating %s %s [newer timestamp]\n", pkg->name, pkg->version);
-
                     replace = true;
                 } else if (pkg->builddate > old->builddate) {
                     trace("updating %s %s [newer build]\n", pkg->name, pkg->version);
-
                     replace = true;
                 } else if (old->base64sig == NULL && pkg->base64sig) {
                     trace("adding signature for %s\n", pkg->name);
-
                     replace = true;
                 }
                 break;
