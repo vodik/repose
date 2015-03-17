@@ -19,6 +19,8 @@
 #include <alpm_list.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <linux/btrfs.h>
 #include "pkghash.h"
 #include "filters.h"
 #include "signing.h"
@@ -119,10 +121,27 @@ static _noreturn_ void elephant(void)
     exit(EXIT_FAILURE);
 }
 
-static inline int make_link(const struct pkg *pkg, int dirfd, const char *source)
+static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
 {
-    _cleanup_free_ char *link = joinstring(source, "/", pkg->filename, NULL);
-    return symlinkat(link, dirfd, pkg->filename);
+    _cleanup_close_ int out = openat(repo->rootfd, pkg->filename, O_WRONLY | O_CREAT, 0664);
+    _cleanup_close_ int in = openat(repo->poolfd, pkg->filename, O_RDONLY);
+
+    return ioctl(out, BTRFS_IOC_CLONE, in);
+}
+
+static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
+{
+    _cleanup_free_ char *link = joinstring(repo->pool, "/", pkg->filename, NULL);
+
+    return symlinkat(link, repo->rootfd, pkg->filename);
+}
+
+static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
+{
+    if (clone_pkg(repo, pkg) < 0)
+        err(EXIT_FAILURE, "failed to make reflink for %s", pkg->filename);
+    else if (symlink_pkg(repo, pkg) < 0)
+        err(EXIT_FAILURE, "failed to make symlink for %s", pkg->filename);
 }
 
 static int render_db(struct repo *repo, const char *repo_name, enum contents what)
@@ -161,7 +180,7 @@ static void link_db(struct repo *repo)
         return;
 
     for (node = repo->cache->list; node; node = node->next)
-        make_link(node->data, repo->rootfd, repo->pool);
+        link_pkg(repo, node->data);
 }
 
 static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new,
