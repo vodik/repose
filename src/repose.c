@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <err.h>
@@ -45,6 +46,7 @@ struct repo {
     char *filesname;
 
     int compression;
+    bool reflink;
     bool sign;
     alpm_pkghash_t *cache;
 };
@@ -76,6 +78,7 @@ static _noreturn_ void usage(FILE *out)
           " -J, --xz              filter the archive through xz\n"
           " -z, --gzip            filter the archive through gzip\n"
           " -Z, --compress        filter the archive through compress\n"
+          "     --reflink         make repose make reflinks instead of symlinks\n"
           "     --rebuild         force rebuild the repo\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -138,10 +141,12 @@ static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
 
 static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
 {
-    if (clone_pkg(repo, pkg) < 0)
-        err(EXIT_FAILURE, "failed to make reflink for %s", pkg->filename);
-    else if (symlink_pkg(repo, pkg) < 0)
+    if (repo->reflink) {
+        if (clone_pkg(repo, pkg) < 0)
+            err(EXIT_FAILURE, "failed to make reflink for %s", pkg->filename);
+    } else if (symlink_pkg(repo, pkg) < 0) {
         err(EXIT_FAILURE, "failed to make symlink for %s", pkg->filename);
+    }
 }
 
 static int render_db(struct repo *repo, const char *repo_name, enum contents what)
@@ -414,8 +419,9 @@ int main(int argc, char *argv[])
         { "xz",       no_argument,       0, 'J' },
         { "gzip",     no_argument,       0, 'z' },
         { "compress", no_argument,       0, 'Z' },
-        { "rebuild",  no_argument,       0, 0x100 },
-        { "elephant", no_argument,       0, 0x101 },
+        { "reflink",  no_argument,       0, 0x100 },
+        { "rebuild",  no_argument,       0, 0x101 },
+        { "elephant", no_argument,       0, 0x102 },
         { 0, 0, 0, 0 }
     };
 
@@ -423,6 +429,7 @@ int main(int argc, char *argv[])
         .state       = REPO_NEW,
         .root        = ".",
         .compression = ARCHIVE_COMPRESSION_NONE,
+        .reflink     = false,
         .sign        = false
     };
 
@@ -472,9 +479,12 @@ int main(int argc, char *argv[])
             repo.compression = ARCHIVE_FILTER_COMPRESS;
             break;
         case 0x100:
-            rebuild = true;
+            repo.reflink = true;
             break;
         case 0x101:
+            rebuild = true;
+            break;
+        case 0x102:
             elephant();
             break;
         }
