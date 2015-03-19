@@ -50,5 +50,8 @@ Compress the resulting database with xz(1).
 Compress the resulting database with gzip(1).
 .IP "\fB\-Z\fR, \fB\-\-compress\fR"
 Compress the resulting database with compress(1).
+.IP "\fB\-\-reflink\fR"
+Make repose create reflinks instead of symlinks when compiling
+a repository.
 .IP "\fB\-\-rebuild\fR"
 Rather than attempting to update the existing database, rebuild it.

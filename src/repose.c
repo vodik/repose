@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <err.h>
@@ -19,6 +20,8 @@
 #include <alpm_list.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <linux/btrfs.h>
 #include "pkghash.h"
 #include "filters.h"
 #include "signing.h"
@@ -43,6 +46,7 @@ struct repo {
     char *filesname;
 
     int compression;
+    bool reflink;
     bool sign;
     alpm_pkghash_t *cache;
 };
@@ -74,6 +78,7 @@ static _noreturn_ void usage(FILE *out)
           " -J, --xz              filter the archive through xz\n"
           " -z, --gzip            filter the archive through gzip\n"
           " -Z, --compress        filter the archive through compress\n"
+          "     --reflink         make repose make reflinks instead of symlinks\n"
           "     --rebuild         force rebuild the repo\n", out);
 
     exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -119,10 +124,29 @@ static _noreturn_ void elephant(void)
     exit(EXIT_FAILURE);
 }
 
-static inline int make_link(const struct pkg *pkg, int dirfd, const char *source)
+static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
 {
-    _cleanup_free_ char *link = joinstring(source, "/", pkg->filename, NULL);
-    return symlinkat(link, dirfd, pkg->filename);
+    _cleanup_close_ int out = openat(repo->rootfd, pkg->filename, O_WRONLY | O_CREAT, 0664);
+    _cleanup_close_ int in = openat(repo->poolfd, pkg->filename, O_RDONLY);
+
+    return ioctl(out, BTRFS_IOC_CLONE, in);
+}
+
+static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
+{
+    _cleanup_free_ char *link = joinstring(repo->pool, "/", pkg->filename, NULL);
+
+    return symlinkat(link, repo->rootfd, pkg->filename);
+}
+
+static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
+{
+    if (repo->reflink) {
+        if (clone_pkg(repo, pkg) < 0)
+            err(EXIT_FAILURE, "failed to make reflink for %s", pkg->filename);
+    } else if (symlink_pkg(repo, pkg) < 0) {
+        err(EXIT_FAILURE, "failed to make symlink for %s", pkg->filename);
+    }
 }
 
 static int render_db(struct repo *repo, const char *repo_name, enum contents what)
@@ -161,7 +185,7 @@ static void link_db(struct repo *repo)
         return;
 
     for (node = repo->cache->list; node; node = node->next)
-        make_link(node->data, repo->rootfd, repo->pool);
+        link_pkg(repo, node->data);
 }
 
 static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new,
@@ -395,8 +419,9 @@ int main(int argc, char *argv[])
         { "xz",       no_argument,       0, 'J' },
         { "gzip",     no_argument,       0, 'z' },
         { "compress", no_argument,       0, 'Z' },
-        { "rebuild",  no_argument,       0, 0x100 },
-        { "elephant", no_argument,       0, 0x101 },
+        { "reflink",  no_argument,       0, 0x100 },
+        { "rebuild",  no_argument,       0, 0x101 },
+        { "elephant", no_argument,       0, 0x102 },
         { 0, 0, 0, 0 }
     };
 
@@ -404,6 +429,7 @@ int main(int argc, char *argv[])
         .state       = REPO_NEW,
         .root        = ".",
         .compression = ARCHIVE_COMPRESSION_NONE,
+        .reflink     = false,
         .sign        = false
     };
 
@@ -453,9 +479,12 @@ int main(int argc, char *argv[])
             repo.compression = ARCHIVE_FILTER_COMPRESS;
             break;
         case 0x100:
-            rebuild = true;
+            repo.reflink = true;
             break;
         case 0x101:
+            rebuild = true;
+            break;
+        case 0x102:
             elephant();
             break;
         }
