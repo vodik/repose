@@ -126,10 +126,18 @@ static _noreturn_ void elephant(void)
 
 static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
 {
-    _cleanup_close_ int out = openat(repo->rootfd, pkg->filename, O_WRONLY | O_TRUNC, 0664);
-    _cleanup_close_ int in = openat(repo->poolfd, pkg->filename, O_RDONLY);
+    _cleanup_close_ int src = openat(repo->poolfd, pkg->filename, O_RDONLY);
+    if (src < 0)
+        err(1, "failed to open pool package %s\n", pkg->filename);
 
-    return ioctl(out, BTRFS_IOC_CLONE, in);
+    _cleanup_close_ int dest = openat(repo->rootfd, pkg->filename, O_WRONLY | O_TRUNC, 0664);
+    if (dest < 0 && errno == ENOENT)
+        dest = openat(repo->rootfd, pkg->filename, O_WRONLY | O_CREAT, 0664);
+
+    if (dest < 0)
+        err(1, "failed to open repo package %s", pkg->filename);
+
+    return ioctl(dest, BTRFS_IOC_CLONE, src);
 }
 
 static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
