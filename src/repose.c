@@ -126,7 +126,7 @@ static _noreturn_ void elephant(void)
 
 static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
 {
-    _cleanup_close_ int out = openat(repo->rootfd, pkg->filename, O_WRONLY | O_CREAT, 0664);
+    _cleanup_close_ int out = openat(repo->rootfd, pkg->filename, O_WRONLY | O_TRUNC, 0664);
     _cleanup_close_ int in = openat(repo->poolfd, pkg->filename, O_RDONLY);
 
     return ioctl(out, BTRFS_IOC_CLONE, in);
