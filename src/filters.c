@@ -14,12 +14,13 @@ bool match_target(struct pkg *pkg, const char *target, const char *fullname)
 
 bool match_targets(struct pkg *pkg, alpm_list_t *targets)
 {
-    const alpm_list_t *node;
     _cleanup_free_ char *fullname = joinstring(pkg->name, "-", pkg->version, NULL);
-    bool ret = false;
+    const alpm_list_t *node;
 
-    for (node = targets; node && !ret; node = node->next)
-        ret = match_target(pkg, node->data, fullname);
+    for (node = targets; node; node = node->next) {
+        if (match_target(pkg, node->data, fullname))
+            return true;
+    }
 
-    return ret;
+    return false;
 }
