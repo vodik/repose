@@ -77,9 +77,10 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
         struct pkg *pkg = load_from_file(dirfd, dp->d_name, arch);
         if (!pkg)
             continue;
-
-        if (targets == NULL || match_targets(pkg, targets))
+        else if (!targets || match_targets(pkg, targets))
             cache = pkgcache_add(cache, pkg);
+        else
+            package_free(pkg);
     }
 
     return cache;
