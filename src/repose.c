@@ -1,3 +1,5 @@
+#include "repose.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -26,33 +28,11 @@
 #include "filters.h"
 #include "signing.h"
 
-static int verbose = 0;
-
-enum state {
-    REPO_NEW,
-    REPO_CLEAN,
-    REPO_DIRTY
-};
-
-struct repo {
-    enum state state;
-    const char *root;
-    const char *pool;
-    int rootfd;
-    int poolfd;
-
-    char *dbname;
-    char *filesname;
-
-    int compression;
-    bool reflink;
-    bool sign;
-    alpm_pkghash_t *cache;
-};
+static struct config config = {0};
 
 static inline _printf_(1,2) void trace(const char *fmt, ...)
 {
-    if (verbose) {
+    if (config.verbose) {
         va_list ap;
 
         va_start(ap, fmt);
@@ -132,7 +112,6 @@ static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
     _cleanup_close_ int dest = openat(repo->rootfd, pkg->filename, O_WRONLY | O_TRUNC, 0664);
     if (dest < 0 && errno == ENOENT)
         dest = openat(repo->rootfd, pkg->filename, O_WRONLY | O_CREAT, 0664);
-
     if (dest < 0)
         err(1, "failed to open repo package %s", pkg->filename);
 
@@ -142,7 +121,6 @@ static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
 static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
 {
     _cleanup_free_ char *link = joinstring(repo->pool, "/", pkg->filename, NULL);
-
     return symlinkat(link, repo->rootfd, pkg->filename);
 }
 
@@ -178,7 +156,6 @@ static inline int delete_link(const struct pkg *pkg, int dirfd)
     struct stat buf;
     if (fstatat(dirfd, pkg->filename, &buf, AT_SYMLINK_NOFOLLOW) < 0)
         return errno != ENOENT ? -1 : 0;
-
     if (S_ISLNK(buf.st_mode))
         return unlinkat(dirfd, pkg->filename, 0);
     return 0;
@@ -453,7 +430,7 @@ int main(int argc, char *argv[])
             printf("%s %s\n",  program_invocation_short_name, REPOSE_VERSION);
             exit(EXIT_SUCCESS);
         case 'v':
-            verbose += 1;
+            config.verbose += 1;
             break;
         case 'd':
             drop = true;
