@@ -32,7 +32,6 @@ static char *find_eol(struct archive_reader* r, size_t block_remaining)
     return eol ? eol : memchr(r->block_offset, '\0', block_remaining);
 }
 
-
 int archive_getline(struct archive_reader *r, char **line)
 {
     char *line_offset = *line = NULL;
