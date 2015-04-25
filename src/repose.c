@@ -26,7 +26,6 @@
 #include "filters.h"
 #include "signing.h"
 
-static struct utsname uts;
 static int verbose = 0;
 
 enum state {
@@ -505,8 +504,9 @@ int main(int argc, char *argv[])
         errx(1, "incorrect number of arguments provided");
 
     if (!arch) {
+	struct utsname uts;
         uname(&uts);
-        arch = uts.machine;
+        arch = strdup(uts.machine);
     }
 
     rootname = get_rootname(argv[0]);
