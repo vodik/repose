@@ -131,7 +131,6 @@ int load_package_signature(struct pkg *pkg, int dirfd)
     struct file_t file;
     _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
     _cleanup_close_ int fd = openat(dirfd, signame, O_RDONLY);
-
     if (fd < 0)
         return -1;
 
@@ -141,8 +140,10 @@ int load_package_signature(struct pkg *pkg, int dirfd)
     base64_encode((unsigned char **)&pkg->base64sig,
                   (const unsigned char *)file.mmap, file.st.st_size);
 
+    // If the signature's timestamp is new than the packages, update
+    // it to the newer value.
     if (file.st.st_mtime > pkg->mtime)
-        file.st.st_mtime = pkg->mtime;
+        pkg->mtime = file.st.st_mtime;
 
     file_close(&file);
     return 0;

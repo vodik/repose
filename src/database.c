@@ -229,8 +229,6 @@ static void compile_desc_entry(struct pkg *pkg, buffer_t *buf, int poolfd)
         pkg->md5sum = md5_file(poolfd, pkg->filename);
     if (!pkg->sha256sum)
         pkg->sha256sum = sha256_file(poolfd, pkg->filename);
-    if (!pkg->base64sig)
-        load_package_signature(pkg, poolfd);
 
     write_string(buf, "MD5SUM", pkg->md5sum);
     write_string(buf, "SHA256SUM", pkg->sha256sum);

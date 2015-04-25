@@ -58,8 +58,8 @@ static struct pkg *load_from_file(int dirfd, const char *filename, const char *a
         goto error;
 
     pkg->filename = strdup(filename);
+    load_package_signature(pkg, dirfd);
     return pkg;
-
 error:
     package_free(pkg);
     return NULL;
