@@ -131,6 +131,16 @@ static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
     }
 }
 
+static void link_db(struct repo *repo)
+{
+    if (!repo->pool)
+        return;
+
+    alpm_list_t *node;
+    for (node = repo->cache->list; node; node = node->next)
+        link_pkg(repo, node->data);
+}
+
 static int render_db(struct repo *repo, const char *repo_name, enum contents what)
 {
     _cleanup_close_ int dbfd = -1;
@@ -158,17 +168,7 @@ static inline int delete_link(const struct pkg *pkg, int dirfd)
     return 0;
 }
 
-static void link_db(struct repo *repo)
-{
-    alpm_list_t *node;
-
-    if (!repo->pool)
-        return;
-
-    for (node = repo->cache->list; node; node = node->next)
-        link_pkg(repo, node->data);
-}
-
+// TODO: cleanup pkghash
 static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new,
                                                     struct pkg *old)
 {
@@ -279,10 +279,8 @@ static alpm_list_t *parse_targets(char *targets[], int count)
 {
     int i;
     alpm_list_t *list = NULL;
-
     for (i = 0; i < count; ++i)
         list = alpm_list_add(list, targets[i]);
-
     return list;
 }
 
@@ -355,10 +353,8 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
 
     if (!load_cache)
         return;
-
     if (load_db(repo, repo->dbname) < 0)
         return;
-
     if (repo->filesname)
         load_db(repo, repo->filesname);
 
