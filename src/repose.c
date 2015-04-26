@@ -228,13 +228,11 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
     for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
         struct pkg *old = _alpm_pkghash_find(repo->cache, pkg->name);
-        bool replace = false;
         int vercmp;
 
         /* if the package isn't in the cache, add it */
         if (!old) {
             trace("adding %s %s\n", pkg->name, pkg->version);
-
             repo->cache = _alpm_pkghash_add(repo->cache, pkg);
             dirty = true;
             continue;
@@ -243,33 +241,28 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
         vercmp = alpm_pkg_vercmp(pkg->version, old->version);
 
         switch(vercmp) {
-            case 1:
-                trace("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
-
-                replace = true;
-                break;
-            case 0:
-                if (pkg->mtime > old->mtime) {
-                    trace("updating %s %s [newer timestamp]\n", pkg->name, pkg->version);
-                    replace = true;
-                } else if (pkg->builddate > old->builddate) {
-                    trace("updating %s %s [newer build]\n", pkg->name, pkg->version);
-                    replace = true;
-                } else if (old->base64sig == NULL && pkg->base64sig) {
-                    trace("adding signature for %s\n", pkg->name);
-                    replace = true;
-                }
-                break;
-            case -1:
-                break;
+        case 1:
+            trace("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
+            break;
+        case 0:
+            if (pkg->mtime > old->mtime) {
+                trace("updating %s %s [newer timestamp]\n", pkg->name, pkg->version);
+            } else if (pkg->builddate > old->builddate) {
+                trace("updating %s %s [newer build]\n", pkg->name, pkg->version);
+            } else if (old->base64sig == NULL && pkg->base64sig) {
+                trace("adding signature for %s\n", pkg->name);
+            } else {
+                continue;
+            }
+            break;
+        default:
+            continue;
         }
 
-        if (replace) {
-            repo->cache = _alpm_pkghash_replace(repo->cache, pkg, old);
-            delete_link(pkg, repo->rootfd);
-            package_free(old);
-            dirty = true;
-        }
+        repo->cache = _alpm_pkghash_replace(repo->cache, pkg, old);
+        delete_link(pkg, repo->rootfd);
+        package_free(old);
+        dirty = true;
     }
 
     return dirty;
