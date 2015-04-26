@@ -149,7 +149,7 @@ static int render_db(struct repo *repo, const char *repo_name, enum contents wha
     if (dbfd < 0)
         err(EXIT_FAILURE, "failed to open %s for writing", repo_name);
 
-    if (save_database(dbfd, repo->cache, what, repo->compression, repo->poolfd) < 0)
+    if (save_database(dbfd, repo->cache, what, config.compression, repo->poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", repo_name);
 
     if (repo->sign)
@@ -396,11 +396,10 @@ int main(int argc, char *argv[])
     };
 
     struct repo repo = {
-        .state       = REPO_NEW,
-        .root        = ".",
-        .compression = ARCHIVE_COMPRESSION_NONE,
-        .reflink     = false,
-        .sign        = false
+        .state   = REPO_NEW,
+        .root    = ".",
+        .reflink = false,
+        .sign    = false
     };
 
     for (;;) {
@@ -437,16 +436,16 @@ int main(int argc, char *argv[])
             arch = optarg;
             break;
         case 'j':
-            repo.compression = ARCHIVE_FILTER_BZIP2;
+            config.compression = ARCHIVE_FILTER_BZIP2;
             break;
         case 'J':
-            repo.compression = ARCHIVE_FILTER_XZ;
+            config.compression = ARCHIVE_FILTER_XZ;
             break;
         case 'z':
-            repo.compression = ARCHIVE_FILTER_GZIP;
+            config.compression = ARCHIVE_FILTER_GZIP;
             break;
         case 'Z':
-            repo.compression = ARCHIVE_FILTER_COMPRESS;
+            config.compression = ARCHIVE_FILTER_COMPRESS;
             break;
         case 0x100:
             repo.reflink = true;

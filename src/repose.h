@@ -19,7 +19,6 @@ struct repo {
     char *dbname;
     char *filesname;
 
-    int compression;
     bool reflink;
     bool sign;
     alpm_pkghash_t *cache;
@@ -27,4 +26,5 @@ struct repo {
 
 struct config {
     int verbose;
+    int compression;
 };
