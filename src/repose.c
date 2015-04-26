@@ -193,7 +193,7 @@ static int reduce_repo(struct repo *repo)
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
-            repo->state = REPO_DIRTY;
+            repo->dirty = true;
         }
     }
 
@@ -216,7 +216,7 @@ static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
             delete_link(pkg, repo->rootfd);
             package_free(pkg);
-            repo->state = REPO_DIRTY;
+            repo->dirty = true;
         }
     }
 }
@@ -274,8 +274,6 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
 /* NOTES TO SELF:
  * - do i really need to do a merge when there's no database?
  *    - how do i handle stdout then?
- * - look at states, do I really need 3?
- * - minimal stdout
  */
 
 static alpm_list_t *parse_targets(char *targets[], int count)
@@ -360,8 +358,6 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
         return;
     if (repo->filesname)
         load_db(repo, repo->filesname);
-
-    repo->state = REPO_CLEAN;
 }
 
 static char *get_rootname(char *name)
@@ -399,7 +395,6 @@ int main(int argc, char *argv[])
     };
 
     struct repo repo = {
-        .state   = REPO_NEW,
         .root    = ".",
         .reflink = false,
         .sign    = false
@@ -489,17 +484,12 @@ int main(int argc, char *argv[])
         reduce_repo(&repo);
 
         if (update_repo(&repo, filecache))
-            repo.state = REPO_DIRTY;
+            repo.dirty = true;
     }
 
-    switch (repo.state) {
-    case REPO_NEW:
-        trace("repo empty!\n");
-        break;
-    case REPO_CLEAN:
+    if (!repo.dirty) {
         trace("repo does not need updating\n");
-        break;
-    case REPO_DIRTY:
+    } else {
         trace("writing %s...\n", repo.dbname);
         render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
 
@@ -509,10 +499,5 @@ int main(int argc, char *argv[])
         }
 
         link_db(&repo);
-        break;
-    default:
-        break;
     }
-
-    return 0;
 }

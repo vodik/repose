@@ -3,14 +3,7 @@
 #include <stdbool.h>
 #include "pkghash.h"
 
-enum state {
-    REPO_NEW,
-    REPO_CLEAN,
-    REPO_DIRTY
-};
-
 struct repo {
-    enum state state;
     const char *root;
     const char *pool;
     int rootfd;
@@ -19,6 +12,7 @@ struct repo {
     char *dbname;
     char *filesname;
 
+    bool dirty;
     bool reflink;
     bool sign;
     alpm_pkghash_t *cache;
