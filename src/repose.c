@@ -124,7 +124,7 @@ static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
 
 static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
 {
-    if (repo->reflink) {
+    if (config.reflink) {
         if (clone_pkg(repo, pkg) < 0)
             err(EXIT_FAILURE, "failed to make reflink for %s", pkg->filename);
     } else if (symlink_pkg(repo, pkg) < 0) {
@@ -153,7 +153,7 @@ static int render_db(struct repo *repo, const char *repo_name, enum contents wha
     if (save_database(dbfd, repo->cache, what, config.compression, repo->poolfd) < 0)
         err(EXIT_FAILURE, "failed to write %s", repo_name);
 
-    if (repo->sign)
+    if (config.sign)
         gpgme_sign(repo->rootfd, repo_name, NULL);
 
     return 0;
@@ -311,7 +311,7 @@ static void check_signature(struct repo *repo, const char *name)
             errx(EXIT_FAILURE, "repo signature is invalid or corrupt!");
         } else {
             trace("found a valid signature, will resign...\n");
-            repo->sign = true;
+            config.sign = true;
         }
     } else if (errno != ENOENT) {
         err(EXIT_FAILURE, "countn't access %s", name);
@@ -345,7 +345,7 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
         }
     }
 
-    if (repo->sign) {
+    if (config.sign) {
         check_signature(repo, repo->dbname);
         check_signature(repo, repo->filesname);
     }
@@ -394,11 +394,7 @@ int main(int argc, char *argv[])
         { 0, 0, 0, 0 }
     };
 
-    struct repo repo = {
-        .root    = ".",
-        .reflink = false,
-        .sign    = false
-    };
+    struct repo repo = { .root = "." };
 
     for (;;) {
         int opt = getopt_long(argc, argv, "hVvdfsr:p:m:jJzZ", opts, NULL);
@@ -422,7 +418,7 @@ int main(int argc, char *argv[])
             files = true;
             break;
         case 's':
-            repo.sign = true;
+            config.sign = true;
             break;
         case 'r':
             repo.root = optarg;
@@ -446,7 +442,7 @@ int main(int argc, char *argv[])
             config.compression = ARCHIVE_FILTER_COMPRESS;
             break;
         case 0x100:
-            repo.reflink = true;
+            config.reflink = true;
             break;
         case 0x101:
             rebuild = true;

@@ -13,12 +13,12 @@ struct repo {
     char *filesname;
 
     bool dirty;
-    bool reflink;
-    bool sign;
     alpm_pkghash_t *cache;
 };
 
 struct config {
     int verbose;
     int compression;
+    bool reflink;
+    bool sign;
 };
