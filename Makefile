@@ -8,6 +8,7 @@ endif
 CFLAGS := -std=c11 -g \
 	-Wall -Wextra -pedantic \
 	-Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes \
+	-Wno-gnu-empty-initializer \
 	-D_GNU_SOURCE \
 	-DREPOSE_VERSION=\"$(VERSION)\" \
 	$(CFLAGS)

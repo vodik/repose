@@ -25,7 +25,8 @@
 #include "base64.h"
 #include "util.h"
 
-static struct config config = {0};
+static struct config config = {};
+
 
 static inline _printf_(1,2) void trace(const char *fmt, ...)
 {
@@ -228,23 +229,25 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
     for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
         struct pkg *old = _alpm_pkghash_find(repo->cache, pkg->name);
-        int vercmp;
 
-        /* if the package isn't in the cache, add it */
         if (!old) {
+            /* The package isn't already in the database. Just add it */
             trace("adding %s %s\n", pkg->name, pkg->version);
             repo->cache = _alpm_pkghash_add(repo->cache, pkg);
             dirty = true;
             continue;
         }
 
-        vercmp = alpm_pkg_vercmp(pkg->version, old->version);
-
-        switch(vercmp) {
+        switch(alpm_pkg_vercmp(pkg->version, old->version)) {
         case 1:
+            /* The filecache package has a newer version than the
+               package in the database. */
             trace("updating %s %s => %s\n", pkg->name, old->version, pkg->version);
             break;
         case 0:
+            /* The filecache package has the same version as the
+               package in the database. Only update the package if the
+               file is newer than the database */
             if (pkg->mtime > old->mtime) {
                 trace("updating %s %s [newer timestamp]\n", pkg->name, pkg->version);
             } else if (pkg->builddate > old->builddate) {
