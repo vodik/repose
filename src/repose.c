@@ -7,26 +7,23 @@
 #include <errno.h>
 #include <err.h>
 #include <getopt.h>
-#include <archive.h>
-#include <archive_entry.h>
-
 #include <fcntl.h>
 #include <unistd.h>
-
-#include "database.h"
-#include "filecache.h"
-#include "file.h"
-#include "util.h"
-#include "base64.h"
-
+#include <archive.h>
+#include <archive_entry.h>
 #include <alpm_list.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/btrfs.h>
+
+#include "database.h"
+#include "filecache.h"
 #include "pkghash.h"
 #include "filters.h"
 #include "signing.h"
+#include "base64.h"
+#include "util.h"
 
 static struct config config = {0};
 
