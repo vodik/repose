@@ -27,7 +27,6 @@
 
 static struct config config = {};
 
-
 static inline _printf_(1,2) void trace(const char *fmt, ...)
 {
     if (config.verbose) {
@@ -47,6 +46,7 @@ static _noreturn_ void usage(FILE *out)
           " -V, --version         display version\n"
           " -v, --verbose         verbose output\n"
           " -f, --files           also build the .files database\n"
+          " -l, --list            list packages in the repository\n"
           " -d, --drop            drop the specified package from the db\n"
           " -r, --root=PATH       set the root for the repository\n"
           " -p, --pool=PATH       set the pool to find packages in\n"
@@ -202,11 +202,10 @@ static int reduce_repo(struct repo *repo)
 
 static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
 {
-    alpm_list_t *node;
-
     if (!targets)
         return;
 
+    alpm_list_t *node;
     for (node = repo->cache->list; node; node = node->next) {
         struct pkg *pkg = node->data;
 
@@ -218,6 +217,16 @@ static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
             package_free(pkg);
             repo->dirty = true;
         }
+    }
+}
+
+static void list_repo(struct repo *repo)
+{
+    alpm_list_t *node;
+    for (node = repo->cache->list; node; node = node->next) {
+        struct pkg *pkg = node->data;
+
+        printf("%s %s\n", pkg->name, pkg->version);
     }
 }
 
@@ -372,12 +381,13 @@ int main(int argc, char *argv[])
 {
     const char *rootname;
     const char *arch = NULL;
-    bool files = false, rebuild = false, drop = false;
+    bool files = false, rebuild = false, drop = false, list = false;
 
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
         { "version",  no_argument,       0, 'V' },
         { "drop",     no_argument,       0, 'd' },
+        { "list",     no_argument,       0, 'l' },
         { "verbose",  no_argument,       0, 'v' },
         { "files",    no_argument,       0, 'f' },
         { "sign",     no_argument,       0, 's' },
@@ -397,7 +407,7 @@ int main(int argc, char *argv[])
     struct repo repo = { .root = "." };
 
     for (;;) {
-        int opt = getopt_long(argc, argv, "hVvdfsr:p:m:jJzZ", opts, NULL);
+        int opt = getopt_long(argc, argv, "hVvdlfsr:p:m:jJzZ", opts, NULL);
         if (opt < 0)
             break;
 
@@ -413,6 +423,9 @@ int main(int argc, char *argv[])
             break;
         case 'd':
             drop = true;
+            break;
+        case 'l':
+            list = true;
             break;
         case 'f':
             files = true;
@@ -465,6 +478,9 @@ int main(int argc, char *argv[])
         arch = strdup(uts.machine);
     }
 
+    if (list & (drop | rebuild))
+        errx(EXIT_FAILURE, "List can't be used with dropping or rebuilding options");
+
     rootname = get_rootname(argv[0]);
     init_repo(&repo, rootname, files, !rebuild);
 
@@ -472,6 +488,9 @@ int main(int argc, char *argv[])
 
     if (drop) {
         drop_from_repo(&repo, targets);
+    } else if (list) {
+        list_repo(&repo);
+        return 0;
     } else {
         alpm_pkghash_t *filecache = get_filecache(repo.poolfd, targets, arch);
         if (!filecache)
