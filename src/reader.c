@@ -37,6 +37,9 @@ int archive_getline(struct archive_reader *r, char **line)
     char *line_offset = *line = NULL;
     size_t line_length = 0;
 
+    if (r->ret == ARCHIVE_FATAL)
+        return -1;
+
     for (;;) {
         if (&r->block[r->block_size] == r->block_offset) {
             if (r->ret == ARCHIVE_EOF)
@@ -74,6 +77,9 @@ int archive_getline(struct archive_reader *r, char **line)
 int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
 {
     char *line_offset = line;
+
+    if (r->ret == ARCHIVE_FATAL)
+        return -1;
 
     for (;;) {
         if (&r->block[r->block_size] == r->block_offset) {

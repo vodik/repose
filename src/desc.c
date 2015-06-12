@@ -50,7 +50,7 @@ void read_desc(struct archive *archive, struct pkg *pkg)
     char buf[8192];
 
     /* FIXME: check -1 might not be the best here. need actual rc */
-    while(archive_fgets(reader, buf, sizeof(buf)) != -1) {
+    while (archive_fgets(reader, buf, sizeof(buf)) != -1) {
         if (streq(buf, "%FILENAME%")) {
             read_desc_entry(reader, &pkg->filename);
         } else if (streq(buf, "%NAME%")) {
