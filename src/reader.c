@@ -26,7 +26,7 @@ static int archive_feed_block(struct archive_reader *r)
     return r->ret == ARCHIVE_OK ? 0 : -1;
 }
 
-static char *find_eol(struct archive_reader* r, size_t block_remaining)
+static char *find_eol(struct archive_reader *r, size_t block_remaining)
 {
     char *eol = memchr(r->block_offset, '\n', block_remaining);
     return eol ? eol : memchr(r->block_offset, '\0', block_remaining);
