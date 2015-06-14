@@ -21,7 +21,9 @@ static int archive_feed_block(struct archive_reader *r)
         int status = archive_read_data_block(r->archive, (void *)&r->block,
                                              &r->block_size, &offset);
         r->block_offset = r->block;
-        return status;
+
+        if (status != ARCHIVE_RETRY)
+            return status;
     }
 }
 
@@ -36,7 +38,7 @@ int archive_getline(struct archive_reader *r, char **line)
     char *line_offset = *line = NULL;
     size_t line_length = 0;
 
-    if (r->status == ARCHIVE_FATAL)
+    if (r->status != ARCHIVE_OK)
         return -1;
 
     for (;;) {
@@ -77,7 +79,7 @@ int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
 {
     char *line_offset = line;
 
-    if (r->status == ARCHIVE_FATAL)
+    if (r->status != ARCHIVE_OK)
         return -1;
 
     for (;;) {
