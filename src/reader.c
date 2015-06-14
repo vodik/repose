@@ -22,8 +22,12 @@ static int archive_feed_block(struct archive_reader *r)
                                              &r->block_size, &offset);
         r->block_offset = r->block;
 
-        if (status != ARCHIVE_RETRY)
-            return status;
+        if (status == ARCHIVE_RETRY)
+            continue;
+        if (status <= ARCHIVE_WARN)
+            warnx("%s", archive_error_string(r->archive));
+
+        return status;
     }
 }
 
