@@ -59,11 +59,10 @@ int archive_getline(struct archive_reader *r, char **line)
         line_offset = mempcpy(&(*line)[line_length], r->block_offset, len);
         line_length += len;
 
+        r->block_offset += len;
         if (eol) {
-            r->block_offset += len + 1;
+            r->block_offset += 1;
             break;
-        } else {
-            r->block_offset += len;
         }
     }
 
@@ -98,11 +97,10 @@ int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
 
         line_offset = mempcpy(line_offset, r->block_offset, len);
 
+        r->block_offset += len;
         if (eol) {
-            r->block_offset += len + 1;
+            r->block_offset += 1;
             break;
-        } else {
-            r->block_offset += len;
         }
     }
 
