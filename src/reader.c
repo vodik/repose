@@ -8,22 +8,21 @@ struct archive_reader *archive_reader_new(struct archive *a)
 {
     struct archive_reader *r = malloc(sizeof(struct archive_reader));
     *r = (struct archive_reader){
-        .archive      = a,
-        .block        = NULL,
-        .block_offset = NULL,
-        .block_size   = 0,
-        .ret          = ARCHIVE_OK
+        .archive = a,
+        .status = ARCHIVE_OK
     };
     return r;
 }
 
 static int archive_feed_block(struct archive_reader *r)
 {
-    int64_t offset;
-    r->ret = archive_read_data_block(r->archive, (void *)&r->block,
-                                     &r->block_size, &offset);
-    r->block_offset = r->block;
-    return r->ret == ARCHIVE_OK ? 0 : -1;
+    for (;;) {
+        int64_t offset;
+        int status = archive_read_data_block(r->archive, (void *)&r->block,
+                                             &r->block_size, &offset);
+        r->block_offset = r->block;
+        return status;
+    }
 }
 
 static char *find_eol(struct archive_reader *r, size_t block_remaining)
@@ -37,14 +36,15 @@ int archive_getline(struct archive_reader *r, char **line)
     char *line_offset = *line = NULL;
     size_t line_length = 0;
 
-    if (r->ret == ARCHIVE_FATAL)
+    if (r->status == ARCHIVE_FATAL)
         return -1;
 
     for (;;) {
         if (&r->block[r->block_size] == r->block_offset) {
-            if (r->ret == ARCHIVE_EOF)
+            if (r->status == ARCHIVE_EOF)
                 break;
-            if (archive_feed_block(r) < 0)
+            r->status = archive_feed_block(r);
+            if (r->status != ARCHIVE_OK)
                 return -1;
         }
 
@@ -77,14 +77,15 @@ int archive_fgets(struct archive_reader *r, char *line, size_t line_size)
 {
     char *line_offset = line;
 
-    if (r->ret == ARCHIVE_FATAL)
+    if (r->status == ARCHIVE_FATAL)
         return -1;
 
     for (;;) {
         if (&r->block[r->block_size] == r->block_offset) {
-            if (r->ret == ARCHIVE_EOF)
+            if (r->status == ARCHIVE_EOF)
                 break;
-            if (archive_feed_block(r) < 0)
+            r->status = archive_feed_block(r);
+            if (r->status != ARCHIVE_OK)
                 return -1;
         }
 

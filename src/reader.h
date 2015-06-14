@@ -10,7 +10,7 @@ struct archive_reader {
     char *block_offset;
     size_t block_size;
 
-    long ret;
+    int status;
 };
 
 struct archive_reader *archive_reader_new(struct archive *a);
