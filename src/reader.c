@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <err.h>
 
 struct archive_reader *archive_reader_new(struct archive *a)
 {
