@@ -10,6 +10,7 @@ CFLAGS := -std=c11 -g \
 	-Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes \
 	-Wno-gnu-empty-initializer \
 	-D_GNU_SOURCE \
+	-D_FILE_OFFSET_BITS=64 \
 	-DREPOSE_VERSION=\"$(VERSION)\" \
 	$(CFLAGS)
 
