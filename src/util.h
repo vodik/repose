@@ -25,6 +25,8 @@ static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 static inline void *zero(void *s, size_t n) { return memset(s, 0, n); }
 static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2) == 0; }
 
+FILE *fopenat(int dirfd, const char *path, const char *mode);
+
 char *joinstring(const char *root, ...) _sentinel_;
 
 int xstrtol(const char *str, long *out);
