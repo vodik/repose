@@ -510,10 +510,10 @@ int main(int argc, char *argv[])
     if (list & (drop | rebuild))
         errx(EXIT_FAILURE, "List can't be used with dropping or rebuilding options");
 
-    rootname = get_rootname(argv[0]);
+    rootname = get_rootname(argv[0]), --argc;
     init_repo(&repo, rootname, files, !rebuild);
 
-    alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
+    alpm_list_t *targets = parse_targets(argv, argc);
 
     if (drop) {
         drop_from_repo(&repo, targets);
@@ -521,7 +521,7 @@ int main(int argc, char *argv[])
         list_repo(&repo);
         return 0;
     } else {
-        if (argc - 1 == 0) {
+        if (argc == 0) {
             targets = load_manifest(&repo, rootname);
         }
 
