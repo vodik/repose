@@ -373,6 +373,31 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
         load_db(repo, repo->filesname);
 }
 
+static alpm_list_t *load_manifest(struct repo *repo, const char *reponame)
+{
+    _cleanup_free_ char *manifest = joinstring(reponame, ".manifest", NULL);
+    _cleanup_fclose_ FILE *fp = fopenat(repo->rootfd, manifest, "r");
+    if (fp == NULL)
+        return NULL;
+
+    alpm_list_t *list = NULL;
+    for (;;) {
+        errno = 0;
+        char *line = NULL;
+        ssize_t nbytes_r = getline(&line, &(size_t){ 0 }, fp);
+        if (nbytes_r < 0) {
+            if (errno != 0)
+                err(EXIT_FAILURE, "Failed to read manifest file");
+            break;
+        }
+
+        line[nbytes_r - 1] = 0;
+        if (line && line[0])
+            list = alpm_list_add(list, line);
+    }
+    return list;
+}
+
 static char *get_rootname(char *name)
 {
     char *sep = strrchr(name, '.');
@@ -485,10 +510,10 @@ int main(int argc, char *argv[])
     if (list & (drop | rebuild))
         errx(EXIT_FAILURE, "List can't be used with dropping or rebuilding options");
 
-    rootname = get_rootname(argv[0]);
+    rootname = get_rootname(argv[0]), --argc;
     init_repo(&repo, rootname, files, !rebuild);
 
-    alpm_list_t *targets = parse_targets(&argv[1], argc - 1);
+    alpm_list_t *targets = parse_targets(argv, argc);
 
     if (drop) {
         drop_from_repo(&repo, targets);
@@ -496,6 +521,10 @@ int main(int argc, char *argv[])
         list_repo(&repo);
         return 0;
     } else {
+        if (argc == 0) {
+            targets = load_manifest(&repo, rootname);
+        }
+
         alpm_pkghash_t *filecache = get_filecache(repo.poolfd, targets, arch);
         if (!filecache)
             err(EXIT_FAILURE, "failed to get filecache");

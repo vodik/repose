@@ -13,6 +13,51 @@
 
 #define WHITESPACE " \t\n\r"
 
+static int oflags(const char *mode)
+{
+    int m, o;
+
+    switch (mode[0]) {
+    case 'r':
+        m = O_RDONLY;
+        o = 0;
+        break;
+    case 'w':
+        m = O_WRONLY;
+        o = O_CREAT | O_TRUNC;
+        break;
+    case 'a':
+        m = O_WRONLY;
+        o = O_CREAT | O_APPEND;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
+    while (*++mode) {
+        switch (*mode) {
+        case '+':
+            m = (m & ~O_ACCMODE) | O_RDWR;
+            break;
+        }
+    }
+
+    return m | o;
+}
+
+FILE *fopenat(int dirfd, const char *path, const char *mode)
+{
+    int flags = oflags(mode);
+    if (flags < 0)
+        return NULL;
+
+    int fd = openat(dirfd, path, flags);
+    if (fd < 0)
+        return NULL;
+    return fdopen(fd, mode);
+}
+
 char *joinstring(const char *root, ...)
 {
     size_t len;
