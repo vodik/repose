@@ -148,14 +148,11 @@ static void link_db(struct repo *repo)
 
 static int render_db(struct repo *repo, const char *repo_name, enum contents what)
 {
-    _cleanup_close_ int dbfd = -1;
-
-    dbfd = openat(repo->rootfd, repo_name, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (dbfd < 0)
-        err(EXIT_FAILURE, "failed to open %s for writing", repo_name);
-
-    if (save_database(dbfd, repo->cache, what, config.compression, repo->poolfd) < 0)
-        err(EXIT_FAILURE, "failed to write %s", repo_name);
+    _cleanup_close_ int dbfd = openat(repo->rootfd, repo_name,
+                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    check_posix(dbfd, "failed to open %s for writing", repo_name);
+    check_posix(save_database(dbfd, repo->cache, what, config.compression, repo->poolfd),
+                "failed to write %s", repo_name);
 
     if (config.sign)
         gpgme_sign(repo->rootfd, repo_name, NULL);
@@ -335,13 +332,11 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
                       bool load_cache)
 {
     repo->rootfd = open(repo->root, O_RDONLY | O_DIRECTORY);
-    if (repo->rootfd < 0)
-        err(EXIT_FAILURE, "failed to open root directory %s", repo->root);
+    check_posix(repo->rootfd, "failed to open root directory %s", repo->root);
 
     if (repo->pool) {
         repo->poolfd = open(repo->pool, O_RDONLY | O_DIRECTORY);
-        if (repo->poolfd < 0)
-            err(EXIT_FAILURE, "failed to open pool directory %s", repo->pool);
+        check_posix(repo->poolfd, "failed to open pool directory %s", repo->pool);
     } else {
         repo->poolfd = repo->rootfd;
     }
@@ -526,8 +521,7 @@ int main(int argc, char *argv[])
         }
 
         alpm_pkghash_t *filecache = get_filecache(repo.poolfd, targets, arch);
-        if (!filecache)
-            err(EXIT_FAILURE, "failed to get filecache");
+        check_null(filecache, "failed to get filecache");
 
         reduce_repo(&repo);
 

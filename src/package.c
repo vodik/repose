@@ -76,7 +76,7 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
         line[nbytes_r] = '\0';
         char *e = memchr(line, '=', nbytes_r);
         if (!e)
-            err(EXIT_FAILURE, "failed to find '='");
+            errx(EXIT_FAILURE, "failed to find '='");
 
         *e++ = 0;
         pkginfo_assignment(strstrip(line), strstrip(e), pkg);

@@ -44,9 +44,7 @@ static size_t get_filecache_size(DIR *dirp)
 static struct pkg *load_from_file(int dirfd, const char *filename, const char *arch)
 {
     _cleanup_close_ int pkgfd = openat(dirfd, filename, O_RDONLY);
-    if (pkgfd < 0) {
-        err(EXIT_FAILURE, "failed to open %s", filename);
-    }
+    check_posix(pkgfd, "failed to open %s", filename);
 
     struct pkg *pkg = malloc(sizeof(pkg_t));
     zero(pkg, sizeof(pkg_t));
@@ -89,15 +87,11 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
 alpm_pkghash_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch)
 {
     int dupfd = dup(dirfd);
-    if (dupfd < 0)
-        err(EXIT_FAILURE, "failed to duplicate fd");
-
-    if (lseek(dupfd, 0, SEEK_SET) < 0)
-        err(EXIT_FAILURE, "failed to lseek");
+    check_posix(dupfd, "failed to duplicate fd");
+    check_posix(lseek(dupfd, 0, SEEK_SET), "failed to lseek");
 
     _cleanup_closedir_ DIR *dirp = fdopendir(dupfd);
-    if (!dirp)
-        err(EXIT_FAILURE, "fdopendir failed");
+    check_null(dirp, "fdopendir failed");
 
     size_t size = get_filecache_size(dirp);
     alpm_pkghash_t *cache = _alpm_pkghash_create(size);
