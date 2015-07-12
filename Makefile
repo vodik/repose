@@ -15,7 +15,7 @@ CFLAGS := -std=c11 -g \
 	$(CFLAGS)
 
 VPATH = src
-LDLIBS = -larchive -lalpm -lgpgme -lcrypto -lssl
+LDLIBS = -larchive -lalpm -lgpgme -lcrypto
 PREFIX = /usr
 
 all: repose
