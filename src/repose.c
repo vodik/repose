@@ -25,7 +25,7 @@
 #include "base64.h"
 #include "util.h"
 
-static struct config config = {};
+static struct config config = {0};
 
 static inline _printf_(1,2) void trace(const char *fmt, ...)
 {
