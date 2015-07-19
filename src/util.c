@@ -197,15 +197,17 @@ static char *sha2_fd(int fd)
     return hex_representation(output, 32);
 }
 
-char *md5_file(int dirfd, char *filename)
+char *md5_file(int dirfd, const char *filename)
 {
     _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
+    check_posix(fd, "failed to open %s for md5 checksum", filename);
     return md5_fd(fd);
 }
 
-char *sha256_file(int dirfd, char *filename)
+char *sha256_file(int dirfd, const char *filename)
 {
     _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
+    check_posix(fd, "failed to open %s for sha256 checksum", filename);
     return sha2_fd(fd);
 }
 

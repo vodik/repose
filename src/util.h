@@ -35,7 +35,7 @@ char *joinstring(const char *root, ...) _sentinel_;
 int xstrtol(const char *str, long *out);
 int xstrtoul(const char *str, unsigned long *out);
 
-char *md5_file(int dirfd, char *filename);
-char *sha256_file(int dirfd, char *filename);
+char *md5_file(int dirfd, const char *filename);
+char *sha256_file(int dirfd, const char *filename);
 
 char *strstrip(char *s);
