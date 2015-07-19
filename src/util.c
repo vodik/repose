@@ -53,9 +53,25 @@ FILE *fopenat(int dirfd, const char *path, const char *mode)
         return NULL;
 
     int fd = openat(dirfd, path, flags);
-    if (fd < 0)
+    if (_unlikely_(fd < 0))
         return NULL;
     return fdopen(fd, mode);
+}
+
+void check_posix(intmax_t rc, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    if (_unlikely_(rc == -1))
+        verr(EXIT_FAILURE, fmt, args);
+    va_end(args);
+}
+
+void check_null(const void *ptr, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    if (_unlikely_(!ptr))
+        verr(EXIT_FAILURE, fmt, args);
+    va_end(args);
 }
 
 char *joinstring(const char *root, ...)

@@ -26,21 +26,8 @@ static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 static inline void *zero(void *s, size_t n) { return memset(s, 0, n); }
 static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2) == 0; }
 
-static inline void _printf_(2, 3) check_posix(intmax_t rc, const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    if (rc == -1)
-        verr(EXIT_FAILURE, fmt, args);
-    va_end(args);
-}
-
-static inline void _printf_(2, 3) check_null(const void *ptr, const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    if (!ptr)
-        verr(EXIT_FAILURE, fmt, args);
-    va_end(args);
-}
+void check_posix(intmax_t rc, const char *fmt, ...) _printf_(2, 3);
+void check_null(const void *ptr, const char *fmt, ...) _printf_(2, 3);
 
 FILE *fopenat(int dirfd, const char *path, const char *mode);
 
