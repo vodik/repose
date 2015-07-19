@@ -32,7 +32,7 @@ static int buffer_extendby(buffer_t *buf, size_t extby)
 
 int buffer_init(buffer_t *buf, size_t reserve)
 {
-    zero(buf, sizeof(buffer_t));
+    *buf = (buffer_t){0};
 
     if (reserve && buffer_extendby(buf, reserve) < 0)
         return -errno;

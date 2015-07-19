@@ -47,7 +47,7 @@ static struct pkg *load_from_file(int dirfd, const char *filename, const char *a
     check_posix(pkgfd, "failed to open %s", filename);
 
     struct pkg *pkg = malloc(sizeof(pkg_t));
-    zero(pkg, sizeof(pkg_t));
+    *pkg = (struct pkg){0};
 
     if (load_package(pkg, pkgfd) < 0)
         goto error;
@@ -58,6 +58,7 @@ static struct pkg *load_from_file(int dirfd, const char *filename, const char *a
     pkg->filename = strdup(filename);
     load_package_signature(pkg, dirfd);
     return pkg;
+
 error:
     package_free(pkg);
     return NULL;

@@ -23,7 +23,6 @@ static inline void fclosep(FILE **fp)  { if (*fp) fclose(*fp); }
 static inline void closedirp(DIR **dp) { if (*dp) closedir(*dp); }
 static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 
-static inline void *zero(void *s, size_t n) { return memset(s, 0, n); }
 static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2) == 0; }
 
 void check_posix(intmax_t rc, const char *fmt, ...) _printf_(2, 3);
