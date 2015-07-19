@@ -14,14 +14,13 @@
 static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pkg)
 {
     struct pkg *old = _alpm_pkghash_find(cache, pkg->name);
-    int vercmp = old == NULL ? 0 : alpm_pkg_vercmp(pkg->version, old->version);
-
-    if (vercmp == 0 || vercmp == 1) {
-        if (old) {
-            cache = _alpm_pkghash_remove(cache, old, NULL);
-            package_free(old);
-        }
+    if (!old) {
         return _alpm_pkghash_add(cache, pkg);
+    }
+
+    int vercmp = alpm_pkg_vercmp(pkg->version, old->version);
+    if (vercmp == 0 || vercmp == 1) {
+        return _alpm_pkghash_replace(cache, pkg, old);
     }
 
     return cache;

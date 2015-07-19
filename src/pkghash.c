@@ -224,9 +224,17 @@ static alpm_pkghash_t *pkghash_add_pkg(alpm_pkghash_t *hash, struct pkg *pkg,
 	return hash;
 }
 
+
 alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, struct pkg *pkg)
 {
 	return pkghash_add_pkg(hash, pkg, 0);
+}
+
+alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new, struct pkg *old)
+{
+	cache = _alpm_pkghash_remove(cache, old, NULL);
+	return _alpm_pkghash_add(cache, new);
+
 }
 
 alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, struct pkg *pkg)

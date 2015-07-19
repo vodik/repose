@@ -170,14 +170,6 @@ static inline int delete_link(const struct pkg *pkg, int dirfd)
     return 0;
 }
 
-// TODO: cleanup pkghash
-static inline alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new,
-                                                    struct pkg *old)
-{
-    cache = _alpm_pkghash_remove(cache, old, NULL);
-    return _alpm_pkghash_add(cache, new);
-}
-
 static int reduce_repo(struct repo *repo)
 {
     alpm_list_t *node;

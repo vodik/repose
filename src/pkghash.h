@@ -52,6 +52,7 @@ unsigned long _alpm_hash_sdbm(const char *str);
 alpm_pkghash_t *_alpm_pkghash_create(unsigned int size);
 
 alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, struct pkg *pkg);
+alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new, struct pkg *old);
 alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, struct pkg *pkg);
 alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, struct pkg *pkg, struct pkg **data);
 
