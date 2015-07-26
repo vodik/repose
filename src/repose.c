@@ -122,6 +122,16 @@ static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
     }
 }
 
+static inline int unlink_pkg(const struct repo *repo, const struct pkg *pkg)
+{
+    struct stat st;
+    if (fstatat(repo->rootfd, pkg->filename, &st, AT_SYMLINK_NOFOLLOW) < 0)
+        return errno != ENOENT ? -1 : 0;
+    if (S_ISLNK(st.st_mode))
+        return unlinkat(repo->rootfd, pkg->filename, 0);
+    return 0;
+}
+
 static void link_db(struct repo *repo)
 {
     if (!repo->pool)
@@ -136,6 +146,7 @@ static int render_db(struct repo *repo, const char *repo_name, enum contents wha
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, repo_name,
                                       O_CREAT | O_WRONLY | O_TRUNC, 0644);
+
     check_posix(dbfd, "failed to open %s for writing", repo_name);
     check_posix(save_database(dbfd, repo->cache, what, config.compression, repo->poolfd),
                 "failed to write %s", repo_name);
@@ -143,16 +154,6 @@ static int render_db(struct repo *repo, const char *repo_name, enum contents wha
     if (config.sign)
         gpgme_sign(repo->rootfd, repo_name, NULL);
 
-    return 0;
-}
-
-static inline int delete_link(const struct pkg *pkg, int dirfd)
-{
-    struct stat buf;
-    if (fstatat(dirfd, pkg->filename, &buf, AT_SYMLINK_NOFOLLOW) < 0)
-        return errno != ENOENT ? -1 : 0;
-    if (S_ISLNK(buf.st_mode))
-        return unlinkat(dirfd, pkg->filename, 0);
     return 0;
 }
 
@@ -170,7 +171,7 @@ static int reduce_repo(struct repo *repo)
             trace("dropping %s\n", pkg->name);
 
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
-            delete_link(pkg, repo->rootfd);
+            unlink_pkg(repo, pkg);
             package_free(pkg);
             repo->dirty = true;
         }
@@ -192,7 +193,7 @@ static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
             trace("dropping %s\n", pkg->name);
 
             repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
-            delete_link(pkg, repo->rootfd);
+            unlink_pkg(repo, pkg);
             package_free(pkg);
             repo->dirty = true;
         }
@@ -251,7 +252,7 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
         }
 
         repo->cache = _alpm_pkghash_replace(repo->cache, pkg, old);
-        delete_link(pkg, repo->rootfd);
+        unlink_pkg(repo, pkg);
         package_free(old);
         dirty = true;
     }
