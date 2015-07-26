@@ -35,7 +35,7 @@ static inline int read_desc_ulong(struct archive_reader *reader, unsigned long *
     _cleanup_free_ char *buf;
     int nbytes_r = archive_getline(reader, &buf);
     if (nbytes_r > 0)
-        xstrtoul(buf, data);
+        fromstr(buf, data);
     return nbytes_r;
 }
 
@@ -44,7 +44,7 @@ static inline int read_desc_long(struct archive_reader *reader, long *data)
     _cleanup_free_ char *buf;
     int nbytes_r = archive_getline(reader, &buf);
     if (nbytes_r > 0)
-        xstrtol(buf, data);
+        fromstr(buf, data);
     return nbytes_r;
 }
 

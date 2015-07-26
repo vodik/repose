@@ -33,6 +33,7 @@ FILE *fopenat(int dirfd, const char *path, const char *mode);
 
 char *joinstring(const char *root, ...) _sentinel_;
 
+#define fromstr(str, out) _Generic((*out), long: xstrtol, unsigned long: xstrtoul)(str, out)
 int xstrtol(const char *str, long *out);
 int xstrtoul(const char *str, unsigned long *out);
 

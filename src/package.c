@@ -29,11 +29,11 @@ static void pkginfo_assignment(const char *key, const char *value, pkg_t *pkg)
     else if (streq(key, "url"))
         pkg->url = strdup(value);
     else if (streq(key, "builddate"))
-        pkg->builddate = atol(value);
+        fromstr(value, &pkg->builddate);
     else if (streq(key, "packager"))
         pkg->packager = strdup(value);
     else if (streq(key, "size"))
-        pkg->isize = atol(value);
+        fromstr(value, &pkg->isize);
     else if (streq(key, "arch"))
         pkg->arch = strdup(value);
     else if (streq(key, "group"))
