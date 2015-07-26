@@ -307,8 +307,8 @@ static void check_signature(struct repo *repo, const char *name)
     }
 }
 
-static void init_repo(struct repo *repo, const char *reponame, bool files,
-                      bool load_cache)
+static int init_repo(struct repo *repo, const char *reponame, bool files,
+                     bool load_cache)
 {
     repo->rootfd = open(repo->root, O_RDONLY | O_DIRECTORY);
     check_posix(repo->rootfd, "failed to open root directory %s", repo->root);
@@ -337,14 +337,16 @@ static void init_repo(struct repo *repo, const char *reponame, bool files,
         check_signature(repo, repo->filesname);
     }
 
-    repo->cache = _alpm_pkghash_create(100);
+    if (load_cache) {
+        repo->cache = _alpm_pkghash_create(100);
 
-    if (!load_cache)
-        return;
-    if (load_db(repo, repo->dbname) < 0)
-        return;
-    if (repo->filesname)
-        load_db(repo, repo->filesname);
+        if (load_db(repo, repo->dbname) < 0)
+            return -1;
+        if (repo->filesname)
+            return load_db(repo, repo->filesname);
+    }
+
+    return 0;
 }
 
 static alpm_list_t *load_manifest(struct repo *repo, const char *reponame)
@@ -485,15 +487,17 @@ int main(int argc, char *argv[])
         errx(EXIT_FAILURE, "List can't be used with dropping or rebuilding options");
 
     rootname = get_rootname(argv[0]), --argc;
-    init_repo(&repo, rootname, files, !rebuild);
+    int ret = init_repo(&repo, rootname, files, !rebuild);
+    if (list) {
+        check_posix(ret, "failed to open database %s.db", rootname);
+        list_repo(&repo);
+        return 0;
+    }
 
     alpm_list_t *targets = parse_targets(argv, argc);
 
     if (drop) {
         drop_from_repo(&repo, targets);
-    } else if (list) {
-        list_repo(&repo);
-        return 0;
     } else {
         if (argc == 0) {
             targets = load_manifest(&repo, rootname);
