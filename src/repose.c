@@ -52,7 +52,7 @@ static _noreturn_ void usage(FILE *out)
 
 static _noreturn_ void elephant(void)
 {
-    static const unsigned char big_elephant[] =
+    static const char *big_elephant =
         "ICAgICBfXwogICAgJy4gXAogICAgICctIFwKICAgICAgLyAvXyAgICAgICAgIC4tLS0uCiAgICAg"
         "LyB8IFxcLC5cLy0tLi8vICAgICkKICAgICB8ICBcLy8gICAgICAgICkvICAvCiAgICAgIFwgICcg"
         "XiBeICAgIC8gICAgKV9fX18uLS0tLS4uICA2CiAgICAgICAnLl9fX18uICAgIC5fX18vICAgICAg"
@@ -62,7 +62,7 @@ static _noreturn_ void elephant(void)
         "XCAgQy8vICMgIC8nLS0tLS0nJy8gIyAgLwogICAgICAgLiAgICdDLyB8ICAgIHwgICAgfCAgIHwg"
         "ICAgfG1yZiAgLAogICAgICAgXCksIC4uIC4nT09PLScuIC4uJ09PTydPT08tJy4gLi5cKCw=";
 
-    static const unsigned char small_elephant[] =
+    static const char *small_elephant =
         "ICAgIF8gICAgXwogICAvIFxfXy8gXF9fX19fCiAgLyAgLyAgXCAgXCAgICBgXAogICkgIFwnJy8g"
         "ICggICAgIHxcCiAgYFxfXykvX18vJ19cICAvIGAKICAgICAvL198X3x+fF98X3wKICAgICBeIiIn"
         "IicgIiInIic=";
@@ -72,22 +72,18 @@ static _noreturn_ void elephant(void)
 
     switch (srand(time(NULL)), rand() % 2) {
     case 0:
-        ret = base64_decode(&data, big_elephant, sizeof(big_elephant) - 1);
+        ret = base64_decode(&data, (const unsigned char *)big_elephant, strlen(big_elephant));
         break;
     case 1:
-        ret = base64_decode(&data, small_elephant, sizeof(small_elephant) - 1);
+        ret = base64_decode(&data, (const unsigned char *)small_elephant, strlen(small_elephant));
         break;
     default:
         errx(EXIT_FAILURE, "failed to find elephant");
         break;
     }
 
-    if (ret > 0) {
-        puts((char *)data);
-        exit(EXIT_SUCCESS);
-    }
-
-    exit(EXIT_FAILURE);
+    puts((char *)data);
+    exit(EXIT_SUCCESS);
 }
 
 static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
