@@ -25,18 +25,7 @@
 #include "base64.h"
 #include "util.h"
 
-static struct config config = {0};
-
-static inline _printf_(1,2) void trace(const char *fmt, ...)
-{
-    if (config.verbose) {
-        va_list ap;
-
-        va_start(ap, fmt);
-        vprintf(fmt, ap);
-        va_end(ap);
-    }
-}
+struct config config = {0};
 
 static _noreturn_ void usage(FILE *out)
 {

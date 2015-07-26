@@ -22,3 +22,5 @@ struct config {
     bool reflink;
     bool sign;
 };
+
+extern struct config config;

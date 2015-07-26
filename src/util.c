@@ -5,13 +5,24 @@
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
-
 #include <unistd.h>
 #include <fcntl.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
+#include "repose.h"
 
 #define WHITESPACE " \t\n\r"
+
+void trace(const char *fmt, ...)
+{
+    if (config.verbose) {
+        va_list ap;
+
+        va_start(ap, fmt);
+        vprintf(fmt, ap);
+        va_end(ap);
+    }
+}
 
 static int oflags(const char *mode)
 {
