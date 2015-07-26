@@ -114,10 +114,11 @@ static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
 static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
 {
     if (config.reflink) {
-        if (clone_pkg(repo, pkg) < 0)
-            err(EXIT_FAILURE, "failed to make reflink for %s", pkg->filename);
-    } else if (symlink_pkg(repo, pkg) < 0) {
-        err(EXIT_FAILURE, "failed to make symlink for %s", pkg->filename);
+        check_posix(clone_pkg(repo, pkg),
+                    "failed to make reflink for %s", pkg->filename);
+    } else {
+        check_posix(symlink_pkg(repo, pkg),
+                    "failed to make symlink for %s", pkg->filename);
     }
 }
 

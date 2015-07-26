@@ -70,19 +70,22 @@ FILE *fopenat(int dirfd, const char *path, const char *mode)
 }
 
 void check_posix(intmax_t rc, const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    if (_unlikely_(rc == -1))
+    if (_unlikely_(rc == -1)) {
+        va_list args;
+        va_start(args, fmt);
         verr(EXIT_FAILURE, fmt, args);
-    va_end(args);
+        va_end(args);
+    }
 }
 
-void check_null(const void *ptr, const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    if (_unlikely_(!ptr))
+void *check_null(const void *ptr, const char *fmt, ...) {
+    if (_unlikely_(!ptr)) {
+        va_list args;
+        va_start(args, fmt);
         verr(EXIT_FAILURE, fmt, args);
-    va_end(args);
+        va_end(args);
+    }
+    return (void *)ptr;
 }
 
 char *joinstring(const char *root, ...)
