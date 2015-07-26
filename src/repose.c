@@ -470,7 +470,7 @@ int main(int argc, char *argv[])
         errx(1, "incorrect number of arguments provided");
 
     if (!arch) {
-	struct utsname uts;
+        struct utsname uts;
         uname(&uts);
         arch = strdup(uts.machine);
     }
