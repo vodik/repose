@@ -67,15 +67,14 @@ static _noreturn_ void elephant(void)
         "ICggICAgIHxcCiAgYFxfXykvX18vJ19cICAvIGAKICAgICAvL198X3x+fF98X3wKICAgICBeIiIn"
         "IicgIiInIic=";
 
-    int ret = 0;
     unsigned char *data = NULL;
 
     switch (srand(time(NULL)), rand() % 2) {
     case 0:
-        ret = base64_decode(&data, (const unsigned char *)big_elephant, strlen(big_elephant));
+        base64_decode(&data, (const unsigned char *)big_elephant, strlen(big_elephant));
         break;
     case 1:
-        ret = base64_decode(&data, (const unsigned char *)small_elephant, strlen(small_elephant));
+        base64_decode(&data, (const unsigned char *)small_elephant, strlen(small_elephant));
         break;
     default:
         errx(EXIT_FAILURE, "failed to find elephant");
