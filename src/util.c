@@ -187,7 +187,7 @@ static char *md5_fd(int fd)
         return NULL;
 
     MD5_Final(output, &ctx);
-    return hex_representation(output, 16);
+    return hex_representation(output, sizeof(output));
 }
 
 static char *sha2_fd(int fd)
@@ -208,7 +208,7 @@ static char *sha2_fd(int fd)
         return NULL;
 
     SHA256_Final(output, &ctx);
-    return hex_representation(output, 32);
+    return hex_representation(output, sizeof(output));
 }
 
 char *md5_file(int dirfd, const char *filename)
