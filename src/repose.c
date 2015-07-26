@@ -157,29 +157,6 @@ static int render_db(struct repo *repo, const char *repo_name, enum contents wha
     return 0;
 }
 
-static int reduce_repo(struct repo *repo)
-{
-    alpm_list_t *node;
-
-    for (node = repo->cache->list; node; node = node->next) {
-        struct pkg *pkg = node->data;
-
-        if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
-            if (errno != ENOENT)
-                err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
-
-            trace("dropping %s\n", pkg->name);
-
-            repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
-            unlink_pkg(repo, pkg);
-            package_free(pkg);
-            repo->dirty = true;
-        }
-    }
-
-    return 0;
-}
-
 static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
 {
     if (!targets)
@@ -210,11 +187,28 @@ static void list_repo(struct repo *repo)
     }
 }
 
-static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
+static void reduce_repo(struct repo *repo)
 {
     alpm_list_t *node;
-    bool dirty = false;
+    for (node = repo->cache->list; node; node = node->next) {
+        struct pkg *pkg = node->data;
 
+        if (faccessat(repo->poolfd, pkg->filename, F_OK, 0) < 0) {
+            if (errno != ENOENT)
+                err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
+
+            trace("dropping %s\n", pkg->name);
+            repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
+            unlink_pkg(repo, pkg);
+            package_free(pkg);
+            repo->dirty = true;
+        }
+    }
+}
+
+static void update_repo(struct repo *repo, alpm_pkghash_t *src)
+{
+    alpm_list_t *node;
     for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
         struct pkg *old = _alpm_pkghash_find(repo->cache, pkg->name);
@@ -223,7 +217,7 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
             /* The package isn't already in the database. Just add it */
             trace("adding %s %s\n", pkg->name, pkg->version);
             repo->cache = _alpm_pkghash_add(repo->cache, pkg);
-            dirty = true;
+            repo->dirty = true;
             continue;
         }
 
@@ -254,10 +248,8 @@ static bool update_repo(struct repo *repo, alpm_pkghash_t *src)
         repo->cache = _alpm_pkghash_replace(repo->cache, pkg, old);
         unlink_pkg(repo, pkg);
         package_free(old);
-        dirty = true;
+        repo->dirty = true;
     }
-
-    return dirty;
 }
 
 /* NOTES TO SELF:
@@ -507,9 +499,7 @@ int main(int argc, char *argv[])
         check_null(filecache, "failed to get filecache");
 
         reduce_repo(&repo);
-
-        if (update_repo(&repo, filecache))
-            repo.dirty = true;
+        update_repo(&repo, filecache);
     }
 
     if (!repo.dirty) {
