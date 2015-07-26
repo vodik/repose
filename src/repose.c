@@ -145,8 +145,9 @@ static int render_db(struct repo *repo, const char *repo_name, enum contents wha
 {
     _cleanup_close_ int dbfd = openat(repo->rootfd, repo_name,
                                       O_CREAT | O_WRONLY | O_TRUNC, 0644);
-
     check_posix(dbfd, "failed to open %s for writing", repo_name);
+
+    trace("writing %s...\n", repo_name);
     check_posix(save_database(dbfd, repo->cache, what, config.compression, repo->poolfd),
                 "failed to write %s", repo_name);
 
@@ -188,6 +189,9 @@ static void list_repo(struct repo *repo)
 
 static void reduce_repo(struct repo *repo)
 {
+    if (!repo->cache)
+        return;
+
     alpm_list_t *node;
     for (node = repo->cache->list; node; node = node->next) {
         struct pkg *pkg = node->data;
@@ -207,6 +211,9 @@ static void reduce_repo(struct repo *repo)
 
 static void update_repo(struct repo *repo, alpm_pkghash_t *src)
 {
+    if (!repo->cache)
+        repo->cache = _alpm_pkghash_create(src->entries);
+
     alpm_list_t *node;
     for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
@@ -504,11 +511,9 @@ int main(int argc, char *argv[])
     if (!repo.dirty) {
         trace("repo does not need updating\n");
     } else {
-        trace("writing %s...\n", repo.dbname);
         render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
 
         if (repo.filesname) {
-            trace("writing %s...\n", repo.filesname);
             render_db(&repo, repo.filesname, DB_FILES);
         }
 
