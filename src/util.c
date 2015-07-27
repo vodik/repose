@@ -10,6 +10,7 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 #include "repose.h"
+#include "file.h"
 
 #define WHITESPACE " \t\n\r"
 
@@ -182,42 +183,34 @@ static char *hex_representation(unsigned char *bytes, size_t size)
 static char *md5_fd(int fd)
 {
     MD5_CTX ctx;
-    unsigned char buf[BUFSIZ], output[16];
-    ssize_t n;
+    unsigned char output[16];
+    struct file_t file;
 
-    MD5_Init(&ctx);
-
-    while ((n = read(fd, buf, sizeof(buf))) > 0 || errno == EINTR) {
-        if (n < 0)
-            continue;
-        MD5_Update(&ctx, buf, n);
-    }
-
-    if (n < 0)
+    if (file_from_fd(&file, fd) < 0)
         return NULL;
 
+    MD5_Init(&ctx);
+    MD5_Update(&ctx, file.mmap, file.st.st_size);
     MD5_Final(output, &ctx);
+    file_close(&file);
+
     return hex_representation(output, sizeof(output));
 }
 
 static char *sha2_fd(int fd)
 {
     SHA256_CTX ctx;
-    unsigned char buf[BUFSIZ], output[32];
-    ssize_t n;
+    unsigned char output[32];
+    struct file_t file;
 
-    SHA256_Init(&ctx);
-
-    while ((n = read(fd, buf, sizeof(buf))) > 0 || errno == EINTR) {
-        if (n < 0)
-            continue;
-        SHA256_Update(&ctx, buf, n);
-    }
-
-    if (n < 0)
+    if (file_from_fd(&file, fd) < 0)
         return NULL;
 
+    SHA256_Init(&ctx);
+    SHA256_Update(&ctx, file.mmap, file.st.st_size);
     SHA256_Final(output, &ctx);
+    file_close(&file);
+
     return hex_representation(output, sizeof(output));
 }
 
