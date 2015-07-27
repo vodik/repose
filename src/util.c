@@ -127,30 +127,40 @@ char *joinstring(const char *root, ...)
 int xstrtol(const char *str, long *out)
 {
     char *end = NULL;
-
-    if (str == NULL || *str == '\0')
-        return -1;
-
     errno = 0;
-    *out = strtoul(str, &end, 10);
-    if (errno || str == end || (end && *end))
-        return -1;
 
+    if (!str || !str[0]) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    *out = strtol(str, &end, 10);
+    if (errno) {
+        return -1;
+    } else if (str == end || (end && end[0])) {
+        errno = EINVAL;
+        return -1;
+    }
     return 0;
 }
 
 int xstrtoul(const char *str, unsigned long *out)
 {
     char *end = NULL;
-
-    if (str == NULL || *str == '\0')
-        return -1;
-
     errno = 0;
-    *out = strtoul(str, &end, 10);
-    if (errno || str == end || (end && *end))
-        return -1;
 
+    if (!str || !str[0]) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    *out = strtoul(str, &end, 10);
+    if (errno) {
+        return -1;
+    } else if (str == end || (end && *end)) {
+        errno = EINVAL;
+        return -1;
+    }
     return 0;
 }
 
