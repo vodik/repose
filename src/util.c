@@ -79,14 +79,13 @@ void check_posix(intmax_t rc, const char *fmt, ...) {
     }
 }
 
-void *check_null(const void *ptr, const char *fmt, ...) {
+void check_null(const void *ptr, const char *fmt, ...) {
     if (_unlikely_(!ptr)) {
         va_list args;
         va_start(args, fmt);
         verr(EXIT_FAILURE, fmt, args);
         va_end(args);
     }
-    return (void *)ptr;
 }
 
 char *joinstring(const char *root, ...)

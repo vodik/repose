@@ -27,7 +27,7 @@ static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2)
 
 void trace(const char *fmt, ...) _printf_(1, 2);
 void check_posix(intmax_t rc, const char *fmt, ...) _printf_(2, 3);
-void *check_null(const void *ptr, const char *fmt, ...) _printf_(2, 3);
+void check_null(const void *ptr, const char *fmt, ...) _printf_(2, 3);
 
 FILE *fopenat(int dirfd, const char *path, const char *mode);
 
