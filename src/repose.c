@@ -258,11 +258,6 @@ static void update_repo(struct repo *repo, alpm_pkghash_t *src)
     }
 }
 
-/* NOTES TO SELF:
- * - do i really need to do a merge when there's no database?
- *    - how do i handle stdout then?
- */
-
 static alpm_list_t *parse_targets(char *targets[], int count)
 {
     int i;
