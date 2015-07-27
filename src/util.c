@@ -70,7 +70,8 @@ FILE *fopenat(int dirfd, const char *path, const char *mode)
     return fdopen(fd, mode);
 }
 
-void check_posix(intmax_t rc, const char *fmt, ...) {
+void check_posix(intmax_t rc, const char *fmt, ...)
+{
     if (_unlikely_(rc == -1)) {
         va_list args;
         va_start(args, fmt);
@@ -79,7 +80,8 @@ void check_posix(intmax_t rc, const char *fmt, ...) {
     }
 }
 
-void check_null(const void *ptr, const char *fmt, ...) {
+void check_null(const void *ptr, const char *fmt, ...)
+{
     if (_unlikely_(!ptr)) {
         va_list args;
         va_start(args, fmt);
