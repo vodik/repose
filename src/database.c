@@ -21,7 +21,6 @@
 
 struct db {
     int fd;
-    struct file_t file;
     struct archive *archive;
     int filter;
     time_t mtime;
@@ -34,22 +33,25 @@ struct db_entry {
     const char *version;
 };
 
-static int open_db(struct db *db, int fd)
+static int open_database(struct db *db, int fd)
 {
-    *db = (struct db){ .filter  = ARCHIVE_COMPRESSION_NONE };
+    struct file_t file;
 
-    if (file_from_fd(&db->file, fd) < 0)
+    if (file_from_fd(&file, fd) < 0)
         return -1;
 
-    db->fd = db->file.fd;
-    db->archive = archive_read_new();
-    db->mtime = db->file.st.st_mtime;
+    *db = (struct db){
+        .archive = archive_read_new(),
+        .filter = ARCHIVE_COMPRESSION_NONE,
+        .fd = file.fd,
+        .mtime = file.st.st_mtime
+    };
 
     archive_read_support_filter_all(db->archive);
     archive_read_support_format_all(db->archive);
 
-    if (archive_read_open_memory(db->archive, db->file.mmap, db->file.st.st_size) != ARCHIVE_OK) {
-        archive_read_free(db->archive);
+    if (archive_read_open_memory(db->archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
+        file_close(&file);
         return -1;
     }
 
@@ -164,8 +166,11 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
     struct db db;
     struct archive_entry *entry;
 
-    if (open_db(&db, fd) < 0)
+    if (open_database(&db, fd) < 0) {
+        archive_read_close(db.archive);
+        archive_read_free(db.archive);
         return -1;
+    }
 
     while (archive_read_next_header(db.archive, &entry) == ARCHIVE_OK) {
         const mode_t mode = archive_entry_mode(entry);
@@ -176,7 +181,6 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
 
     archive_read_close(db.archive);
     archive_read_free(db.archive);
-
     return 0;
 }
 
