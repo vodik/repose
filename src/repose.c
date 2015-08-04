@@ -469,7 +469,7 @@ int main(int argc, char *argv[])
         rebuild = false;
     }
 
-    rootname = get_rootname(argv[0]), --argc;
+    rootname = get_rootname(*argv++), --argc;
     int ret = init_repo(&repo, rootname, files, !rebuild);
     if (list) {
         check_posix(ret, "failed to open database %s.db", rootname);
