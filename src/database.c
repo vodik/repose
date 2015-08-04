@@ -28,6 +28,7 @@ struct db {
     struct pkg *likely_pkg;
 };
 
+/* The name, version and type fields all share the same memory */
 struct db_entry {
     char *name;
     const char *type;
@@ -60,7 +61,7 @@ static int open_database(struct db *db, int fd)
     return 0;
 }
 
-static int parse_db_entry(const char *entryname, struct db_entry *entry)
+static int parse_database_pathname(const char *entryname, struct db_entry *entry)
 {
     entry->name = strdup(entryname);
     const char *slash = strchrnul(entry->name, '/'), *dash = slash;
@@ -71,7 +72,6 @@ static int parse_db_entry(const char *entryname, struct db_entry *entry)
     if (*dash != '-')
         return -EINVAL;
 
-    /* name, version and type share the same memory */
     entry->name[dash - entry->name] = entry->name[slash - entry->name] = '\0';
     entry->type = slash ? slash + 1 : NULL;
     entry->version = &entry->name[dash - entry->name + 1];
@@ -79,7 +79,7 @@ static int parse_db_entry(const char *entryname, struct db_entry *entry)
     return 0;
 }
 
-static inline void free_db_entry(struct db_entry *e)
+static inline void db_entry_free(struct db_entry *e)
 {
     free(e->name);
 }
@@ -141,7 +141,7 @@ static int parse_database_entry(struct db *db, struct archive_entry *entry,
     struct db_entry e;
     int ret = 0;
 
-    if (parse_db_entry(pathname, &e) < 0) {
+    if (parse_database_pathname(pathname, &e) < 0) {
         ret = -1;
         goto cleanup;
     }
@@ -160,7 +160,7 @@ static int parse_database_entry(struct db *db, struct archive_entry *entry,
     }
 
 cleanup:
-    free_db_entry(&e);
+    db_entry_free(&e);
     return ret;
 }
 
