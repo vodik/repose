@@ -103,8 +103,8 @@ static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
 static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
 {
     _cleanup_free_ char *link = joinstring(repo->pool, "/", pkg->filename, NULL);
-    int ret = symlinkat(link, repo->rootfd, pkg->filename);
 
+    int ret = symlinkat(link, repo->rootfd, pkg->filename);
     if (ret < 0 && errno == EEXIST)
         return 0;
     return ret;

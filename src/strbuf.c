@@ -11,15 +11,14 @@ static inline size_t next_power(size_t x)
     return 1UL << (64 - __builtin_clzl(x - 1));
 }
 
-static int buffer_extendby(buffer_t *buf, size_t extby)
+static int buffer_extendby(struct buffer *buf, size_t extby)
 {
-    char *data;
     size_t newlen = _unlikely_(!buf->buflen && extby < 64)
         ? 64 : buf->len + extby;
 
     if (newlen > buf->buflen) {
         newlen = next_power(newlen);
-        data = realloc(buf->data, newlen);
+        char *data = realloc(buf->data, newlen);
         if (!data)
             return -errno;
 
@@ -30,25 +29,25 @@ static int buffer_extendby(buffer_t *buf, size_t extby)
     return 0;
 }
 
-int buffer_init(buffer_t *buf, size_t reserve)
+int buffer_init(struct buffer *buf, size_t reserve)
 {
-    *buf = (buffer_t){0};
+    *buf = (struct buffer){0};
 
-    if (reserve && buffer_extendby(buf, reserve) < 0)
+    if (buffer_extendby(buf, reserve) < 0)
         return -errno;
 
     buf->data[buf->len] = '\0';
     return 0;
 }
 
-void buffer_clear(buffer_t *buf)
+void buffer_clear(struct buffer *buf)
 {
     buf->len = 0;
     if (buf->data)
         buf->data[buf->len] = '\0';
 }
 
-int buffer_putc(buffer_t *buf, const char c)
+int buffer_putc(struct buffer *buf, const char c)
 {
     if (buffer_extendby(buf, 2) < 0)
         return -errno;
@@ -58,27 +57,24 @@ int buffer_putc(buffer_t *buf, const char c)
     return 0;
 }
 
-ssize_t buffer_printf(buffer_t *buf, const char *fmt, ...)
+ssize_t buffer_printf(struct buffer *buf, const char *fmt, ...)
 {
     size_t len = buf->buflen - buf->len;
-    char *p = &buf->data[buf->len];
 
     va_list ap;
     va_start(ap, fmt);
-    size_t rc = vsnprintf(p, len, fmt, ap);
+    size_t nbytes_w = vsnprintf(&buf->data[buf->len], len, fmt, ap);
     va_end(ap);
 
-    if (rc >= len) {
-        if (buffer_extendby(buf, rc + 1) < 0)
+    if (nbytes_w >= len) {
+        if (buffer_extendby(buf, nbytes_w + 1) < 0)
             return -errno;
 
-        p = &buf->data[buf->len];
-
         va_start(ap, fmt);
-        rc = vsnprintf(p, rc + 1, fmt, ap);
+        nbytes_w = vsnprintf(&buf->data[buf->len], nbytes_w + 1, fmt, ap);
         va_end(ap);
     }
 
-    buf->len += rc;
-    return rc;
+    buf->len += nbytes_w;
+    return nbytes_w;
 }

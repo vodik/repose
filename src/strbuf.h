@@ -2,17 +2,16 @@
 
 #include <stdlib.h>
 #include <stdarg.h>
-#include <sys/types.h>
 
-typedef struct buffer {
+struct buffer {
     char *data;
     size_t len;
     size_t buflen;
-} buffer_t;
+};
 
-int buffer_init(buffer_t *buf, size_t reserve);
-void buffer_clear(buffer_t *buf);
-static inline void buffer_free(buffer_t *buf) { free(buf->data); }
+int buffer_init(struct buffer *buf, size_t reserve);
+static inline void buffer_free(struct buffer *buf) { free(buf->data); }
+void buffer_clear(struct buffer *buf);
 
-int buffer_putc(buffer_t *buf, const char c);
-ssize_t buffer_printf(buffer_t *buf, const char *fmt, ...) __attribute__((format (printf, 2, 3)));
+int buffer_putc(struct buffer *buf, const char c);
+ssize_t buffer_printf(struct buffer *buf, const char *fmt, ...) __attribute__((format (printf, 2, 3)));
