@@ -143,7 +143,7 @@ static void link_db(struct repo *repo)
 
 static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
 {
-    if (!targets)
+    if (!targets || !repo->cache)
         return;
 
     alpm_list_t *node;
@@ -460,8 +460,14 @@ int main(int argc, char *argv[])
         arch = strdup(uts.machine);
     }
 
-    if (list & (drop | rebuild))
-        errx(EXIT_FAILURE, "List can't be used with dropping or rebuilding options");
+    if (list && drop)
+        errx(EXIT_FAILURE, "List and drop operations are mutually exclusive");
+
+    if (rebuild && (list || drop)) {
+        fprintf(stderr, "Can't rebuild while performing a list or drop operation.\n"
+                        "Ignoring the --rebuild flag.\n");
+        rebuild = false;
+    }
 
     rootname = get_rootname(argv[0]), --argc;
     int ret = init_repo(&repo, rootname, files, !rebuild);
