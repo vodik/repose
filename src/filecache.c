@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <errno.h>
 #include <err.h>
 
 #include "pkghash.h"
@@ -40,27 +41,25 @@ static size_t get_filecache_size(DIR *dirp)
     return size;
 }
 
-static struct pkg *load_from_file(int dirfd, const char *filename, const char *arch)
+static struct pkg *load_from_file(int dirfd, const char *filename)
 {
     _cleanup_close_ int pkgfd = openat(dirfd, filename, O_RDONLY);
     check_posix(pkgfd, "failed to open %s", filename);
 
     struct pkg *pkg = malloc(sizeof(pkg_t));
-    *pkg = (struct pkg){0};
+    *pkg = (struct pkg){ .filename = strdup(filename) };
 
-    if (load_package(pkg, pkgfd) < 0)
-        goto error;
+    if (load_package(pkg, pkgfd) < 0) {
+        package_free(pkg);
+        return NULL;
+    }
 
-    if (arch && pkg->arch && !match_arch(pkg, arch))
-        goto error;
+    if (load_package_signature(pkg, dirfd) < 0 && errno != ENOENT) {
+        package_free(pkg);
+        return NULL;
+    }
 
-    pkg->filename = strdup(filename);
-    load_package_signature(pkg, dirfd);
     return pkg;
-
-error:
-    package_free(pkg);
-    return NULL;
 }
 
 static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *dirp,
@@ -68,17 +67,25 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
 {
     const struct dirent *dp;
 
-    while ((dp = readdir(dirp))) {
+    for (dp = readdir(dirp); dp; dp = readdir(dirp)) {
         if (dp->d_type != DT_REG && dp->d_type != DT_UNKNOWN)
             continue;
 
-        struct pkg *pkg = load_from_file(dirfd, dp->d_name, arch);
+        struct pkg *pkg = load_from_file(dirfd, dp->d_name);
         if (!pkg)
             continue;
-        else if (!targets || match_targets(pkg, targets))
-            cache = pkgcache_add(cache, pkg);
-        else
+
+        if (targets && !match_targets(pkg, targets)) {
             package_free(pkg);
+            continue;
+        }
+
+        if (!match_arch(pkg, arch)) {
+            package_free(pkg);
+            continue;
+        }
+
+        cache = pkgcache_add(cache, pkg);
     }
 
     return cache;
