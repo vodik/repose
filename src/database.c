@@ -23,7 +23,6 @@
 struct db {
     int fd;
     struct archive *archive;
-    int filter;
     time_t mtime;
     struct pkg *likely_pkg;
 };
@@ -44,7 +43,6 @@ static int open_database(struct db *db, int fd)
 
     *db = (struct db){
         .archive = archive_read_new(),
-        .filter = ARCHIVE_COMPRESSION_NONE,
         .fd = file.fd,
         .mtime = file.st.st_mtime
     };
@@ -57,7 +55,6 @@ static int open_database(struct db *db, int fd)
         return -1;
     }
 
-    db->filter = archive_filter_code(db->archive, 0);
     return 0;
 }
 
