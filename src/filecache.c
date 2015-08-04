@@ -12,6 +12,11 @@
 #include "filters.h"
 #include "util.h"
 
+static inline bool is_file(int d_type)
+{
+    return d_type == DT_REG || d_type == DT_UNKNOWN;
+}
+
 static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pkg)
 {
     struct pkg *old = _alpm_pkghash_find(cache, pkg->name);
@@ -29,11 +34,11 @@ static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pk
 
 static size_t get_filecache_size(DIR *dirp)
 {
-    struct dirent *entry;
+    struct dirent *dp;
     size_t size = 0;
 
-    while ((entry = readdir(dirp)) != NULL) {
-        if (entry->d_type == DT_REG || entry->d_type == DT_UNKNOWN)
+    for (dp = readdir(dirp); dp; dp = readdir(dirp)) {
+        if (is_file(dp->d_type))
             ++size;
     }
 
@@ -68,7 +73,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
     const struct dirent *dp;
 
     for (dp = readdir(dirp); dp; dp = readdir(dirp)) {
-        if (dp->d_type != DT_REG && dp->d_type != DT_UNKNOWN)
+        if (!is_file(dp->d_type))
             continue;
 
         struct pkg *pkg = load_from_file(dirfd, dp->d_name);
