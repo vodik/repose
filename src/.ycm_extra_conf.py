@@ -12,15 +12,14 @@ compilation_database_folder = ''
 # These are the compilation flags that will be used in case there's no
 # compilation database set.
 flags = [
-  '-Wall',
-  '-Wextra',
-  '-Werror',
+  '-std=c11', '-x', 'c',
+  '-Wall', '-Wextra', '-Werror', '-pedandic',
+  '-Wshadow', '-Wpointer-arith', '-Wcast-qual', '-Wstrict-prototypes', '-Wmissing-prototypes',
+  '-Wno-missing-field-initializers',
   '-DNDEBUG',
   '-DUSE_CLANG_COMPLETER',
   '-D_GNU_SOURCE',
   '-DREPOSE_VERSION="devel"',
-  '-std=c99',
-  '-x', 'c',
 ]
 
 if compilation_database_folder:
