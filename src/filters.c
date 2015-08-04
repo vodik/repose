@@ -3,11 +3,9 @@
 #include <fnmatch.h>
 #include "util.h"
 
-bool match_target(struct pkg *pkg, const char *target, const char *fullname)
+static bool match_target(struct pkg *pkg, const char *target, const char *fullname)
 {
-    if (streq(target, pkg->filename))
-        return true;
-    else if (streq(target, pkg->name))
+    if (streq(target, pkg->filename) || streq(target, pkg->name))
         return true;
     return fnmatch(target, fullname, 0) == 0;
 }
