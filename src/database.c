@@ -84,36 +84,36 @@ static inline void free_db_entry(struct db_entry *e)
     free(e->name);
 }
 
-static struct pkg *load_pkg_for_entry(struct db *db, alpm_pkghash_t **pkgcache,
-                                      struct db_entry *e, bool allocate)
+static struct pkg *get_package(struct db *db, struct db_entry *e,
+                               alpm_pkghash_t **pkgcache, bool allocate)
 {
     struct pkg *pkg;
 
     if (db->likely_pkg) {
         unsigned long pkgname_hash = _alpm_hash_sdbm(e->name);
-
         if (pkgname_hash == db->likely_pkg->name_hash && streq(db->likely_pkg->name, e->name))
             return db->likely_pkg;
     }
 
     pkg = _alpm_pkghash_find(*pkgcache, e->name);
-
     if (allocate && !pkg) {
         pkg = malloc(sizeof(struct pkg));
         if (!pkg)
             return NULL;
 
         *pkg = (struct pkg){
-            .name      = strdup(e->name),
+            .name = strdup(e->name),
             .name_hash = _alpm_hash_sdbm(e->name),
-            .version   = strdup(e->version),
-            .mtime     = db->mtime
+            .version = strdup(e->version),
+            .mtime = db->mtime
         };
 
         *pkgcache = _alpm_pkghash_add_sorted(*pkgcache, pkg);
     }
 
-    db->likely_pkg = pkg;
+    if (pkg)
+        db->likely_pkg = pkg;
+
     return pkg;
 }
 
@@ -134,55 +134,60 @@ static bool is_database_metadata(const char *entry_name)
     return false;
 }
 
-static int db_read_pkg(struct db *db, alpm_pkghash_t **pkgcache,
-                        struct archive_entry *entry)
+static int parse_database_entry(struct db *db, struct archive_entry *entry,
+                                alpm_pkghash_t **pkgcache)
 {
     const char *pathname = archive_entry_pathname(entry);
     struct db_entry e;
+    int ret = 0;
 
     if (parse_db_entry(pathname, &e) < 0) {
-        free_db_entry(&e);
-        return -1;
+        ret = -1;
+        goto cleanup;
     }
 
     if (e.type && is_database_metadata(e.type)) {
-        bool is_files = streq(e.type, "files");
+        bool allocate = !streq(e.type, "files");
 
-        struct pkg *pkg = load_pkg_for_entry(db, pkgcache, &e, !is_files);
-        if (!is_files && pkg == NULL) {
-            free_db_entry(&e);
-            return -1;
+        struct pkg *pkg = get_package(db, &e, pkgcache, allocate);
+        if (allocate && !pkg) {
+            ret = -1;
+            goto cleanup;
         }
 
         if (pkg)
             read_desc(db->archive, pkg);
     }
 
+cleanup:
     free_db_entry(&e);
-    return 0;
+    return ret;
 }
 
 int load_database(int fd, alpm_pkghash_t **pkgcache)
 {
     struct db db;
     struct archive_entry *entry;
+    int ret = 0;
 
     if (open_database(&db, fd) < 0) {
-        archive_read_close(db.archive);
-        archive_read_free(db.archive);
-        return -1;
+        ret = -1;
+        goto cleanup;
     }
 
     while (archive_read_next_header(db.archive, &entry) == ARCHIVE_OK) {
         const mode_t mode = archive_entry_mode(entry);
 
-        if (S_ISREG(mode) && db_read_pkg(&db, pkgcache, entry) < 0)
-            return -1;
+        if (S_ISREG(mode) && parse_database_entry(&db, entry, pkgcache) < 0) {
+            ret = -1;
+            goto cleanup;
+        }
     }
 
+cleanup:
     archive_read_close(db.archive);
     archive_read_free(db.archive);
-    return 0;
+    return ret;
 }
 
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
