@@ -16,7 +16,7 @@
 #include "pkghash.h"
 #include "util.h"
 #include "desc.h"
-#include "strbuf.h"
+#include "buffer.h"
 #include "signing.h"
 #include <alpm.h>
 

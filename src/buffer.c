@@ -1,4 +1,4 @@
-#include "strbuf.h"
+#include "buffer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
