@@ -329,16 +329,25 @@ static void compile_database_entry(struct archive *archive, struct archive_entry
     }
 }
 
-static int save_database(struct repo *repo, int fd, enum contents what, int compression)
+static int compile_database(struct repo *repo, const char *repo_name,
+                            enum contents what)
 {
+    _cleanup_close_ int dbfd = openat(repo->rootfd, repo_name,
+                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (dbfd < 0)
+        return -1;
+
+    int ret = 0;
     struct archive *archive = archive_write_new();
     struct archive_entry *entry = archive_entry_new();
 
-    archive_write_add_filter(archive, compression);
+    archive_write_add_filter(archive, config.compression);
     archive_write_set_format_pax_restricted(archive);
 
-    if (archive_write_open_fd(archive, fd) < 0)
-        return -1;
+    if (archive_write_open_fd(archive, dbfd) < 0) {
+        ret = -1;
+        goto cleanup;
+    }
 
     struct buffer buf;
     buffer_init(&buf, 1024);
@@ -349,23 +358,19 @@ static int save_database(struct repo *repo, int fd, enum contents what, int comp
         compile_database_entry(archive, entry, metadata, what, &buf, repo->poolfd);
     }
 
+    archive_write_close(archive);
     buffer_free(&buf);
 
-    archive_write_close(archive);
+cleanup:
     archive_entry_free(entry);
     archive_write_free(archive);
-
-    return 0;
+    return ret;
 }
 
 int write_database(struct repo *repo, const char *repo_name, enum contents what)
 {
-    _cleanup_close_ int dbfd = openat(repo->rootfd, repo_name,
-                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    check_posix(dbfd, "failed to open %s for writing", repo_name);
-
     trace("writing %s...\n", repo_name);
-    check_posix(save_database(repo, dbfd, what, config.compression),
+    check_posix(compile_database(repo, repo_name, what),
                 "failed to write %s database", repo_name);
 
     if (config.sign)
