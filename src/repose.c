@@ -141,22 +141,6 @@ static void link_db(struct repo *repo)
         link_pkg(repo, node->data);
 }
 
-static int render_db(struct repo *repo, const char *repo_name, enum contents what)
-{
-    _cleanup_close_ int dbfd = openat(repo->rootfd, repo_name,
-                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    check_posix(dbfd, "failed to open %s for writing", repo_name);
-
-    trace("writing %s...\n", repo_name);
-    check_posix(save_database(dbfd, repo->cache, what, config.compression, repo->poolfd),
-                "failed to write %s", repo_name);
-
-    if (config.sign)
-        gpgme_sign(repo->rootfd, repo_name, NULL);
-
-    return 0;
-}
-
 static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
 {
     if (!targets)
@@ -506,10 +490,10 @@ int main(int argc, char *argv[])
     if (!repo.dirty) {
         trace("repo does not need updating\n");
     } else {
-        render_db(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
+        write_database(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
 
         if (repo.filesname) {
-            render_db(&repo, repo.filesname, DB_FILES);
+            write_database(&repo, repo.filesname, DB_FILES);
         }
 
         link_db(&repo);

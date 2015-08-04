@@ -17,6 +17,7 @@
 #include "util.h"
 #include "desc.h"
 #include "strbuf.h"
+#include "signing.h"
 #include <alpm.h>
 
 struct db {
@@ -323,12 +324,10 @@ static void compile_database_entry(struct archive *archive, struct archive_entry
     }
 }
 
-int save_database(int fd, alpm_pkghash_t *pkgcache, enum contents what, int compression, int poolfd)
+static int save_database(struct repo *repo, int fd, enum contents what, int compression)
 {
     struct archive *archive = archive_write_new();
     struct archive_entry *entry = archive_entry_new();
-    alpm_list_t *pkg, *pkgs = pkgcache->list;
-    struct buffer buf;
 
     archive_write_add_filter(archive, compression);
     archive_write_set_format_pax_restricted(archive);
@@ -336,11 +335,13 @@ int save_database(int fd, alpm_pkghash_t *pkgcache, enum contents what, int comp
     if (archive_write_open_fd(archive, fd) < 0)
         return -1;
 
+    struct buffer buf;
     buffer_init(&buf, 1024);
 
+    alpm_list_t *pkg, *pkgs = repo->cache->list;
     for (pkg = pkgs; pkg; pkg = pkg->next) {
         struct pkg *metadata = pkg->data;
-        compile_database_entry(archive, entry, metadata, what, &buf, poolfd);
+        compile_database_entry(archive, entry, metadata, what, &buf, repo->poolfd);
     }
 
     buffer_free(&buf);
@@ -348,6 +349,22 @@ int save_database(int fd, alpm_pkghash_t *pkgcache, enum contents what, int comp
     archive_write_close(archive);
     archive_entry_free(entry);
     archive_write_free(archive);
+
+    return 0;
+}
+
+int write_database(struct repo *repo, const char *repo_name, enum contents what)
+{
+    _cleanup_close_ int dbfd = openat(repo->rootfd, repo_name,
+                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    check_posix(dbfd, "failed to open %s for writing", repo_name);
+
+    trace("writing %s...\n", repo_name);
+    check_posix(save_database(repo, dbfd, what, config.compression),
+                "failed to write %s database", repo_name);
+
+    if (config.sign)
+        gpgme_sign(repo->rootfd, repo_name, NULL);
 
     return 0;
 }
