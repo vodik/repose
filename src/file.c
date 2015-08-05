@@ -6,12 +6,13 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include "util.h"
 
 int file_from_fd(struct file_t *file, int fd)
 {
     *file = (struct file_t){ .fd = fd };
 
-    fstat(fd, &file->st);
+    check_posix(fstat(fd, &file->st), "failed to stat file");
 
     file->mmap = mmap(NULL, file->st.st_size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
     madvise(file->mmap, file->st.st_size, MADV_WILLNEED | MADV_SEQUENTIAL);
