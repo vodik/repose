@@ -345,7 +345,7 @@ static alpm_list_t *load_manifest(struct repo *repo, const char *reponame)
         }
 
         line[nbytes_r - 1] = 0;
-        if (line && line[0])
+        if (line[0])
             list = alpm_list_add(list, line);
     }
     return list;
