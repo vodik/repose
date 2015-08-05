@@ -362,7 +362,6 @@ static char *get_rootname(char *name)
 int main(int argc, char *argv[])
 {
     const char *rootname;
-    const char *arch = NULL;
     bool files = false, rebuild = false, drop = false, list = false;
 
     static const struct option opts[] = {
@@ -422,7 +421,7 @@ int main(int argc, char *argv[])
             repo.pool = optarg;
             break;
         case 'm':
-            arch = optarg;
+            config.arch = optarg;
             break;
         case 'j':
             config.compression = ARCHIVE_FILTER_BZIP2;
@@ -454,10 +453,10 @@ int main(int argc, char *argv[])
     if (argc == 0)
         errx(1, "incorrect number of arguments provided");
 
-    if (!arch) {
+    if (!config.arch) {
         struct utsname uts;
         uname(&uts);
-        arch = strdup(uts.machine);
+        config.arch = strdup(uts.machine);
     }
 
     if (list && drop)
@@ -486,7 +485,7 @@ int main(int argc, char *argv[])
             targets = load_manifest(&repo, rootname);
         }
 
-        alpm_pkghash_t *filecache = get_filecache(repo.poolfd, targets, arch);
+        alpm_pkghash_t *filecache = get_filecache(repo.poolfd, targets, config.arch);
         check_null(filecache, "failed to get filecache");
 
         reduce_repo(&repo);

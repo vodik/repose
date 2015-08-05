@@ -21,6 +21,7 @@ struct config {
     int compression;
     bool reflink;
     bool sign;
+    char *arch;
 };
 
 extern struct config config;
