@@ -311,7 +311,8 @@ static int init_repo(struct repo *repo, const char *reponame, bool files,
 
     if (config.sign) {
         check_signature(repo, repo->dbname);
-        check_signature(repo, repo->filesname);
+        if (repo->filesname)
+            check_signature(repo, repo->filesname);
     }
 
     if (load_cache) {
