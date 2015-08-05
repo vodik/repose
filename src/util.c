@@ -106,8 +106,10 @@ char *joinstring(const char *root, ...)
     while ((temp = va_arg(ap, const char *))) {
         size_t temp_len = strlen(temp);
 
-        if (temp_len > ((size_t) -1) - len)
+        if (temp_len > ((size_t) -1) - len) {
+            va_end(ap);
             return NULL;
+        }
 
         len += temp_len;
     }
