@@ -1,5 +1,10 @@
 ## repose
 
+<a href="https://scan.coverity.com/projects/3577">
+  <img alt="Coverity Scan Build Status"
+       src="https://scan.coverity.com/projects/3577/badge.svg"/>
+</a>
+
 Owning more than one Archlinux machine, I operate my own repository to
 distribute customized and/or extra packages between the various
 machines. `repo-add`, the provided tool for repository management, is
