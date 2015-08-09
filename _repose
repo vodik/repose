@@ -5,6 +5,7 @@ _arguments -s \
   {-V,--version}'[display version]' \
   {-v,--verbose}'[verbose output]' \
   {-f,--files}'[generate complementing files database]' \
+  {-l,--list}'[list packages in the repository]' \
   {-d,--drop}'[drop package from database]:packages:_files -g "*.pkg.tar*~*.sig(.,@)"' \
   {-r,--root=-}'[repository root directory]:root:_directories' \
   {-p,--pool=-}'[set the pool to find packages in it]:pool:_directories' \
@@ -13,6 +14,7 @@ _arguments -s \
   {-J,--xz}'[compress the database with xz]' \
   {-z,--gzip}'[compress the database with gzip]' \
   {-Z,--compress}'[compress the database with LZ]' \
+  '--reflink[use reflinks instead of symlinks]' \
   '--rebuild[force rebuild the repo]' \
   '1:database:_files -g "*.db*~*.sig(.,@)(\:r)"' \
   '*::packages:_files -g "*.pkg.tar*~*.sig(.,@)"'
