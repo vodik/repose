@@ -52,7 +52,8 @@ static int open_database(struct db *db, int fd)
 
     if (archive_read_open_memory(db->archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
         file_close(&file);
-        return -1;
+        archive_read_close(db->archive);
+        archive_read_free(db->archive);
     }
 
     return 0;
@@ -165,26 +166,21 @@ int load_database(int fd, alpm_pkghash_t **pkgcache)
 {
     struct db db;
     struct archive_entry *entry;
-    int ret = 0;
 
-    if (open_database(&db, fd) < 0) {
-        ret = -1;
-        goto cleanup;
-    }
+    if (open_database(&db, fd) < 0)
+        return -1;
 
     while (archive_read_next_header(db.archive, &entry) == ARCHIVE_OK) {
         const mode_t mode = archive_entry_mode(entry);
 
         if (S_ISREG(mode) && parse_database_entry(&db, entry, pkgcache) < 0) {
-            ret = -1;
-            goto cleanup;
+            archive_read_close(db.archive);
+            archive_read_free(db.archive);
+            return -1;
         }
     }
 
-cleanup:
-    archive_read_close(db.archive);
-    archive_read_free(db.archive);
-    return ret;
+    return 0;
 }
 
 static void write_list(struct buffer *buf, const char *header, const alpm_list_t *lst)
