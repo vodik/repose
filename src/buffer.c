@@ -13,6 +13,7 @@ static inline size_t next_power(size_t x)
 
 static int buffer_extendby(struct buffer *buf, size_t extby)
 {
+    bool first_alloc = !buf->data;
     size_t newlen = _unlikely_(!buf->buflen && extby < 64)
         ? 64 : buf->len + extby;
 
@@ -26,18 +27,24 @@ static int buffer_extendby(struct buffer *buf, size_t extby)
         buf->data = data;
     }
 
+    if (_unlikely_(first_alloc)) {
+        buf->data[buf->len] = 0;
+    }
+
     return 0;
 }
 
-int buffer_init(struct buffer *buf, size_t reserve)
+int buffer_reserve(struct buffer *buf, size_t reserve)
 {
-    *buf = (struct buffer){0};
-
     if (buffer_extendby(buf, reserve) < 0)
         return -errno;
-
-    buf->data[buf->len] = '\0';
     return 0;
+}
+
+void buffer_release(struct buffer *buf)
+{
+    free(buf->data);
+    *buf = (struct buffer){0};
 }
 
 void buffer_clear(struct buffer *buf)

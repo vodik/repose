@@ -9,8 +9,8 @@ struct buffer {
     size_t buflen;
 };
 
-int buffer_init(struct buffer *buf, size_t reserve);
-static inline void buffer_free(struct buffer *buf) { free(buf->data); }
+int buffer_reserve(struct buffer *buf, size_t reserve);
+void buffer_release(struct buffer *buf);
 void buffer_clear(struct buffer *buf);
 
 int buffer_putc(struct buffer *buf, const char c);

@@ -342,8 +342,8 @@ static int compile_database(struct repo *repo, const char *repo_name,
         goto cleanup;
     }
 
-    struct buffer buf;
-    buffer_init(&buf, 1024);
+    struct buffer buf = {0};
+    buffer_reserve(&buf, 1024);
 
     alpm_list_t *pkg, *pkgs = repo->cache->list;
     for (pkg = pkgs; pkg; pkg = pkg->next) {
@@ -352,7 +352,7 @@ static int compile_database(struct repo *repo, const char *repo_name,
     }
 
     archive_write_close(archive);
-    buffer_free(&buf);
+    buffer_release(&buf);
 
 cleanup:
     archive_entry_free(entry);
