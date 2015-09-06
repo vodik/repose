@@ -17,7 +17,7 @@ static int buffer_extendby(struct buffer *buf, size_t extby)
     size_t newlen = _unlikely_(!buf->buflen && extby < 64)
         ? 64 : buf->len + extby;
 
-    if (newlen > buf->buflen) {
+    if (newlen > buf->buflen || !buf->data) {
         newlen = next_power(newlen);
         char *data = realloc(buf->data, newlen);
         if (!data)
