@@ -9,7 +9,9 @@
 static inline size_t next_power(size_t x)
 {
     const size_t zeros = __builtin_clzl(x - 1);
-    return !zeros ? SIZE_MAX : 1UL << (sizeof(size_t) * 8 - zeros);
+    if (!zeros)
+        return SIZE_MAX;
+    return 1UL << (sizeof(x) * 8 - zeros);
 }
 
 static inline int addsz(size_t a, size_t b, size_t *r)
