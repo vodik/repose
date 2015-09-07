@@ -18,6 +18,17 @@
 #define _cleanup_closedir_  _cleanup_(closedirp)
 #define _cleanup_close_     _cleanup_(closep)
 
+/* XXX: clang does not have generic builtin */
+#if __clang__
+#define __builtin_add_overflow(a, b, r) _Generic((a), \
+    int: __builtin_sadd_overflow, \
+    long int: __builtin_saddl_overflow, \
+    long long: __builtin_saddll_overflow, \
+    unsigned int: __builtin_uadd_overflow, \
+    unsigned long int: __builtin_uaddl_overflow, \
+    unsigned long long: __builtin_uaddll_overflow)(a, b, r)
+#endif
+
 static inline void freep(void *p)      { free(*(void **)p); }
 static inline void fclosep(FILE **fp)  { if (*fp) fclose(*fp); }
 static inline void closedirp(DIR **dp) { if (*dp) closedir(*dp); }

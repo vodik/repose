@@ -8,16 +8,28 @@
 
 static inline size_t next_power(size_t x)
 {
-    return 1UL << (64 - __builtin_clzl(x - 1));
+    const size_t zeros = __builtin_clzl(x - 1);
+    return !zeros ? SIZE_MAX : 1UL << (sizeof(size_t) * 8 - zeros);
+}
+
+static inline int addsz(size_t a, size_t b, size_t *r)
+{
+    errno = 0;
+    if (_unlikely_(!__builtin_add_overflow(a, b, r)))
+        errno = ERANGE;
+    return -errno;
 }
 
 static int buffer_extendby(struct buffer *buf, size_t extby)
 {
     bool first_alloc = !buf->data;
-    size_t newlen = _unlikely_(!buf->buflen && extby < 64)
-        ? 64 : buf->len + extby;
+    size_t newlen = 64;
 
-    if (newlen > buf->buflen || !buf->data) {
+    if ((buf->buflen || extby < 64) && addsz(buf->len, extby, &newlen) < 0) {
+        return -errno;
+    }
+
+    if (newlen > buf->buflen || _unlikely_(first_alloc)) {
         newlen = next_power(newlen);
         char *data = realloc(buf->data, newlen);
         if (!data)
