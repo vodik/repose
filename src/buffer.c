@@ -17,7 +17,7 @@ static inline size_t next_power(size_t x)
 static inline int addsz(size_t a, size_t b, size_t *r)
 {
     errno = 0;
-    if (_unlikely_(!__builtin_add_overflow(a, b, r)))
+    if (_unlikely_(__builtin_add_overflow(a, b, r)))
         errno = ERANGE;
     return -errno;
 }
@@ -27,11 +27,14 @@ static int buffer_extendby(struct buffer *buf, size_t extby)
     bool first_alloc = !buf->data;
     size_t newlen = 64;
 
-    if ((buf->buflen || extby < 64) && addsz(buf->len, extby, &newlen) < 0)
-        return -errno;
+    if (buf->buflen || extby > 64) {
+        if (addsz(buf->len, extby, &newlen) < 0)
+            return -errno;
+    }
 
     if (newlen > buf->buflen || _unlikely_(first_alloc)) {
         newlen = next_power(newlen);
+
         char *data = realloc(buf->data, newlen);
         if (!data)
             return -errno;
@@ -40,8 +43,7 @@ static int buffer_extendby(struct buffer *buf, size_t extby)
         buf->data = data;
     }
 
-    if (_unlikely_(first_alloc))
-        buf->data[buf->len] = 0;
+    buf->data[buf->len] = 0;
     return 0;
 }
 
