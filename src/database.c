@@ -343,7 +343,11 @@ static int compile_database(struct repo *repo, const char *repo_name,
     }
 
     struct buffer buf = {0};
-    buffer_reserve(&buf, 1024);
+
+    /* The files database can get very, very large. Lets preallocate
+     * a 2MiB buffer so we have plenty of room and avoid lots of
+     * rallocations. */
+    buffer_reserve(&buf, 0x200000);
 
     alpm_list_t *pkg, *pkgs = repo->cache->list;
     for (pkg = pkgs; pkg; pkg = pkg->next) {
