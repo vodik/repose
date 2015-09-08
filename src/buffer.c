@@ -27,9 +27,8 @@ static int buffer_extendby(struct buffer *buf, size_t extby)
     bool first_alloc = !buf->data;
     size_t newlen = 64;
 
-    if ((buf->buflen || extby < 64) && addsz(buf->len, extby, &newlen) < 0) {
+    if ((buf->buflen || extby < 64) && addsz(buf->len, extby, &newlen) < 0)
         return -errno;
-    }
 
     if (newlen > buf->buflen || _unlikely_(first_alloc)) {
         newlen = next_power(newlen);
@@ -41,10 +40,8 @@ static int buffer_extendby(struct buffer *buf, size_t extby)
         buf->data = data;
     }
 
-    if (_unlikely_(first_alloc)) {
+    if (_unlikely_(first_alloc))
         buf->data[buf->len] = 0;
-    }
-
     return 0;
 }
 
