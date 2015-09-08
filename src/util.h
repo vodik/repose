@@ -53,7 +53,6 @@ char *joinstring(const char *root, ...) _sentinel_;
 int str_to_size(const char *str, size_t *out);
 int str_to_time(const char *str, time_t *out);
 
-char *md5_file(int dirfd, const char *filename);
 char *sha256_file(int dirfd, const char *filename);
 
 char *strstrip(char *s);

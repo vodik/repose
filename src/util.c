@@ -6,8 +6,6 @@
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <openssl/md5.h>
 #include <openssl/sha.h>
 #include "repose.h"
 #include "file.h"
@@ -193,23 +191,6 @@ static char *hex_representation(unsigned char *bytes, size_t size)
     return str;
 }
 
-static char *md5_fd(int fd)
-{
-    MD5_CTX ctx;
-    unsigned char output[16];
-    struct file_t file;
-
-    if (file_from_fd(&file, fd) < 0)
-        return NULL;
-
-    MD5_Init(&ctx);
-    MD5_Update(&ctx, file.mmap, file.st.st_size);
-    MD5_Final(output, &ctx);
-    file_close(&file);
-
-    return hex_representation(output, sizeof(output));
-}
-
 static char *sha2_fd(int fd)
 {
     SHA256_CTX ctx;
@@ -225,13 +206,6 @@ static char *sha2_fd(int fd)
     file_close(&file);
 
     return hex_representation(output, sizeof(output));
-}
-
-char *md5_file(int dirfd, const char *filename)
-{
-    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
-    check_posix(fd, "failed to open %s for md5 checksum", filename);
-    return md5_fd(fd);
 }
 
 char *sha256_file(int dirfd, const char *filename)

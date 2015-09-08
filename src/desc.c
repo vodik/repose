@@ -74,8 +74,6 @@ void read_desc(struct archive *archive, struct pkg *pkg)
             nbytes_r = read_desc_size(reader, &pkg->size);
         } else if (streq(buf, "%ISIZE%")) {
             nbytes_r = read_desc_size(reader, &pkg->isize);
-        } else if (streq(buf, "%MD5SUM%")) {
-            nbytes_r = read_desc_entry(reader, &pkg->md5sum);
         } else if (streq(buf, "%SHA256SUM%")) {
             nbytes_r = read_desc_entry(reader, &pkg->sha256sum);
         } else if(streq(buf, "%PGPSIG%")) {

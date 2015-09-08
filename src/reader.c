@@ -20,16 +20,15 @@ struct archive_reader *archive_reader_new(struct archive *a)
 static int archive_feed_block(struct archive_reader *r)
 {
     for (;;) {
-        int64_t offset;
         int status = archive_read_data_block(r->archive, (void *)&r->block,
-                                             &r->block_size, &offset);
-        r->block_offset = r->block;
+                                             &r->block_size, &(int64_t){0});
 
         if (status == ARCHIVE_RETRY)
             continue;
         if (status <= ARCHIVE_WARN)
             warnx("%s", archive_error_string(r->archive));
 
+        r->block_offset = r->block;
         return status;
     }
 }

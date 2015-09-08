@@ -13,7 +13,6 @@ typedef struct pkg {
     char *desc;
     char *url;
     char *packager;
-    char *md5sum;
     char *sha256sum;
     char *base64sig;
     char *arch;
