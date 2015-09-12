@@ -85,7 +85,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
             continue;
         }
 
-        if (!match_arch(pkg, arch)) {
+        if (arch && !match_arch(pkg, arch)) {
             package_free(pkg);
             continue;
         }
