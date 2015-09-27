@@ -30,7 +30,7 @@ static inline int read_desc_entry(struct archive_reader *reader, char **data)
     return archive_getline(reader, data);
 }
 
-static inline int read_desc_ulong(struct archive_reader *reader, unsigned long *data)
+static inline int read_desc_size(struct archive_reader *reader, size_t *data)
 {
     _cleanup_free_ char *buf;
     int nbytes_r = archive_getline(reader, &buf);
@@ -39,7 +39,7 @@ static inline int read_desc_ulong(struct archive_reader *reader, unsigned long *
     return nbytes_r;
 }
 
-static inline int read_desc_long(struct archive_reader *reader, long *data)
+static inline int read_desc_time(struct archive_reader *reader, time_t *data)
 {
     _cleanup_free_ char *buf;
     int nbytes_r = archive_getline(reader, &buf);
@@ -77,9 +77,9 @@ void read_desc(struct archive *archive, struct pkg *pkg)
         } else if (streq(buf, "%GROUPS%")) {
             nbytes_r = read_desc_list(reader, &pkg->groups);
         } else if (streq(buf, "%CSIZE%")) {
-            nbytes_r = read_desc_ulong(reader, &pkg->size);
+            nbytes_r = read_desc_size(reader, &pkg->size);
         } else if (streq(buf, "%ISIZE%")) {
-            nbytes_r = read_desc_ulong(reader, &pkg->isize);
+            nbytes_r = read_desc_size(reader, &pkg->isize);
         } else if (streq(buf, "%MD5SUM%")) {
             nbytes_r = read_desc_entry(reader, &pkg->md5sum);
         } else if (streq(buf, "%SHA256SUM%")) {
@@ -93,7 +93,7 @@ void read_desc(struct archive *archive, struct pkg *pkg)
         } else if (streq(buf, "%ARCH%")) {
             nbytes_r = read_desc_entry(reader, &pkg->arch);
         } else if (streq(buf, "%BUILDDATE%")) {
-            nbytes_r = read_desc_long(reader, &pkg->builddate);
+            nbytes_r = read_desc_time(reader, &pkg->builddate);
         } else if (streq(buf, "%PACKAGER%")) {
             nbytes_r = read_desc_entry(reader, &pkg->packager);
         } else if (streq(buf, "%REPLACES%")) {

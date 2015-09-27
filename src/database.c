@@ -207,7 +207,7 @@ static void write_size(struct buffer *buf, const char *header, size_t val)
     buffer_printf(buf, "%%%s%%\n%zd\n\n", header, val);
 }
 
-static void write_long(struct buffer *buf, const char *header, long val)
+static void write_time(struct buffer *buf, const char *header, time_t val)
 {
     buffer_printf(buf, "%%%s%%\n%ld\n\n", header, val);
 }
@@ -216,7 +216,7 @@ static void write_long(struct buffer *buf, const char *header, long val)
     alpm_list_t *: write_list, \
     char *: write_string, \
     size_t: write_size, \
-    long: write_long)(buf, header, val)
+    time_t: write_time)(buf, header, val)
 
 static void compile_depends_entry(struct pkg *pkg, struct buffer *buf)
 {
