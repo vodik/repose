@@ -24,15 +24,13 @@ static inline int addsz(size_t a, size_t b, size_t *r)
 
 static int buffer_extendby(struct buffer *buf, size_t extby)
 {
-    bool first_alloc = !buf->data;
     size_t newlen = 64;
-
-    if (buf->buflen || extby > 64) {
+    if (buf->buflen || extby > newlen) {
         if (addsz(buf->len, extby, &newlen) < 0)
             return -errno;
     }
 
-    if (newlen > buf->buflen || _unlikely_(first_alloc)) {
+    if (_unlikely_(!buf->data) || newlen > buf->buflen) {
         newlen = next_power(newlen);
 
         char *data = realloc(buf->data, newlen);
@@ -80,6 +78,9 @@ int buffer_putc(struct buffer *buf, const char c)
 ssize_t buffer_printf(struct buffer *buf, const char *fmt, ...)
 {
     size_t len = buf->buflen - buf->len;
+
+    if (!buf->data && buffer_extendby(buf, 0) < 0)
+        return -errno;
 
     va_list ap;
     va_start(ap, fmt);
