@@ -44,9 +44,12 @@ FILE *fopenat(int dirfd, const char *path, const char *mode);
 
 char *joinstring(const char *root, ...) _sentinel_;
 
-#define fromstr(str, out) _Generic((*out), long: xstrtol, unsigned long: xstrtoul)(str, out)
-int xstrtol(const char *str, long *out);
-int xstrtoul(const char *str, unsigned long *out);
+#define fromstr(str, out) _Generic((*out), \
+    size_t: str_to_size, \
+    time_t: str_to_time)(str, out)
+
+int str_to_size(const char *str, size_t *out);
+int str_to_time(const char *str, time_t *out);
 
 char *md5_file(int dirfd, const char *filename);
 char *sha256_file(int dirfd, const char *filename);

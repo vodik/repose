@@ -128,27 +128,7 @@ char *joinstring(const char *root, ...)
     return ret;
 }
 
-int xstrtol(const char *str, long *out)
-{
-    char *end = NULL;
-    errno = 0;
-
-    if (!str || !str[0]) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    *out = strtol(str, &end, 10);
-    if (errno) {
-        return -1;
-    } else if (str == end || (end && end[0])) {
-        errno = EINVAL;
-        return -1;
-    }
-    return 0;
-}
-
-int xstrtoul(const char *str, unsigned long *out)
+static int xstrtoul(const char *str, unsigned long *out)
 {
     char *end = NULL;
     errno = 0;
@@ -165,6 +145,36 @@ int xstrtoul(const char *str, unsigned long *out)
         errno = EINVAL;
         return -1;
     }
+    return 0;
+}
+
+int str_to_size(const char *str, size_t *out)
+{
+    unsigned long value = 0;
+    if (xstrtoul(str, &value) < 0)
+        return -1;
+
+    if (value > SIZE_MAX) {
+        errno = ERANGE;
+        return -1;
+    }
+
+    *out = (size_t)value;
+    return 0;
+}
+
+int str_to_time(const char *str, time_t *out)
+{
+    struct tm tm;
+    errno = 0;
+
+    const char *end = strptime(str, "%s", &tm);
+    if (str == end || (end && *end)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    *out = mktime(&tm);
     return 0;
 }
 
