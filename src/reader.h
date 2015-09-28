@@ -1,7 +1,8 @@
 #pragma once
 
 #include <stddef.h>
-#include <archive.h>
+
+struct archive;
 
 struct archive_reader {
     struct archive *archive;

@@ -5,11 +5,12 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <locale.h>
 #include <errno.h>
 #include <err.h>
-#include <limits.h>
 #include <gpgme.h>
+#include <gpg-error.h>
 
 #include "util.h"
 

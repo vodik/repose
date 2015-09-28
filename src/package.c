@@ -1,7 +1,7 @@
 #include "package.h"
 
 #include <stdlib.h>
-#include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <limits.h>
 #include <err.h>
@@ -9,6 +9,7 @@
 #include <archive_entry.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 #include "file.h"
 #include "util.h"

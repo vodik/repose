@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <string.h>
 #include <err.h>
+#include <archive.h>
+#include <sys/types.h>
 
 struct archive_reader *archive_reader_new(struct archive *a)
 {

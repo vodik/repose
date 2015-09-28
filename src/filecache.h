@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdbool.h>
 #include <alpm_list.h>
 #include "pkghash.h"
 

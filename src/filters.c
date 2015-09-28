@@ -1,6 +1,7 @@
 #include "filters.h"
 
 #include <fnmatch.h>
+#include "package.h"
 #include "util.h"
 
 static bool match_target(struct pkg *pkg, const char *target, const char *fullname)

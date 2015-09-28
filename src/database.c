@@ -2,23 +2,26 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <archive.h>
 #include <archive_entry.h>
-
+#include <alpm_list.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <err.h>
 #include <time.h>
+#include <sys/stat.h>
 
+#include "repose.h"
 #include "file.h"
+#include "package.h"
 #include "pkghash.h"
 #include "util.h"
 #include "desc.h"
 #include "buffer.h"
 #include "signing.h"
-#include <alpm.h>
 
 struct db {
     int fd;

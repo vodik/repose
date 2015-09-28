@@ -2,14 +2,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
 #include <time.h>
-#include <errno.h>
 #include <err.h>
-
-#include <archive.h>
-#include <archive_entry.h>
 #include <alpm_list.h>
 
 #include "reader.h"

@@ -1,8 +1,7 @@
 #include "file.h"
 
-#include <stdio.h>
+#include <stddef.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/mman.h>

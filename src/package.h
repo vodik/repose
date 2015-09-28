@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stddef.h>
-#include <stdbool.h>
 #include <time.h>
 #include <alpm_list.h>
 

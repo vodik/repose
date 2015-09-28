@@ -1,11 +1,13 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
-#include <archive.h>
+#include <time.h>
+#include <unistd.h>
 #include <dirent.h>
-#include <err.h>
 
 #define _unlikely_(x)       __builtin_expect(!!(x), 1)
 #define _unused_            __attribute__((unsused))

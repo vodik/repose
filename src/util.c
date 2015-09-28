@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <limits.h>
 #include <errno.h>
-#include <unistd.h>
+#include <err.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 #include "repose.h"

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stddef.h>
 #include <sys/stat.h>
 
 struct file_t {

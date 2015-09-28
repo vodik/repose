@@ -6,11 +6,12 @@
 #include <string.h>
 #include <errno.h>
 #include <err.h>
+#include <time.h>
 #include <getopt.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <archive.h>
-#include <archive_entry.h>
+#include <alpm.h>
 #include <alpm_list.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
@@ -19,6 +20,7 @@
 
 #include "database.h"
 #include "filecache.h"
+#include "package.h"
 #include "pkghash.h"
 #include "filters.h"
 #include "signing.h"

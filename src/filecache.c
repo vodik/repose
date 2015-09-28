@@ -2,12 +2,15 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
-#include <err.h>
+#include <alpm.h>
 
+#include "package.h"
 #include "pkghash.h"
 #include "filters.h"
 #include "util.h"

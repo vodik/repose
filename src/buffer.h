@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdlib.h>
-#include <stdarg.h>
+#include <sys/types.h>
 
 struct buffer {
     char *data;

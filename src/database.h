@@ -1,7 +1,8 @@
 #pragma once
 
-#include "repose.h"
 #include "pkghash.h"
+
+struct repo;
 
 enum contents {
     DB_DESC    = 1,
