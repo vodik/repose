@@ -211,7 +211,7 @@ static void update_repo(struct repo *repo, alpm_pkghash_t *src)
             continue;
         }
 
-        switch(alpm_pkg_vercmp(pkg->version, old->version)) {
+        switch (alpm_pkg_vercmp(pkg->version, old->version)) {
         case 1:
             /* The filecache package has a newer version than the
                package in the database. */
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
             usage(stdout);
             break;
         case 'V':
-            printf("%s %s\n",  program_invocation_short_name, REPOSE_VERSION);
+            printf("%s %s\n", program_invocation_short_name, REPOSE_VERSION);
             exit(EXIT_SUCCESS);
         case 'v':
             config.verbose += 1;
