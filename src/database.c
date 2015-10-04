@@ -242,11 +242,13 @@ static void compile_desc_entry(struct pkg *pkg, struct buffer *buf, int poolfd)
     write_entry(buf, "CSIZE",     pkg->size);
     write_entry(buf, "ISIZE",     pkg->isize);
 
-    if (!pkg->sha256sum)
-        pkg->sha256sum = sha256_file(poolfd, pkg->filename);
-
-    write_entry(buf, "SHA256SUM", pkg->sha256sum);
-    write_entry(buf, "PGPSIG",    pkg->base64sig);
+    if (pkg->base64sig) {
+        write_entry(buf, "PGPSIG", pkg->base64sig);
+    } else {
+        if (!pkg->sha256sum)
+            pkg->sha256sum = sha256_file(poolfd, pkg->filename);
+        write_entry(buf, "SHA256SUM", pkg->sha256sum);
+    }
 
     write_entry(buf, "URL",       pkg->url);
     write_entry(buf, "LICENSE",   pkg->licenses);
