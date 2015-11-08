@@ -276,8 +276,8 @@ static void archive_entry_populate(struct archive_entry *e, mode_t mode)
     time_t now = time(NULL);
 
     archive_entry_set_perm(e, mode);
-    archive_entry_set_uname(e, getlogin());
-    archive_entry_set_gname(e, getlogin());
+    archive_entry_set_uname(e, "repose");
+    archive_entry_set_gname(e, "repose");
     archive_entry_set_ctime(e, now, 0);
     archive_entry_set_mtime(e, now, 0);
     archive_entry_set_atime(e, now, 0);
