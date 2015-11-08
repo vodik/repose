@@ -271,10 +271,13 @@ static void compile_files_entry(struct pkg *pkg, struct buffer *buf, int poolfd)
     write_entry(buf, "FILES", pkg->files);
 }
 
-static void archive_entry_populate(struct archive_entry *e, mode_t mode)
+static void archive_entry_populate(struct archive_entry *e, unsigned int type,
+                                   const char *path, mode_t mode)
 {
     time_t now = time(NULL);
 
+    archive_entry_set_pathname(e, path);
+    archive_entry_set_filetype(e, type);
     archive_entry_set_perm(e, mode);
     archive_entry_set_uname(e, "repose");
     archive_entry_set_gname(e, "repose");
@@ -286,11 +289,9 @@ static void archive_entry_populate(struct archive_entry *e, mode_t mode)
 static void record_entry(struct archive *archive, struct archive_entry *e,
                          const char *root, const char *entry, struct buffer *buf)
 {
-    _cleanup_free_ char *entry_path = joinstring(root, "/", entry, NULL);
+    _cleanup_free_ char *entrypath = joinstring(root, "/", entry, NULL);
 
-    archive_entry_set_pathname(e, entry_path);
-    archive_entry_set_filetype(e, AE_IFREG);
-    archive_entry_populate(e, 0644);
+    archive_entry_populate(e, AE_IFREG, entrypath, 0644);
     archive_entry_set_size(e, buf->len);
     archive_write_header(archive, e);
     archive_write_data(archive, buf->data, buf->len);
@@ -302,25 +303,23 @@ static void record_entry(struct archive *archive, struct archive_entry *e,
 static void compile_database_entry(struct archive *archive, struct archive_entry *e, struct pkg *pkg,
                                    int contents, struct buffer *buf, int poolfd)
 {
-    _cleanup_free_ char *entry = joinstring(pkg->name, "-", pkg->version, NULL);
+    _cleanup_free_ char *entrypath = joinstring(pkg->name, "-", pkg->version, NULL);
 
-    archive_entry_set_pathname(e, entry);
-    archive_entry_set_filetype(e, AE_IFDIR);
-    archive_entry_populate(e, 0755);
+    archive_entry_populate(e, AE_IFDIR, entrypath, 0755);
     archive_write_header(archive, e);
     archive_entry_clear(e);
 
     if (contents & DB_DESC) {
         compile_desc_entry(pkg, buf, poolfd);
-        record_entry(archive, e, entry, "desc", buf);
+        record_entry(archive, e, entrypath, "desc", buf);
     }
     if (contents & DB_DEPENDS) {
         compile_depends_entry(pkg, buf);
-        record_entry(archive, e, entry, "depends", buf);
+        record_entry(archive, e, entrypath, "depends", buf);
     }
     if (contents & DB_FILES) {
         compile_files_entry(pkg, buf, poolfd);
-        record_entry(archive, e, entry, "files", buf);
+        record_entry(archive, e, entrypath, "files", buf);
     }
 }
 
