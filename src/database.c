@@ -31,7 +31,7 @@ struct db {
 };
 
 /* The name, version and type fields all share the same memory */
-struct db_entry {
+struct dbentry {
     char *name;
     const char *type;
     const char *version;
@@ -62,7 +62,7 @@ static int open_database(struct db *db, int fd)
     return 0;
 }
 
-static int parse_database_pathname(const char *entryname, struct db_entry *entry)
+static int parse_database_pathname(const char *entryname, struct dbentry *entry)
 {
     entry->name = strdup(entryname);
     const char *slash = strchrnul(entry->name, '/'), *dash = slash;
@@ -80,32 +80,32 @@ static int parse_database_pathname(const char *entryname, struct db_entry *entry
     return 0;
 }
 
-static inline void db_entry_free(struct db_entry *e)
+static inline void dbentry_free(struct dbentry *dbentry)
 {
-    free(e->name);
+    free(dbentry->name);
 }
 
-static struct pkg *get_package(struct db *db, struct db_entry *e,
+static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
                                alpm_pkghash_t **pkgcache, bool allocate)
 {
     struct pkg *pkg;
 
     if (db->likely_pkg) {
-        unsigned long pkgname_hash = _alpm_hash_sdbm(e->name);
-        if (pkgname_hash == db->likely_pkg->name_hash && streq(db->likely_pkg->name, e->name))
+        unsigned long pkgname_hash = _alpm_hash_sdbm(dbentry->name);
+        if (pkgname_hash == db->likely_pkg->name_hash && streq(db->likely_pkg->name, dbentry->name))
             return db->likely_pkg;
     }
 
-    pkg = _alpm_pkghash_find(*pkgcache, e->name);
+    pkg = _alpm_pkghash_find(*pkgcache, dbentry->name);
     if (allocate && !pkg) {
         pkg = malloc(sizeof(struct pkg));
         if (!pkg)
             return NULL;
 
         *pkg = (struct pkg){
-            .name = strdup(e->name),
-            .name_hash = _alpm_hash_sdbm(e->name),
-            .version = strdup(e->version),
+            .name = strdup(dbentry->name),
+            .name_hash = _alpm_hash_sdbm(dbentry->name),
+            .version = strdup(dbentry->version),
             .mtime = db->mtime
         };
 
@@ -139,18 +139,18 @@ static int parse_database_entry(struct db *db, struct archive_entry *entry,
                                 alpm_pkghash_t **pkgcache)
 {
     const char *pathname = archive_entry_pathname(entry);
-    struct db_entry e;
+    struct dbentry dbentry;
     int ret = 0;
 
-    if (parse_database_pathname(pathname, &e) < 0) {
+    if (parse_database_pathname(pathname, &dbentry) < 0) {
         ret = -1;
         goto cleanup;
     }
 
-    if (e.type && is_database_metadata(e.type)) {
-        bool allocate = !streq(e.type, "files");
+    if (dbentry.type && is_database_metadata(dbentry.type)) {
+        bool allocate = !streq(dbentry.type, "files");
 
-        struct pkg *pkg = get_package(db, &e, pkgcache, allocate);
+        struct pkg *pkg = get_package(db, &dbentry, pkgcache, allocate);
         if (allocate && !pkg) {
             ret = -1;
             goto cleanup;
@@ -161,7 +161,7 @@ static int parse_database_entry(struct db *db, struct archive_entry *entry,
     }
 
 cleanup:
-    db_entry_free(&e);
+    dbentry_free(&dbentry);
     return ret;
 }
 
