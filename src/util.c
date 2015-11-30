@@ -6,22 +6,8 @@
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
-#include <openssl/sha.h>
-#include "repose.h"
-#include "file.h"
 
 #define WHITESPACE " \t\n\r"
-
-void trace(const char *fmt, ...)
-{
-    if (config.verbose) {
-        va_list ap;
-
-        va_start(ap, fmt);
-        vprintf(fmt, ap);
-        va_end(ap);
-    }
-}
 
 static int oflags(const char *mode)
 {
@@ -176,7 +162,7 @@ int str_to_time(const char *str, time_t *out)
     return 0;
 }
 
-static char *hex_representation(unsigned char *bytes, size_t size)
+char *hex_representation(unsigned char *bytes, size_t size)
 {
     static const char *hex_digits = "0123456789abcdef";
     char *str = malloc(2 * size + 1);
@@ -189,30 +175,6 @@ static char *hex_representation(unsigned char *bytes, size_t size)
 
     str[2 * size] = '\0';
     return str;
-}
-
-static char *sha2_fd(int fd)
-{
-    SHA256_CTX ctx;
-    unsigned char output[32];
-    struct file_t file;
-
-    if (file_from_fd(&file, fd) < 0)
-        return NULL;
-
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, file.mmap, file.st.st_size);
-    SHA256_Final(output, &ctx);
-    file_close(&file);
-
-    return hex_representation(output, sizeof(output));
-}
-
-char *sha256_file(int dirfd, const char *filename)
-{
-    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
-    check_posix(fd, "failed to open %s for sha256 checksum", filename);
-    return sha2_fd(fd);
 }
 
 char *strstrip(char *s)

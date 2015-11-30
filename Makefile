@@ -23,12 +23,18 @@ repose: repose.o database.o package.o file.o util.o filecache.o \
 	pkghash.o buffer.o base64.o filters.o signing.o \
 	reader.o desc.o
 
+librepose.so: util.c
+	$(LINK.o) $(CFLAGS) -fPIC -shared $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+tests: librepose.so
+	@py.test -v tests
+
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose
 	install -Dm644 _repose $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_repose
 	install -Dm644 man/repose.1 $(DESTDIR)$(PREFIX)/share/man/man1/repose.1
 
 clean:
-	$(RM) repose *.o
+	$(RM) repose librepose.so *.o
 
-.PHONY: clean install uninstall
+.PHONY: tests clean install uninstall

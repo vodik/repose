@@ -38,7 +38,6 @@ static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 
 static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2) == 0; }
 
-void trace(const char *fmt, ...) _printf_(1, 2);
 void check_posix(intmax_t rc, const char *fmt, ...) _printf_(2, 3);
 void check_null(const void *ptr, const char *fmt, ...) _printf_(2, 3);
 
@@ -53,6 +52,5 @@ char *joinstring(const char *root, ...) _sentinel_;
 int str_to_size(const char *str, size_t *out);
 int str_to_time(const char *str, time_t *out);
 
-char *sha256_file(int dirfd, const char *filename);
-
 char *strstrip(char *s);
+char *hex_representation(unsigned char *bytes, size_t size);

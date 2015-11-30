@@ -29,6 +29,17 @@
 
 struct config config = {0};
 
+void trace(const char *fmt, ...)
+{
+    if (config.verbose) {
+        va_list ap;
+
+        va_start(ap, fmt);
+        vprintf(fmt, ap);
+        va_end(ap);
+    }
+}
+
 static _noreturn_ void usage(FILE *out)
 {
     fprintf(out, "usage: %s [options] <database> [pkgs|deltas ...]\n", program_invocation_short_name);

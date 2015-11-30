@@ -13,6 +13,7 @@
 #include <err.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <openssl/sha.h>
 
 #include "repose.h"
 #include "file.h"
@@ -36,6 +37,30 @@ struct dbentry {
     const char *type;
     const char *version;
 };
+
+static char *sha2_fd(int fd)
+{
+    SHA256_CTX ctx;
+    unsigned char output[32];
+    struct file_t file;
+
+    if (file_from_fd(&file, fd) < 0)
+        return NULL;
+
+    SHA256_Init(&ctx);
+    SHA256_Update(&ctx, file.mmap, file.st.st_size);
+    SHA256_Final(output, &ctx);
+    file_close(&file);
+
+    return hex_representation(output, sizeof(output));
+}
+
+static char *sha256_file(int dirfd, const char *filename)
+{
+    _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
+    check_posix(fd, "failed to open %s for sha256 checksum", filename);
+    return sha2_fd(fd);
+}
 
 static int open_database(struct db *db, int fd)
 {

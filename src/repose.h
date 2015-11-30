@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include "pkghash.h"
+#include "util.h"
 
 struct repo {
     const char *root;
@@ -25,3 +26,4 @@ struct config {
 };
 
 extern struct config config;
+void trace(const char *fmt, ...) _printf_(1, 2);
