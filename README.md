@@ -1,5 +1,9 @@
 ## repose
 
+<a href="https://travis-ci.org/vodik/repose">
+  <img alt="Travis CI Status"
+       src="https://travis-ci.org/vodik/repose.png"/>
+</a>
 <a href="https://scan.coverity.com/projects/3577">
   <img alt="Coverity Scan Build Status"
        src="https://scan.coverity.com/projects/3577/badge.svg"/>

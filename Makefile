@@ -24,7 +24,7 @@ repose: repose.o database.o package.o file.o util.o filecache.o \
 	reader.o desc.o
 
 librepose.so: util.c
-	$(LINK.o) $(CFLAGS) -fPIC -shared $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK.o) $(CFLAGS) -fPIC -shared $^ -o $@
 
 tests: librepose.so
 	@py.test -v tests

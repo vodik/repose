@@ -1,16 +1,11 @@
 import pytest
 import errno
-import cffi
-
-
-def pretty_print_ids(arg):
-    return str(tuple(str(x, encoding='utf-8') for x in arg))
 
 
 @pytest.mark.parametrize("input", [
     (b'foo ', b'bar ', b'baz'),
     (b'Hello ', b'', b'World', b'!')
-], ids=pretty_print_ids)
+])
 def test_joinstring(ffi, lib, input):
     args = [ffi.new("char[]", x) for x in input]
     args.append(ffi.NULL)
@@ -40,7 +35,7 @@ def test_str_to_size(ffi, lib):
 
 
 def test_str_to_size_ERANGE(ffi, lib, size_t_max):
-    input = bytes(str(size_t_max + 1), encoding='utf-8')
+    input = str(size_t_max + 1).encode('utf-8')
     arg = ffi.new("char[]", input)
     out = ffi.new("size_t *")
 
