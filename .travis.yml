@@ -1,0 +1,11 @@
+language: python
+
+python:
+  - pypy
+
+install:
+  - pip install cffi
+  - pip install pytest
+
+script:
+  - make tests
