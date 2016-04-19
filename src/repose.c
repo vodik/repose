@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/btrfs.h>
+#include <locale.h>
 
 #include "database.h"
 #include "filecache.h"
@@ -377,6 +378,8 @@ int main(int argc, char *argv[])
 {
     const char *rootname;
     bool files = false, rebuild = false, drop = false, list = false;
+
+    setlocale(LC_ALL, "");
 
     static const struct option opts[] = {
         { "help",     no_argument,       0, 'h' },
