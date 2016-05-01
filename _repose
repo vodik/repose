@@ -7,6 +7,7 @@ _arguments -s \
   {-f,--files}'[generate complementing files database]' \
   {-l,--list}'[list packages in the repository]' \
   {-d,--drop}'[drop package from database]:packages:_files -g "*.pkg.tar*~*.sig(.,@)"' \
+  {-s,--sign}'[create a database signature]' \
   {-r,--root=-}'[repository root directory]:root:_directories' \
   {-p,--pool=-}'[set the pool to find packages in it]:pool:_directories' \
   {-m,--arch=-}'[the primary architecture of the database]:arch:(i686 x86_64)' \
