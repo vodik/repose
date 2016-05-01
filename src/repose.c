@@ -100,43 +100,51 @@ static _noreturn_ void elephant(void)
     exit(EXIT_SUCCESS);
 }
 
-static inline int clone_pkg(const struct repo *repo, const struct pkg *pkg)
+static int clone_file(const struct repo *repo, const char *filename)
 {
-    _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
-    _cleanup_close_ int sigsrc = openat(repo->poolfd, signame, O_RDONLY);
-    _cleanup_close_ int sigdest = openat(repo->rootfd, signame, O_WRONLY | O_TRUNC, 0664);
-
-    if (sigdest < 0 && errno == ENOENT && sigsrc > -1)
-        sigdest = openat(repo->rootfd, signame, O_WRONLY | O_CREAT, 0664);
-    if (sigdest > -1 && sigsrc > -1)
-        ioctl(sigdest, BTRFS_IOC_CLONE, sigsrc);
-
-    _cleanup_close_ int src = openat(repo->poolfd, pkg->filename, O_RDONLY);
+    _cleanup_close_ int src = openat(repo->poolfd, filename, O_RDONLY);
     if (src < 0)
-        err(1, "failed to open pool package %s\n", pkg->filename);
+	return src;
 
-    _cleanup_close_ int dest = openat(repo->rootfd, pkg->filename, O_WRONLY | O_TRUNC, 0664);
-    if (dest < 0 && errno == ENOENT)
-        dest = openat(repo->rootfd, pkg->filename, O_WRONLY | O_CREAT, 0664);
+    _cleanup_close_ int dest = openat(repo->rootfd, filename, O_WRONLY | O_TRUNC, 0664);
+    if (dest < 0 && errno == ENOENT) {
+        dest = openat(repo->rootfd, filename, O_WRONLY | O_CREAT, 0664);
+    }
     if (dest < 0)
-        err(1, "failed to open repo package %s", pkg->filename);
+	return dest;
 
     return ioctl(dest, BTRFS_IOC_CLONE, src);
 }
 
-static inline int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
+static int symlink_file(const struct repo *repo, const char *path1, const char *path2)
 {
-    _cleanup_free_ char *link = joinstring(repo->pool, "/", pkg->filename, NULL);
-    _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
-    _cleanup_free_ char *siglink = joinstring(link, ".sig", NULL);
-
-    if (access(siglink, F_OK) != -1)
-        symlinkat(siglink, repo->rootfd, signame);
-
-    int ret = symlinkat(link, repo->rootfd, pkg->filename);
+    int ret = symlinkat(path1, repo->rootfd, path2);
     if (ret < 0 && errno == EEXIST)
         return 0;
     return ret;
+}
+
+static int clone_pkg(const struct repo *repo, const struct pkg *pkg)
+{
+    _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
+    if (clone_file(repo, signame) < 0 && errno != ENOENT)
+	err(1, "failed to clone signature %s", signame);
+
+    return clone_file(repo, pkg->filename);
+}
+
+static int symlink_pkg(const struct repo *repo, const struct pkg *pkg)
+{
+    _cleanup_free_ char *link = joinstring(repo->pool, "/", pkg->filename, NULL);
+    _cleanup_free_ char *siglink = joinstring(link, ".sig", NULL);
+
+    if (access(siglink, F_OK) != -1) {
+	_cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
+	if (symlink_file(repo, siglink, signame) < 0 && errno != EEXIST)
+	    err(1, "failed to symlink signature %s", signame);
+    }
+
+    return symlink_file(repo, link, pkg->filename);
 }
 
 static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
