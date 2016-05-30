@@ -124,6 +124,16 @@ static int symlink_file(const struct repo *repo, const char *path1, const char *
     return ret;
 }
 
+static inline int unlink_file(const struct repo *repo, const char *filename)
+{
+    struct stat st;
+    if (fstatat(repo->rootfd, filename, &st, AT_SYMLINK_NOFOLLOW) < 0)
+        return errno != ENOENT ? -1 : 0;
+    if (S_ISLNK(st.st_mode))
+        return unlinkat(repo->rootfd, filename, 0);
+    return 0;
+}
+
 static int clone_pkg(const struct repo *repo, const struct pkg *pkg)
 {
     _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
@@ -160,12 +170,12 @@ static inline void link_pkg(const struct repo *repo, const struct pkg *pkg)
 
 static inline int unlink_pkg(const struct repo *repo, const struct pkg *pkg)
 {
-    struct stat st;
-    if (fstatat(repo->rootfd, pkg->filename, &st, AT_SYMLINK_NOFOLLOW) < 0)
-        return errno != ENOENT ? -1 : 0;
-    if (S_ISLNK(st.st_mode))
-        return unlinkat(repo->rootfd, pkg->filename, 0);
-    return 0;
+    int ret = unlink_file(repo, pkg->filename);
+    if (ret < 0)
+        return ret;
+
+    _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
+    return unlink_file(repo, signame);
 }
 
 static void link_db(struct repo *repo)
