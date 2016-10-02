@@ -118,7 +118,8 @@ static int clone_file(const struct repo *repo, const char *filename)
 
 static int symlink_file(const struct repo *repo, const char *path1, const char *path2)
 {
-    int ret = symlinkat(path1, repo->rootfd, path2);
+    _cleanup_free_ char* canonical_path1 = canonicalize_file_name(path1);
+    int ret = symlinkat(canonical_path1, repo->rootfd, path2);
     if (ret < 0 && errno == EEXIST)
         return 0;
     return ret;
