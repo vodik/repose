@@ -365,8 +365,13 @@ static int init_repo(struct repo *repo, const char *reponame, bool files,
     if (load_cache) {
         repo->cache = _alpm_pkghash_create(100);
 
-        if (load_db(repo, repo->dbname) < 0)
+        if (load_db(repo, repo->dbname) < 0) {
+            /* Database doesn't exist. Mark it dirty so we force its
+               generation */
+            repo->dirty = true;
             return -1;
+        }
+
         if (repo->filesname)
             return load_db(repo, repo->filesname);
     }
@@ -490,6 +495,7 @@ int main(int argc, char *argv[])
             break;
         case 0x101:
             rebuild = true;
+            repo.dirty = true;
             break;
         case 0x102:
             elephant();
