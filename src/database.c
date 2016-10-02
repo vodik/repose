@@ -320,7 +320,6 @@ static void record_entry(struct archive *archive, struct archive_entry *e,
     archive_entry_set_size(e, buf->len);
     archive_write_header(archive, e);
     archive_write_data(archive, buf->data, buf->len);
-
     archive_entry_clear(e);
     buffer_clear(buf);
 }
@@ -367,6 +366,10 @@ static int compile_database(struct repo *repo, const char *repo_name,
         ret = -1;
         goto cleanup;
     }
+
+    archive_entry_populate(entry, AE_IFDIR, "", 0755);
+    archive_write_header(archive, entry);
+    archive_entry_clear(entry);
 
     struct buffer buf = {0};
 
