@@ -150,26 +150,6 @@ int load_package_signature(struct pkg *pkg, int dirfd)
     return 0;
 }
 
-static bool is_package_metadata(const char *entry_name) {
-    static const char *metadata_names[] = {
-        ".PKGINFO",
-        ".CHANGELOG",
-        ".MTREE",
-        ".INSTALL",
-        NULL
-    };
-
-    if (entry_name[0] != '.')
-        return false;
-
-    for (const char **n = metadata_names; *n; ++n) {
-        if (streq(entry_name, *n))
-            return true;
-    }
-
-    return false;
-}
-
 int load_package_files(struct pkg *pkg, int fd)
 {
     struct archive *archive;
@@ -191,7 +171,7 @@ int load_package_files(struct pkg *pkg, int fd)
     while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
         const char *entry_name = archive_entry_pathname(entry);
 
-        if (!is_package_metadata(entry_name))
+        if (entry_name[0] != '.')
             pkg->files = alpm_list_add(pkg->files, strdup(entry_name));
     }
 
