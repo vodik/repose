@@ -16,7 +16,6 @@
 #include <openssl/sha.h>
 
 #include "repose.h"
-#include "file.h"
 #include "package.h"
 #include "pkghash.h"
 #include "util.h"
@@ -38,19 +37,21 @@ struct dbentry {
     const char *version;
 };
 
-static char *sha2_fd(int fd)
+static char *sha256_fd(int fd)
 {
     SHA256_CTX ctx;
     unsigned char output[32];
-    struct file_t file;
-
-    if (file_from_fd(&file, fd) < 0)
-        return NULL;
 
     SHA256_Init(&ctx);
-    SHA256_Update(&ctx, file.mmap, file.st.st_size);
+    for (;;) {
+        char buf[BUFSIZ];
+        ssize_t nbytes_r = read(fd, buf, sizeof(buf));
+        check_posix(nbytes_r, "failed to read file");
+        if (nbytes_r == 0)
+            break;
+        SHA256_Update(&ctx, buf, nbytes_r);
+    }
     SHA256_Final(output, &ctx);
-    file_close(&file);
 
     return hex_representation(output, sizeof(output));
 }
@@ -59,27 +60,24 @@ static char *sha256_file(int dirfd, const char *filename)
 {
     _cleanup_close_ int fd = openat(dirfd, filename, O_RDONLY);
     check_posix(fd, "failed to open %s for sha256 checksum", filename);
-    return sha2_fd(fd);
+    return sha256_fd(fd);
 }
 
 static int open_database(struct db *db, int fd)
 {
-    struct file_t file;
-
-    if (file_from_fd(&file, fd) < 0)
-        return -1;
+    struct stat st;
+    check_posix(fstat(fd, &st), "failed to stat database");
 
     *db = (struct db){
         .archive = archive_read_new(),
-        .fd = file.fd,
-        .mtime = file.st.st_mtime
+        .fd = fd,
+        .mtime = st.st_mtime
     };
 
     archive_read_support_filter_all(db->archive);
     archive_read_support_format_all(db->archive);
 
-    if (archive_read_open_memory(db->archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
-        file_close(&file);
+    if (archive_read_open_fd(db->archive, fd, 8192) != ARCHIVE_OK) {
         archive_read_close(db->archive);
         archive_read_free(db->archive);
     }

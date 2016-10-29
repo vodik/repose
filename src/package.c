@@ -11,7 +11,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include "file.h"
 #include "util.h"
 #include "reader.h"
 #include "pkghash.h"
@@ -87,17 +86,15 @@ static void read_pkginfo(struct archive *archive, pkg_t *pkg)
 int load_package(pkg_t *pkg, int fd)
 {
     struct archive *archive;
-    struct file_t file;
+    struct stat st;
 
-    if (file_from_fd(&file, fd) < 0) {
-        return -1;
-    }
+    check_posix(fstat(fd, &st), "failed to stat file");
 
     archive = archive_read_new();
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    if (archive_read_open_memory(archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
+    if (archive_read_open_fd(archive, fd, 8192) != ARCHIVE_OK) {
         archive_read_free(archive);
         return -1;
     }
@@ -118,8 +115,8 @@ int load_package(pkg_t *pkg, int fd)
     archive_read_free(archive);
 
     if (found_pkginfo) {
-        pkg->size = file.st.st_size;
-        pkg->mtime = file.st.st_mtime;
+        pkg->size = st.st_size;
+        pkg->mtime = st.st_mtime;
         pkg->name_hash = _alpm_hash_sdbm(pkg->name);
         return 0;
     }
@@ -129,40 +126,40 @@ int load_package(pkg_t *pkg, int fd)
 
 int load_package_signature(struct pkg *pkg, int dirfd)
 {
-    struct file_t file;
     _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
     _cleanup_close_ int fd = openat(dirfd, signame, O_RDONLY);
     if (fd < 0)
         return -1;
 
-    if (file_from_fd(&file, fd) < 0)
-        return -1;
+    struct stat st;
+    check_posix(fstat(fd, &st), "failed to stat signature");
+
+    _cleanup_free_ char *signature = malloc(st.st_size);
+    check_posix(read(fd, signature, st.st_size), "failed to read signature");
 
     base64_encode((unsigned char **)&pkg->base64sig,
-                  (const unsigned char *)file.mmap, file.st.st_size);
+                  (const unsigned char *)signature, st.st_size);
 
     // If the signature's timestamp is new than the packages, update
     // it to the newer value.
-    if (file.st.st_mtime > pkg->mtime)
-        pkg->mtime = file.st.st_mtime;
+    if (st.st_mtime > pkg->mtime)
+        pkg->mtime = st.st_mtime;
 
-    file_close(&file);
     return 0;
 }
 
 int load_package_files(struct pkg *pkg, int fd)
 {
     struct archive *archive;
-    struct file_t file;
+    struct stat st;
 
-    if (file_from_fd(&file, fd) < 0)
-        return -1;
+    check_posix(fstat(fd, &st), "failed to stat file");
 
     archive = archive_read_new();
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    if (archive_read_open_memory(archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
+    if (archive_read_open_fd(archive, fd, 8192) != ARCHIVE_OK) {
         archive_read_free(archive);
         return -1;
     }
