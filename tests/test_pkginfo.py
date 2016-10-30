@@ -25,17 +25,18 @@ makedepend = ragel
 '''
 
 
+class PKGINFOParser(Parser):
+    def init_parser(self):
+        parser = ffi.new('struct pkginfo_parser*')
+        lib.pkginfo_parser_init(parser)
+        return parser
+
+    def feed_parser(self, parser, pkg, data):
+        return lib.pkginfo_parser_feed(parser, pkg, data, len(data))
+
+
 @pytest.fixture
 def parser():
-    class PKGINFOParser(Parser):
-        def init_parser(self):
-            parser = ffi.new('struct pkginfo_parser*')
-            lib.pkginfo_parser_init(parser)
-            return parser
-
-        def feed_parser(self, parser, pkg, data):
-            return lib.pkginfo_parser_feed(parser, pkg, data, len(data))
-
     return PKGINFOParser()
 
 
@@ -48,8 +49,8 @@ def test_parse_pkginfo(pkg, parser):
     parser.feed(pkg, REPOSE_PKGINFO)
     assert parser.entry == lib.PKG_MAKEDEPENDS
 
-    assert pkg.base == None
-    assert pkg.base64sig == None
+    assert pkg.base is None
+    assert pkg.base64sig is None
     assert pkg.desc == 'A archlinux repo building tool'
     assert pkg.isize == 63488
     assert pkg.url == 'http://github.com/vodik/repose'
@@ -67,8 +68,8 @@ def test_parse_chunked(pkg, parser, chunksize):
     for chunk in chunk(REPOSE_PKGINFO, chunksize):
         parser.feed(pkg, chunk)
 
-    assert pkg.base == None
-    assert pkg.base64sig == None
+    assert pkg.base is None
+    assert pkg.base64sig is None
     assert pkg.desc == 'A archlinux repo building tool'
     assert pkg.isize == 63488
     assert pkg.url == 'http://github.com/vodik/repose'

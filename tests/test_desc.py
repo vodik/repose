@@ -57,17 +57,18 @@ git
 '''
 
 
+class DescParser(Parser):
+    def init_parser(self):
+        parser = ffi.new('struct desc_parser*')
+        lib.desc_parser_init(parser)
+        return parser
+
+    def feed_parser(self, parser, pkg, data):
+        return lib.desc_parser_feed(parser, pkg, data, len(data))
+
+
 @pytest.fixture
 def parser():
-    class DescParser(Parser):
-        def init_parser(self):
-            parser = ffi.new('struct desc_parser*')
-            lib.desc_parser_init(parser)
-            return parser
-
-        def feed_parser(self, parser, pkg, data):
-            return lib.desc_parser_feed(parser, pkg, data, len(data))
-
     return DescParser()
 
 
@@ -80,8 +81,8 @@ def test_parse_desc(pkg, parser):
     parser.feed(pkg, REPOSE_DESC)
     assert parser.entry == lib.PKG_PACKAGER
 
-    assert pkg.base == None
-    assert pkg.base64sig == None
+    assert pkg.base is None
+    assert pkg.base64sig is None
     assert pkg.filename == 'repose-git-5.19.g82c3d4a-1-x86_64.pkg.tar.xz'
     assert pkg.desc == 'A archlinux repo building tool'
     assert pkg.size == 18804
@@ -112,8 +113,8 @@ def test_parse_chunked(pkg, parser, chunksize):
     for chunk in chunk(REPOSE_DESC, chunksize):
         parser.feed(pkg, chunk)
 
-    assert pkg.base == None
-    assert pkg.base64sig == None
+    assert pkg.base is None
+    assert pkg.base64sig is None
     assert pkg.filename == 'repose-git-5.19.g82c3d4a-1-x86_64.pkg.tar.xz'
     assert pkg.desc == 'A archlinux repo building tool'
     assert pkg.size == 18804
