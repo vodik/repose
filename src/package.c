@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <limits.h>
 #include <err.h>
 #include <archive.h>
 #include <archive_entry.h>

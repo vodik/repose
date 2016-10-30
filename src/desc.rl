@@ -3,7 +3,6 @@
 #include <err.h>
 #include <archive.h>
 #include "package.h"
-#include "util.h"
 
 %%{
     machine desc;
