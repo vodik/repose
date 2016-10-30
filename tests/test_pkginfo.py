@@ -59,7 +59,7 @@ def test_parse_pkginfo(pkg, parser):
     assert pkg.licenses == ['GPL']
 
 
-@pytest.mark.parametrize("chunksize", [1, 10, 100])
+@pytest.mark.parametrize('chunksize', [1, 10, 100])
 def test_parse_chunked(pkg, parser, chunksize):
     def chunk(data, size):
         return (data[i:i+size] for i in range(0, len(data), size))
