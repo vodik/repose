@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from repose import lib, ffi
 from wrappers import Parser, Package
 
@@ -55,7 +56,7 @@ def test_parse_pkginfo(pkg, parser):
     assert pkg.isize == 63488
     assert pkg.url == 'http://github.com/vodik/repose'
     assert pkg.arch == 'x86_64'
-    assert pkg.builddate == 1477843787
+    assert pkg.builddate == "Oct 30, 2016, 12:09:47"
     assert pkg.packager == 'Simon Gomizelj <simongmzlj@gmail.com>'
     assert pkg.licenses == ['GPL']
 
@@ -74,6 +75,6 @@ def test_parse_chunked(pkg, parser, chunksize):
     assert pkg.isize == 63488
     assert pkg.url == 'http://github.com/vodik/repose'
     assert pkg.arch == 'x86_64'
-    assert pkg.builddate == 1477843787
+    assert pkg.builddate == "Oct 30, 2016, 12:09:47"
     assert pkg.packager == 'Simon Gomizelj <simongmzlj@gmail.com>'
     assert pkg.licenses == ['GPL']
