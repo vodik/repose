@@ -37,6 +37,7 @@ static inline void closedirp(DIR **dp) { if (*dp) closedir(*dp); }
 static inline void closep(int *fd)     { if (*fd >= 0) close(*fd); }
 
 static inline bool streq(const char *s1, const char *s2) { return strcmp(s1, s2) == 0; }
+static inline bool strneq(const char *s1, const char *s2, size_t len) { return strncmp(s1, s2, len) == 0; }
 
 void check_posix(intmax_t rc, const char *fmt, ...) _printf_(2, 3);
 void check_null(const void *ptr, const char *fmt, ...) _printf_(2, 3);
@@ -44,10 +45,6 @@ void check_null(const void *ptr, const char *fmt, ...) _printf_(2, 3);
 FILE *fopenat(int dirfd, const char *path, const char *mode);
 
 char *joinstring(const char *root, ...) _sentinel_;
-
-#define fromstr(str, out) _Generic((*out), \
-    size_t: str_to_size, \
-    time_t: str_to_time)(str, out)
 
 int str_to_size(const char *str, size_t *out);
 int str_to_time(const char *str, time_t *out);

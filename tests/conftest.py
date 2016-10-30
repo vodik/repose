@@ -1,47 +1,38 @@
 import pytest
+import weakref
 import cffi
+import importlib
 
 
 def pytest_namespace():
-    return {'FFI': cffi.FFI}
+    ffi = cffi.FFI()
+    with open('tests/_repose.h') as header:
+        header = ffi.set_source('_repose.pytest', header.read(),
+                                include_dirs=['../src'],
+                                sources=['../src/desc.c', '../src/pkginfo.c',
+                                         '../src/package.c', '../src/pkghash.c',
+                                         '../src/util.c', '../src/base64.c'],
+                                extra_compile_args=['-std=c11', '-O0', '-g', '-D_GNU_SOURCE'],
+                                libraries=['archive', 'alpm'])
+
+    with open('tests/_repose.c') as cdef:
+        ffi.cdef(cdef.read())
+
+    ffi.compile(tmpdir='tests')
+    return {'weakkeydict': weakref.WeakKeyDictionary(),
+            '_repose': importlib.import_module('_repose.pytest')}
 
 
-@pytest.fixture(scope='session')
-def climits():
-    ffi = pytest.FFI()
-    ffi.cdef("const size_t size_t_max;")
-    return ffi.verify("const size_t size_t_max = (size_t)-1;")
+@pytest.fixture
+def size_t_max(lib):
+    return lib.SIZE_MAX
 
 
-@pytest.fixture(scope='session')
-def size_t_max(climits):
-    return climits.size_t_max
-
-
-@pytest.fixture(scope='session')
+@pytest.fixture
 def ffi():
-    ffi = pytest.FFI()
-    ffi.cdef("""
-typedef long long time_t;
-
-struct config {
-    int verbose;
-    int compression;
-    bool reflink;
-    bool sign;
-    char *arch;
-};
-
-extern struct config config;
-
-char *joinstring(const char *root, ...);
-int str_to_size(const char *str, size_t *out);
-int str_to_time(const char *size, time_t *out);
-char *strstrip(char *s);
-""")
-    return ffi
+    return pytest._repose.ffi
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def lib(ffi):
-    return ffi.dlopen("./librepose.so")
+    return pytest._repose.lib

@@ -11,93 +11,23 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include "file.h"
 #include "util.h"
-#include "reader.h"
+#include "pkginfo.h"
 #include "pkghash.h"
 #include "base64.h"
-
-static void pkginfo_assignment(const char *key, const char *value, pkg_t *pkg)
-{
-    if (streq(key, "pkgname"))
-        pkg->name = strdup(value);
-    else if (streq(key, "pkgbase"))
-        pkg->base = strdup(value);
-    else if (streq(key, "pkgver"))
-        pkg->version = strdup(value);
-    else if (streq(key, "pkgdesc"))
-        pkg->desc = strdup(value);
-    else if (streq(key, "url"))
-        pkg->url = strdup(value);
-    else if (streq(key, "builddate"))
-        fromstr(value, &pkg->builddate);
-    else if (streq(key, "packager"))
-        pkg->packager = strdup(value);
-    else if (streq(key, "size"))
-        fromstr(value, &pkg->isize);
-    else if (streq(key, "arch"))
-        pkg->arch = strdup(value);
-    else if (streq(key, "group"))
-        pkg->groups = alpm_list_add(pkg->groups, strdup(value));
-    else if (streq(key, "license"))
-        pkg->licenses = alpm_list_add(pkg->licenses, strdup(value));
-    else if (streq(key, "replaces"))
-        pkg->replaces = alpm_list_add(pkg->replaces, strdup(value));
-    else if (streq(key, "depend"))
-        pkg->depends = alpm_list_add(pkg->depends, strdup(value));
-    else if (streq(key, "conflict"))
-        pkg->conflicts = alpm_list_add(pkg->conflicts, strdup(value));
-    else if (streq(key, "provides"))
-        pkg->provides = alpm_list_add(pkg->provides, strdup(value));
-    else if (streq(key, "optdepend"))
-        pkg->optdepends = alpm_list_add(pkg->optdepends, strdup(value));
-    else if (streq(key, "makedepend"))
-        pkg->makedepends = alpm_list_add(pkg->makedepends, strdup(value));
-    else if (streq(key, "checkdepend"))
-        pkg->checkdepends = alpm_list_add(pkg->checkdepends, strdup(value));
-}
-
-static void read_pkginfo(struct archive *archive, pkg_t *pkg)
-{
-    _cleanup_free_ struct archive_reader *reader = archive_reader_new(archive);
-    ssize_t nbytes_r = 0;
-    char line[LINE_MAX];
-
-    for (;;) {
-        nbytes_r = archive_fgets(reader, line, sizeof(line));
-        if (nbytes_r < 0)
-            break;
-
-        if (nbytes_r == 0)
-            continue;
-        nbytes_r = strcspn(line, "#");
-        if (nbytes_r == 0)
-            continue;
-
-        line[nbytes_r] = '\0';
-        char *e = memchr(line, '=', nbytes_r);
-        if (!e)
-            errx(EXIT_FAILURE, "failed to find '='");
-
-        *e++ = 0;
-        pkginfo_assignment(strstrip(line), strstrip(e), pkg);
-    }
-}
 
 int load_package(pkg_t *pkg, int fd)
 {
     struct archive *archive;
-    struct file_t file;
+    struct stat st;
 
-    if (file_from_fd(&file, fd) < 0) {
-        return -1;
-    }
+    check_posix(fstat(fd, &st), "failed to stat file");
 
     archive = archive_read_new();
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    if (archive_read_open_memory(archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
+    if (archive_read_open_fd(archive, fd, 8192) != ARCHIVE_OK) {
         archive_read_free(archive);
         return -1;
     }
@@ -118,8 +48,8 @@ int load_package(pkg_t *pkg, int fd)
     archive_read_free(archive);
 
     if (found_pkginfo) {
-        pkg->size = file.st.st_size;
-        pkg->mtime = file.st.st_mtime;
+        pkg->size = st.st_size;
+        pkg->mtime = st.st_mtime;
         pkg->name_hash = _alpm_hash_sdbm(pkg->name);
         return 0;
     }
@@ -129,40 +59,40 @@ int load_package(pkg_t *pkg, int fd)
 
 int load_package_signature(struct pkg *pkg, int dirfd)
 {
-    struct file_t file;
     _cleanup_free_ char *signame = joinstring(pkg->filename, ".sig", NULL);
     _cleanup_close_ int fd = openat(dirfd, signame, O_RDONLY);
     if (fd < 0)
         return -1;
 
-    if (file_from_fd(&file, fd) < 0)
-        return -1;
+    struct stat st;
+    check_posix(fstat(fd, &st), "failed to stat signature");
+
+    _cleanup_free_ char *signature = malloc(st.st_size);
+    check_posix(read(fd, signature, st.st_size), "failed to read signature");
 
     base64_encode((unsigned char **)&pkg->base64sig,
-                  (const unsigned char *)file.mmap, file.st.st_size);
+                  (const unsigned char *)signature, st.st_size);
 
     // If the signature's timestamp is new than the packages, update
     // it to the newer value.
-    if (file.st.st_mtime > pkg->mtime)
-        pkg->mtime = file.st.st_mtime;
+    if (st.st_mtime > pkg->mtime)
+        pkg->mtime = st.st_mtime;
 
-    file_close(&file);
     return 0;
 }
 
 int load_package_files(struct pkg *pkg, int fd)
 {
     struct archive *archive;
-    struct file_t file;
+    struct stat st;
 
-    if (file_from_fd(&file, fd) < 0)
-        return -1;
+    check_posix(fstat(fd, &st), "failed to stat file");
 
     archive = archive_read_new();
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
 
-    if (archive_read_open_memory(archive, file.mmap, file.st.st_size) != ARCHIVE_OK) {
+    if (archive_read_open_fd(archive, fd, 8192) != ARCHIVE_OK) {
         archive_read_free(archive);
         return -1;
     }
@@ -212,3 +142,116 @@ void package_free(pkg_t *pkg)
     free(pkg);
 }
 
+static void pkg_append_list(const char *entry, size_t len, alpm_list_t **list)
+{
+    *list = alpm_list_add(*list, strndup(entry, len));
+}
+
+static void pkg_set_string(const char *entry, size_t len, char **data)
+{
+    free(*data);
+    *data = strndup(entry, len);
+}
+
+static void pkg_set_size(const char *entry, size_t len, size_t *data)
+{
+    (void)len;
+    str_to_size(entry, data);
+}
+
+static void pkg_set_time(const char *entry, size_t len, time_t *data)
+{
+    (void)len;
+    str_to_time(entry, data);
+}
+
+#define pkg_set(entry, len, field) _Generic((field), \
+    alpm_list_t **: pkg_append_list, \
+    char **: pkg_set_string, \
+    size_t *: pkg_set_size, \
+    time_t *: pkg_set_time)(entry, len, field)
+
+void package_set(pkg_t *pkg, enum pkg_entry type, const char *entry, size_t len)
+{
+    switch (type) {
+    case PKG_FILENAME:
+        pkg_set(entry, len, &pkg->filename);
+        break;
+    case PKG_PKGNAME:
+        if (!pkg->name) {
+            pkg_set(entry, len, &pkg->name);
+        } else if (!strneq(entry, pkg->name, len)) {
+            errx(EXIT_FAILURE, "database entry %%NAME%% and desc record are mismatched!");
+        }
+        break;
+    case PKG_PKGBASE:
+        pkg_set(entry, len, &pkg->base);
+        break;
+    case PKG_VERSION:
+        if (!pkg->version) {
+            pkg_set(entry, len, &pkg->version);
+        } else if (!strneq(entry, pkg->version, len)) {
+            errx(EXIT_FAILURE, "database entry %%VERSION%% and desc record are mismatched!");
+        }
+        break;
+    case PKG_DESCRIPTION:
+        pkg_set(entry, len, &pkg->desc);
+        break;
+    case PKG_GROUPS:
+        pkg_set(entry, len, &pkg->groups);
+        break;
+    case PKG_CSIZE:
+        pkg_set(entry, len, &pkg->size);
+        break;
+    case PKG_ISIZE:
+        pkg_set(entry, len, &pkg->isize);
+        break;
+    case PKG_SHA256SUM:
+        pkg_set(entry, len, &pkg->sha256sum);
+        break;
+    case PKG_PGPSIG:
+        pkg_set(entry, len, &pkg->base64sig);
+        break;
+    case PKG_URL:
+        pkg_set(entry, len, &pkg->url);
+        break;
+    case PKG_LICENSE:
+        pkg_set(entry, len, &pkg->licenses);
+        break;
+    case PKG_ARCH:
+        pkg_set(entry, len, &pkg->arch);
+        break;
+    case PKG_BUILDDATE:
+        pkg_set(entry, len, &pkg->builddate);
+        break;
+    case PKG_PACKAGER:
+        pkg_set(entry, len, &pkg->packager);
+        break;
+    case PKG_REPLACES:
+        pkg_set(entry, len, &pkg->replaces);
+        break;
+    case PKG_DEPENDS:
+        pkg_set(entry, len, &pkg->depends);
+        break;
+    case PKG_CONFLICTS:
+        pkg_set(entry, len, &pkg->conflicts);
+        break;
+    case PKG_PROVIDES:
+        pkg_set(entry, len, &pkg->provides);
+        break;
+    case PKG_OPTDEPENDS:
+        pkg_set(entry, len, &pkg->optdepends);
+        break;
+    case PKG_MAKEDEPENDS:
+        pkg_set(entry, len, &pkg->makedepends);
+        break;
+    case PKG_CHECKDEPENDS:
+        pkg_set(entry, len, &pkg->checkdepends);
+        break;
+    case PKG_FILES:
+        pkg_set(entry, len, &pkg->files);
+        break;
+    default:
+        errx(EXIT_FAILURE, "parse failure");
+    }
+}
