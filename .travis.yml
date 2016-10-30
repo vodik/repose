@@ -3,18 +3,17 @@ sudo: false
 cache: bundler
 
 python:
-  - pypy
+  - 3.5
 
 addons:
   apt:
-    sources:
-      - llvm-toolchain-precise-3.7
     packages:
-      - clang-3.7
-    
+      - libarchive-dev
+
 install:
   - pip install cffi
   - pip install pytest
+  - pip install pytest-xdist
 
 script:
   - make tests

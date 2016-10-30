@@ -30,6 +30,8 @@ CFLAGS := -std=c11 -g \
 	-DREPOSE_VERSION=\"$(VERSION)\" \
 	$(CFLAGS)
 
+PYTEST_FLAGS := --boxed $(PYTEST_FLAGS)
+
 VPATH = src
 LDLIBS = -larchive -lalpm -lgpgme -lcrypto
 PREFIX = /usr
@@ -44,6 +46,8 @@ repose: repose.o database.o package.o util.o filecache.o \
 	pkghash.o buffer.o base64.o filters.o signing.o \
 	pkginfo.o desc.o
 
+tests: src/desc.c
+	py.test tests $(PYTEST_FLAGS)
 
 graphs: desc.png pkginfo.dot
 

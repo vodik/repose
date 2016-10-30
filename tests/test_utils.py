@@ -15,6 +15,7 @@ def test_joinstring(ffi, lib, input):
 
 
 @pytest.mark.parametrize("input", [
+    b'Hello World',
     b'Hello World  ',
     b'    Hello World',
     b'\tHello World   '
@@ -45,8 +46,8 @@ def test_str_to_size_ERANGE(ffi, lib, size_t_max):
 
 
 def test_str_to_time(ffi, lib):
-    arg = ffi.new("char[]", b"832421")
+    arg = ffi.new("char[]", b"1448690669")
     out = ffi.new("time_t *")
 
     assert lib.str_to_time(arg, out) == 0
-    assert out[0] == 832421
+    assert out[0] == 1448690669
