@@ -1,19 +1,9 @@
-language: python
 sudo: false
-cache: bundler
-
-python:
-  - 3.5
-
-addons:
-  apt:
-    packages:
-      - libarchive-dev
+services:
+  - docker
 
 install:
-  - pip install cffi
-  - pip install pytest
-  - pip install pytest-xdist
+  - docker build -t repose .
 
 script:
-  - make tests
+  - docker run repose

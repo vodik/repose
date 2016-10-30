@@ -46,7 +46,7 @@ repose: repose.o database.o package.o util.o filecache.o \
 	pkghash.o buffer.o base64.o filters.o signing.o \
 	pkginfo.o desc.o
 
-tests: src/desc.c
+tests: desc.c pkginfo.c
 	py.test tests $(PYTEST_FLAGS)
 
 graphs: desc.png pkginfo.dot
@@ -57,6 +57,6 @@ install: repose
 	install -Dm644 man/repose.1 $(DESTDIR)$(PREFIX)/share/man/man1/repose.1
 
 clean:
-	$(RM) repose src/desc.c *.o *.dot *.png
+	$(RM) repose $(VPATH)/desc.c $(VPATH)/pkginfo.c *.o *.dot *.png
 
 .PHONY: tests clean graph install uninstall

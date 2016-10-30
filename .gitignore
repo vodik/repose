@@ -8,5 +8,6 @@
 *.files
 *.pyc
 __pycache__/
-/tests/.cache
-/tests/_repose/pytest*
+.cache
+/tests/repose.c
+/tests/*.so

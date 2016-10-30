@@ -7,7 +7,7 @@ import importlib
 def pytest_namespace():
     ffi = cffi.FFI()
     with open('tests/_repose.h') as header:
-        header = ffi.set_source('_repose.pytest', header.read(),
+        header = ffi.set_source('repose', header.read(),
                                 include_dirs=['../src'],
                                 sources=['../src/desc.c', '../src/pkginfo.c',
                                          '../src/package.c', '../src/pkghash.c',
@@ -20,7 +20,7 @@ def pytest_namespace():
 
     ffi.compile(tmpdir='tests')
     return {'weakkeydict': weakref.WeakKeyDictionary(),
-            '_repose': importlib.import_module('_repose.pytest')}
+            'repose': importlib.import_module('repose')}
 
 
 @pytest.fixture
@@ -30,9 +30,9 @@ def size_t_max(lib):
 
 @pytest.fixture
 def ffi():
-    return pytest._repose.ffi
+    return pytest.repose.ffi
 
 
 @pytest.fixture
-def lib(ffi):
-    return pytest._repose.lib
+def lib():
+    return pytest.repose.lib
