@@ -1,3 +1,19 @@
+DOT = dot
+RAGEL = ragel
+RAGEL_FLAGS := -G2
+
+COMPILE.rl = $(RAGEL) $(RAGEL_FLAGS)
+COMPILE.dot = $(DOT) $(DOT_FLAGS)
+
+%.c: %.rl
+	$(COMPILE.rl) -C $(OUTPUT_OPTION) $<
+
+%.dot: %.rl
+	$(COMPILE.rl) -Vp $(OUTPUT_OPTION) $<
+
+%.png: %.dot
+	$(COMPILE.dot) -Tpng $(OUTPUT_OPTION) $<
+
 VERSION=6.2
 GIT_DESC=$(shell test -d .git && git describe 2>/dev/null)
 
@@ -19,15 +35,17 @@ LDLIBS = -larchive -lalpm -lgpgme -lcrypto
 PREFIX = /usr
 
 all: repose
+desc.o: $(VPATH)/desc.c
+desc.dot: $(VPATH)/desc.rl
+pkginfo.o: $(VPATH)/pkginfo.c
+pkginfo.dot: $(VPATH)/pkginfo.rl
+
 repose: repose.o database.o package.o util.o filecache.o \
 	pkghash.o buffer.o base64.o filters.o signing.o \
-	reader.o desc.o
+	pkginfo.o desc.o
 
-librepose.so: util.c
-	$(LINK.o) $(CFLAGS) -fPIC -shared $^ -o $@
 
-tests: librepose.so
-	@py.test -v tests
+graphs: desc.png pkginfo.dot
 
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose
@@ -35,6 +53,6 @@ install: repose
 	install -Dm644 man/repose.1 $(DESTDIR)$(PREFIX)/share/man/man1/repose.1
 
 clean:
-	$(RM) repose librepose.so *.o
+	$(RM) repose src/desc.c *.o *.dot *.png
 
-.PHONY: tests clean install uninstall
+.PHONY: tests clean graph install uninstall

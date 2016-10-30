@@ -1,6 +1,12 @@
 /repose
+/src/desc.c
+/src/pkginfo.c
 *.o
+*.dot
+*.png
 *.db
 *.files
 *.pyc
 __pycache__/
+/tests/.cache
+/tests/_repose/pytest*

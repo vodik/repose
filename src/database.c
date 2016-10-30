@@ -179,8 +179,9 @@ static int parse_database_entry(struct db *db, struct archive_entry *entry,
             goto cleanup;
         }
 
-        if (pkg)
+        if (pkg) {
             read_desc(db->archive, pkg);
+        }
     }
 
 cleanup:

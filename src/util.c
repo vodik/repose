@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
