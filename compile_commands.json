@@ -1,0 +1,27 @@
+[
+    {
+        "command": "cc -c -std=c11 -g -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -Wno-missing-field-initializers -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DREPOSE_VERSION=\\\"6.2-5-g66c159f\\\" -O -g -o database.o src/database.c",
+        "directory": "/home/simon/src/repose",
+        "file": "/home/simon/src/repose/src/database.c"
+    },
+    {
+        "command": "cc -c -std=c11 -g -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -Wno-missing-field-initializers -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DREPOSE_VERSION=\\\"6.2-5-g66c159f\\\" -O -g -o package.o src/package.c",
+        "directory": "/home/simon/src/repose",
+        "file": "/home/simon/src/repose/src/package.c"
+    },
+    {
+        "command": "cc -c -std=c11 -g -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -Wno-missing-field-initializers -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DREPOSE_VERSION=\\\"6.2-5-g66c159f\\\" -O -g -o util.o src/util.c",
+        "directory": "/home/simon/src/repose",
+        "file": "/home/simon/src/repose/src/util.c"
+    },
+    {
+        "command": "cc -c -std=c11 -g -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -Wno-missing-field-initializers -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DREPOSE_VERSION=\\\"6.2-5-g66c159f\\\" -O -g -o pkginfo.o src/pkginfo.c",
+        "directory": "/home/simon/src/repose",
+        "file": "/home/simon/src/repose/src/pkginfo.c"
+    },
+    {
+        "command": "cc -c -std=c11 -g -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -Wno-missing-field-initializers -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DREPOSE_VERSION=\\\"6.2-5-g66c159f\\\" -O -g -o desc.o src/desc.c",
+        "directory": "/home/simon/src/repose",
+        "file": "/home/simon/src/repose/src/desc.c"
+    }
+]
