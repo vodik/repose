@@ -72,8 +72,8 @@ struct desc_parser {
 
 // utils
 char *joinstring(const char *root, ...);
-int str_to_size(const char *str, size_t *out);
-int str_to_time(const char *size, time_t *out);
+int parse_size(const char *str, size_t *out);
+int parse_time(const char *size, time_t *out);
 char *strstrip(char *s);
 
 // desc

@@ -156,13 +156,13 @@ static void pkg_set_string(const char *entry, size_t len, char **data)
 static void pkg_set_size(const char *entry, size_t len, size_t *data)
 {
     (void)len;
-    str_to_size(entry, data);
+    parse_size(entry, data);
 }
 
 static void pkg_set_time(const char *entry, size_t len, time_t *data)
 {
     (void)len;
-    str_to_time(entry, data);
+    parse_time(entry, data);
 }
 
 #define pkg_set(entry, len, field) _Generic((field), \

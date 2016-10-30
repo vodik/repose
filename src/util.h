@@ -46,8 +46,8 @@ FILE *fopenat(int dirfd, const char *path, const char *mode);
 
 char *joinstring(const char *root, ...) _sentinel_;
 
-int str_to_size(const char *str, size_t *out);
-int str_to_time(const char *str, time_t *out);
+int parse_size(const char *str, size_t *out);
+int parse_time(const char *str, time_t *out);
 
 char *strstrip(char *s);
 char *hex_representation(unsigned char *bytes, size_t size);

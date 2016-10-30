@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #define WHITESPACE " \t\n\r"
 
@@ -133,7 +134,7 @@ static int xstrtoul(const char *str, unsigned long *out)
     return 0;
 }
 
-int str_to_size(const char *str, size_t *out)
+int parse_size(const char *str, size_t *out)
 {
     unsigned long value = 0;
     if (xstrtoul(str, &value) < 0)
@@ -148,18 +149,18 @@ int str_to_size(const char *str, size_t *out)
     return 0;
 }
 
-int str_to_time(const char *str, time_t *out)
+int parse_time(const char *str, time_t *out)
 {
-    struct tm tm;
-    errno = 0;
+    unsigned long value = 0;
+    if (xstrtoul(str, &value) < 0)
+        return -1;
 
-    const char *end = strptime(str, "%s", &tm);
-    if (str == end || (end && *end)) {
-        errno = EINVAL;
+    if (value > INT_MAX) {
+        errno = ERANGE;
         return -1;
     }
 
-    *out = mktime(&tm);
+    *out = (time_t)value;
     return 0;
 }
 
