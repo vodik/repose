@@ -1,38 +1,35 @@
-import pytest
 import weakref
+import pytest
 import cffi
-import importlib
+
+
+CFLAGS = ['-std=c11', '-O0', '-g', '-D_GNU_SOURCE']
+SOURCES = ['../src/desc.c', '../src/pkginfo.c',
+           '../src/package.c', '../src/pkghash.c',
+           '../src/util.c', '../src/base64.c']
 
 
 def pytest_namespace():
+    return {'weakkeydict': weakref.WeakKeyDictionary()}
+
+
+def pytest_configure(config):
     ffi = cffi.FFI()
     with open('tests/_repose.h') as header:
-        header = ffi.set_source('repose', header.read(),
+        header = ffi.set_source('repose',
+                                header.read(),
                                 include_dirs=['../src'],
-                                sources=['../src/desc.c', '../src/pkginfo.c',
-                                         '../src/package.c', '../src/pkghash.c',
-                                         '../src/util.c', '../src/base64.c'],
-                                extra_compile_args=['-std=c11', '-O0', '-g', '-D_GNU_SOURCE'],
-                                libraries=['archive', 'alpm'])
+                                libraries=['archive', 'alpm'],
+                                sources=SOURCES,
+                                extra_compile_args=CFLAGS)
 
     with open('tests/_repose.c') as cdef:
         ffi.cdef(cdef.read())
 
     ffi.compile(tmpdir='tests')
-    return {'weakkeydict': weakref.WeakKeyDictionary(),
-            'repose': importlib.import_module('repose')}
 
 
 @pytest.fixture
-def size_t_max(lib):
+def size_t_max():
+    from repose import lib
     return lib.SIZE_MAX
-
-
-@pytest.fixture
-def ffi():
-    return pytest.repose.ffi
-
-
-@pytest.fixture
-def lib():
-    return pytest.repose.lib

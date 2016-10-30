@@ -1,17 +1,14 @@
 #define SIZE_MAX ...
 
+typedef int... time_t;
+
 typedef struct __alpm_list_t {
     void *data;
     struct __alpm_list_t *next;
     ...;
 } alpm_list_t;
 
-typedef int... time_t;
-
-char *strptime(const char *s, const char *format, struct tm *tm);
-
 struct pkg {
-    unsigned long name_hash;
     char *filename;
     char *name;
     char *base;
@@ -37,6 +34,7 @@ struct pkg {
     alpm_list_t *makedepends;
     alpm_list_t *checkdepends;
     alpm_list_t *files;
+    ...;
 };
 
 enum pkg_entry {
@@ -65,18 +63,28 @@ enum pkg_entry {
     PKG_FILES
 };
 
+// desc
 struct desc_parser {
     enum pkg_entry entry;
     ...;
 };
+
+void desc_parser_init(struct desc_parser *parser);
+ssize_t desc_parser_feed(struct desc_parser *parser, struct pkg *pkg,
+                         char *buf, size_t buf_len);
+
+// pkginfo
+struct pkginfo_parser {
+    enum pkg_entry entry;
+    ...;
+};
+
+void pkginfo_parser_init(struct pkginfo_parser *parser);
+ssize_t pkginfo_parser_feed(struct pkginfo_parser *parser, struct pkg *pkg,
+                            char *buf, size_t buf_len);
 
 // utils
 char *joinstring(const char *root, ...);
 int parse_size(const char *str, size_t *out);
 int parse_time(const char *size, time_t *out);
 char *strstrip(char *s);
-
-// desc
-void desc_parser_init(struct desc_parser *parser);
-ssize_t desc_parser_feed(struct desc_parser *parser, struct pkg *pkg,
-                         char *buf, size_t buf_len);
