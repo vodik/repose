@@ -91,7 +91,7 @@ def test_parse_desc(pkg, parser):
     assert pkg.sha256sum == '4045b3b24bae8a2d811323e5dd3727345e9e6f81788c65d5935d07b2ee06b505'
     assert pkg.url == 'http://github.com/vodik/repose'
     assert pkg.arch == 'x86_64'
-    assert pkg.builddate == "Nov 28, 2015, 01:04:29"
+    assert pkg.builddate == "Nov 28, 2015, 06:04:29"
     assert pkg.packager == 'Simon Gomizelj <simongmzlj@gmail.com>'
     assert pkg.licenses == ['GPL']
 
@@ -123,6 +123,6 @@ def test_parse_chunked(pkg, parser, chunksize):
     assert pkg.sha256sum == '4045b3b24bae8a2d811323e5dd3727345e9e6f81788c65d5935d07b2ee06b505'
     assert pkg.url == 'http://github.com/vodik/repose'
     assert pkg.arch == 'x86_64'
-    assert pkg.builddate == "Nov 28, 2015, 01:04:29"
+    assert pkg.builddate == "Nov 28, 2015, 06:04:29"
     assert pkg.packager == 'Simon Gomizelj <simongmzlj@gmail.com>'
     assert pkg.licenses == ['GPL']

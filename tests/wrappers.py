@@ -17,7 +17,7 @@ class marshal_date(object):
         self.field = field
 
     def __get__(self, obj, cls):
-        timestamp = datetime.fromtimestamp(getattr(obj._struct, self.field))
+        timestamp = datetime.utcfromtimestamp(getattr(obj._struct, self.field))
         return timestamp.strftime("%b %d, %Y, %H:%M:%S")
 
 
