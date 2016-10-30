@@ -1,5 +1,5 @@
 import abc
-import pytest
+import weakref
 from repose import ffi
 
 
@@ -46,15 +46,16 @@ class marshal_string_list(object):
 
 class Package(object):
     def __init__(self, name=None, version=None):
-        init_data = {}
+        self.weakkeydict = weakref.WeakKeyDictionary()
 
+        init_data = {}
         if name:
             init_data['name'] = ffi.new('char[]', name.encode())
         if version:
             init_data['version'] = ffi.new('char[]', version.encode())
 
         self._struct = ffi.new('struct pkg*', init_data)
-        pytest.weakkeydict[self._struct] = tuple(init_data.values())
+        self.weakkeydict[self._struct] = tuple(init_data.values())
 
     arch = marshal_string('arch')
     base = marshal_string('base')

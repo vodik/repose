@@ -1,4 +1,3 @@
-import weakref
 import pytest
 import cffi
 
@@ -7,10 +6,6 @@ CFLAGS = ['-std=c11', '-O0', '-g', '-D_GNU_SOURCE']
 SOURCES = ['../src/desc.c', '../src/pkginfo.c',
            '../src/package.c', '../src/pkghash.c',
            '../src/util.c', '../src/base64.c']
-
-
-def pytest_namespace():
-    return {'weakkeydict': weakref.WeakKeyDictionary()}
 
 
 def pytest_configure(config):
