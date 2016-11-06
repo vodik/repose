@@ -69,8 +69,9 @@ int load_package_signature(struct pkg *pkg, int dirfd)
     _cleanup_free_ char *signature = malloc(st.st_size);
     check_posix(read(fd, signature, st.st_size), "failed to read signature");
 
-    base64_encode((unsigned char **)&pkg->base64sig,
-                  (const unsigned char *)signature, st.st_size);
+    pkg->base64sig = base64_encode((const unsigned char *)signature,
+                                   st.st_size, NULL);
+    check_null(pkg->base64sig, "failed to find base64 signature");
 
     // If the signature's timestamp is new than the packages, update
     // it to the newer value.

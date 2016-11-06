@@ -83,21 +83,21 @@ static _noreturn_ void elephant(void)
         "ICggICAgIHxcCiAgYFxfXykvX18vJ19cICAvIGAKICAgICAvL198X3x+fF98X3wKICAgICBeIiIn"
         "IicgIiInIic=";
 
-    unsigned char *data = NULL;
+    char *data = NULL;
 
     switch (srand(time(NULL)), rand() % 2) {
     case 0:
-        base64_decode(&data, (const unsigned char *)big_elephant, strlen(big_elephant));
+        data = base64_decode((const unsigned char *)big_elephant, strlen(big_elephant), NULL);
         break;
     case 1:
-        base64_decode(&data, (const unsigned char *)small_elephant, strlen(small_elephant));
+        data = base64_decode((const unsigned char *)small_elephant, strlen(small_elephant), NULL);
         break;
     default:
         errx(EXIT_FAILURE, "failed to find elephant");
         break;
     }
 
-    puts((char *)data);
+    puts(data);
     exit(EXIT_SUCCESS);
 }
 

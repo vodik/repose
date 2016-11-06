@@ -1,185 +1,91 @@
-/*
- *  RFC 1521 base64 encoding/decoding
- *
- *  Copyright (C) 2006-2010, Brainspark B.V.
- *
- *  This file is part of PolarSSL (http://www.polarssl.org)
- *  Lead Maintainer: Paul Bakker <polarssl_maintainer at polarssl.org>
- *
- *  All rights reserved.
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-/*
- *  Pacman Notes:
- *
- *  Taken from the PolarSSL project at www.polarssl.org under terms of the
- *  GPL. This is from version 0.14.2 of the library, and has been modified
- *  as following, which may be helpful for future updates:
- *  * remove "polarssl/config.h" include
- *  * change include from "polarssl/base64.h" to "base64.h"
- *  * removal of SELF_TEST code
- */
-
+#include "base64.h"
 #include <stdlib.h>
 #include <stdint.h>
-#include <errno.h>
 
-#include "base64.h"
+static const char encoding_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
+                                     "ghijklmnopqrstuvwxyz0123456789+/";
 
-static const unsigned char base64_enc_map[64] =
-{
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-    'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
-    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-    'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', '+', '/'
+static uint8_t decoding_table[256] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x3F,
+    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B,
+    0x3C, 0x3D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+    0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x1E,
+    0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+    0x17, 0x18, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20,
+    0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
+    0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30,
+    0x31, 0x32, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-static const unsigned char base64_dec_map[128] =
+char *base64_encode(const unsigned char *data, size_t data_length,
+                    size_t *output_length)
 {
-    127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
-    127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
-    127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
-    127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
-    127, 127, 127,  62, 127, 127, 127,  63,  52,  53,
-     54,  55,  56,  57,  58,  59,  60,  61, 127, 127,
-    127,  64, 127, 127, 127,   0,   1,   2,   3,   4,
-      5,   6,   7,   8,   9,  10,  11,  12,  13,  14,
-     15,  16,  17,  18,  19,  20,  21,  22,  23,  24,
-     25, 127, 127, 127, 127, 127, 127,  26,  27,  28,
-     29,  30,  31,  32,  33,  34,  35,  36,  37,  38,
-     39,  40,  41,  42,  43,  44,  45,  46,  47,  48,
-     49,  50,  51, 127, 127, 127, 127, 127
-};
+    const size_t length = 4 * ((data_length + 2) / 3);
+    char *encoded_data = malloc(length + 1), *p = encoded_data;
+    if (encoded_data == NULL)
+        return NULL;
 
-/*
- * Encode a buffer into base64 format
- */
-int base64_encode(unsigned char **dst, const unsigned char *src, size_t len)
-{
-    size_t i, n;
-    int C1, C2, C3;
-    unsigned char *p;
-    unsigned char *mem;
+    for (size_t i = 0; i < data_length; i += 3) {
+        const uint8_t lookahead[2] = {
+            i + 1 < data_length,
+            i + 2 < data_length
+        };
 
-    if(len == 0)
-        return 0;
+        const uint8_t octets[3] = {
+            data[i],
+            lookahead[0] ? data[i + 1] : 0,
+            lookahead[1] ? data[i + 2] : 0
+        };
 
-    n = (len << 3) / 6;
-
-    switch((len << 3) - (n * 6)) {
-    case 2:
-        n += 3;
-        break;
-    case 4:
-        n += 2;
-        break;
-    default:
-        break;
+        const uint32_t bitpattern = (octets[0] << 16) + (octets[1] << 8) + octets[2];
+        *p++ = encoding_table[(bitpattern >> 18) & 0x3F];
+        *p++ = encoding_table[(bitpattern >> 12) & 0x3F];
+        *p++ = lookahead[0] ? encoding_table[(bitpattern >> 6) & 0x3F] : '=';
+        *p++ = lookahead[1] ? encoding_table[bitpattern & 0x3F] : '=';
     }
 
-    mem = malloc(n + 1);
-    n = (len / 3) * 3;
-
-    for(i = 0, p = mem; i < n; i += 3) {
-        C1 = *src++;
-        C2 = *src++;
-        C3 = *src++;
-
-        *p++ = base64_enc_map[(C1 >> 2) & 0x3F];
-        *p++ = base64_enc_map[(((C1 &  3) << 4) + (C2 >> 4)) & 0x3F];
-        *p++ = base64_enc_map[(((C2 & 15) << 2) + (C3 >> 6)) & 0x3F];
-        *p++ = base64_enc_map[C3 & 0x3F];
-    }
-
-    if(i < len) {
-        C1 = *src++;
-        C2 = (i + 1 < len) ? *src++ : 0;
-
-        *p++ = base64_enc_map[(C1 >> 2) & 0x3F];
-        *p++ = base64_enc_map[(((C1 & 3) << 4) + (C2 >> 4)) & 0x3F];
-
-        if(i + 1 < len) {
-            *p++ = base64_enc_map[((C2 & 15) << 2) & 0x3F];
-        } else {
-            *p++ = '=';
-        }
-
-        *p++ = '=';
-    }
-
-    *p = 0;
-    *dst = mem;
-    return p - mem;
+    *p = '\0';
+    if (output_length)
+        *output_length = length;
+    return encoded_data;
 }
 
-/*
- * Decode a base64-formatted buffer
- */
-int base64_decode(unsigned char **dst, const unsigned char *src, size_t len)
+char *base64_decode(const unsigned char *data, size_t data_length,
+                    size_t *output_length)
 {
-    size_t i, n;
-    uint32_t j, x;
-    unsigned char *p;
-    unsigned char *mem;
+    const size_t length = 3 * ((data_length + 2) / 4);
+    char *decoded_data = malloc(length + 1), *p = decoded_data;
+    if (decoded_data == NULL)
+        return NULL;
 
-    for(i = j = n = 0; i < len; i++) {
-        if(len - i >= 2 && src[i] == '\r' && src[i + 1] == '\n')
-            continue;
+    for (size_t i = 0; i < data_length; i += 4) {
+        const uint8_t lookahead[3] = {
+            i + 1 < data_length,
+            i + 2 < data_length,
+            i + 3 < data_length
+        };
 
-        if(src[i] == '\n')
-            continue;
+        const uint8_t octets[4] = {
+            decoding_table[data[i]],
+            lookahead[0] ? decoding_table[data[i + 1]] : 0,
+            lookahead[1] ? decoding_table[data[i + 2]] : 0,
+            lookahead[1] ? decoding_table[data[i + 3]] : 0
+        };
 
-        if(src[i] == '=' && ++j > 2)
-            return -EINVAL;
-
-        if(src[i] > 127 || base64_dec_map[src[i]] == 127)
-            return -EINVAL;
-
-        if(base64_dec_map[src[i]] < 64 && j != 0)
-            return -EINVAL;
-
-        n++;
+        *p++ = (octets[0] << 2) + ((octets[1] & 0x30) >> 4);
+        *p++ = ((octets[1] & 0xf) << 4) + ((octets[2] & 0x3c) >> 2);
+        *p++ = ((octets[2] & 0x3) << 6) + octets[3];
     }
 
-    if(n == 0 )
-        return 0;
-
-    n = ((n * 6) + 7) >> 3;
-    mem = malloc(n);
-
-   for(j = 3, n = x = 0, p = mem; i > 0; i--, src++) {
-        if(*src == '\r' || *src == '\n')
-            continue;
-
-        j -= (base64_dec_map[*src] == 64);
-        x  = (x << 6) | (base64_dec_map[*src] & 0x3F);
-
-        if(++n == 4) {
-            n = 0;
-            if(j > 0)
-                *p++ = (unsigned char)(x >> 16);
-            if(j > 1)
-                *p++ = (unsigned char)(x >> 8);
-            if(j > 2)
-                *p++ = (unsigned char)x;
-        }
-    }
-
-   *dst = mem;
-    return p - mem;
+    *p = '\0';
+    if (output_length)
+        *output_length = length;
+    return decoded_data;
 }
