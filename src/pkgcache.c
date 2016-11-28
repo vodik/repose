@@ -82,7 +82,7 @@ static const double max_hash_load = 0.68;
 static const double initial_hash_load = 0.58;
 
 /* Allocate a hash table with space for at least "size" elements */
-alpm_pkgcache_t *_alpm_pkgcache_create(unsigned int size)
+alpm_pkgcache_t *pkgcache_create(unsigned int size)
 {
 	alpm_pkgcache_t *hash = NULL;
 	unsigned int i, loopsize;
@@ -162,7 +162,7 @@ static alpm_pkgcache_t *rehash(alpm_pkgcache_t *oldhash)
 		newsize = oldhash->buckets + 1;
 	}
 
-	newhash = _alpm_pkgcache_create(newsize);
+	newhash = pkgcache_create(newsize);
 	if(newhash == NULL) {
 		/* creation of newhash failed, stick with old one... */
 		return oldhash;
@@ -183,7 +183,7 @@ static alpm_pkgcache_t *rehash(alpm_pkgcache_t *oldhash)
 
 	newhash->entries = oldhash->entries;
 
-	_alpm_pkgcache_free(oldhash);
+	pkgcache_free(oldhash);
 
 	return newhash;
 }
@@ -225,19 +225,19 @@ static alpm_pkgcache_t *pkgcache_add_pkg(alpm_pkgcache_t *hash, struct pkg *pkg,
 }
 
 
-alpm_pkgcache_t *_alpm_pkgcache_add(alpm_pkgcache_t *hash, struct pkg *pkg)
+alpm_pkgcache_t *pkgcache_add(alpm_pkgcache_t *hash, struct pkg *pkg)
 {
 	return pkgcache_add_pkg(hash, pkg, 0);
 }
 
-alpm_pkgcache_t *_alpm_pkgcache_replace(alpm_pkgcache_t *cache, struct pkg *new, struct pkg *old)
+alpm_pkgcache_t *pkgcache_replace(alpm_pkgcache_t *cache, struct pkg *new, struct pkg *old)
 {
-	cache = _alpm_pkgcache_remove(cache, old, NULL);
-	return _alpm_pkgcache_add(cache, new);
+	cache = pkgcache_remove(cache, old, NULL);
+	return pkgcache_add(cache, new);
 
 }
 
-alpm_pkgcache_t *_alpm_pkgcache_add_sorted(alpm_pkgcache_t *hash, struct pkg *pkg)
+alpm_pkgcache_t *pkgcache_add_sorted(alpm_pkgcache_t *hash, struct pkg *pkg)
 {
 	return pkgcache_add_pkg(hash, pkg, 1);
 }
@@ -280,7 +280,7 @@ static unsigned int move_one_entry(alpm_pkgcache_t *hash,
  *
  * @return the resultant hash
  */
-alpm_pkgcache_t *_alpm_pkgcache_remove(alpm_pkgcache_t *hash, struct pkg *pkg,
+alpm_pkgcache_t *pkgcache_remove(alpm_pkgcache_t *hash, struct pkg *pkg,
 		struct pkg **data)
 {
 	alpm_list_t *i;
@@ -346,7 +346,7 @@ alpm_pkgcache_t *_alpm_pkgcache_remove(alpm_pkgcache_t *hash, struct pkg *pkg,
 	return hash;
 }
 
-void _alpm_pkgcache_free(alpm_pkgcache_t *hash)
+void pkgcache_free(alpm_pkgcache_t *hash)
 {
 	if(hash != NULL) {
 		unsigned int i;
@@ -358,7 +358,7 @@ void _alpm_pkgcache_free(alpm_pkgcache_t *hash)
 	free(hash);
 }
 
-struct pkg *_alpm_pkgcache_find(alpm_pkgcache_t *hash, const char *name)
+struct pkg *pkgcache_find(alpm_pkgcache_t *hash, const char *name)
 {
 	alpm_list_t *lp;
 	unsigned long name_hash;

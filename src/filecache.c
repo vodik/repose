@@ -22,14 +22,14 @@ static inline bool is_file(int d_type)
 
 static inline alpm_pkgcache_t *pkgcache_add(alpm_pkgcache_t *cache, struct pkg *pkg)
 {
-    struct pkg *old = _alpm_pkgcache_find(cache, pkg->name);
+    struct pkg *old = pkgcache_find(cache, pkg->name);
     if (!old) {
-        return _alpm_pkgcache_add(cache, pkg);
+        return pkgcache_add(cache, pkg);
     }
 
     int vercmp = alpm_pkg_vercmp(pkg->version, old->version);
     if (vercmp == 0 || vercmp == 1) {
-        return _alpm_pkgcache_replace(cache, pkg, old);
+        return pkgcache_replace(cache, pkg, old);
     }
 
     return cache;
@@ -109,7 +109,7 @@ alpm_pkgcache_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch
     check_null(dirp, "fdopendir failed");
 
     size_t size = get_filecache_size(dirp);
-    alpm_pkgcache_t *cache = _alpm_pkgcache_create(size);
+    alpm_pkgcache_t *cache = pkgcache_create(size);
 
     return scan_for_targets(cache, dirfd, dirp, targets, arch);
 }

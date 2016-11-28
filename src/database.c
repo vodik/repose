@@ -119,7 +119,7 @@ static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
             return db->likely_pkg;
     }
 
-    pkg = _alpm_pkgcache_find(*pkgcache, dbentry->name);
+    pkg = pkgcache_find(*pkgcache, dbentry->name);
     if (allocate && !pkg) {
         pkg = malloc(sizeof(struct pkg));
         if (!pkg)
@@ -132,7 +132,7 @@ static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
             .mtime = db->mtime
         };
 
-        *pkgcache = _alpm_pkgcache_add_sorted(*pkgcache, pkg);
+        *pkgcache = pkgcache_add_sorted(*pkgcache, pkg);
     }
 
     if (pkg)

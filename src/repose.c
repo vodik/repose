@@ -202,7 +202,7 @@ static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
         if (match_targets(pkg, targets)) {
             trace("dropping %s\n", pkg->name);
 
-            repo->cache = _alpm_pkgcache_remove(repo->cache, pkg, NULL);
+            repo->cache = pkgcache_remove(repo->cache, pkg, NULL);
             unlink_pkg(repo, pkg);
             package_free(pkg);
             repo->dirty = true;
@@ -234,7 +234,7 @@ static void reduce_repo(struct repo *repo)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
 
             trace("dropping %s\n", pkg->name);
-            repo->cache = _alpm_pkgcache_remove(repo->cache, pkg, NULL);
+            repo->cache = pkgcache_remove(repo->cache, pkg, NULL);
             unlink_pkg(repo, pkg);
             package_free(pkg);
             repo->dirty = true;
@@ -245,17 +245,17 @@ static void reduce_repo(struct repo *repo)
 static void update_repo(struct repo *repo, alpm_pkgcache_t *src)
 {
     if (!repo->cache)
-        repo->cache = _alpm_pkgcache_create(src->entries);
+        repo->cache = pkgcache_create(src->entries);
 
     alpm_list_t *node;
     for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
-        struct pkg *old = _alpm_pkgcache_find(repo->cache, pkg->name);
+        struct pkg *old = pkgcache_find(repo->cache, pkg->name);
 
         if (!old) {
             /* The package isn't already in the database. Just add it */
             trace("adding %s %s\n", pkg->name, pkg->version);
-            repo->cache = _alpm_pkgcache_add(repo->cache, pkg);
+            repo->cache = pkgcache_add(repo->cache, pkg);
             repo->dirty = true;
             continue;
         }
@@ -284,7 +284,7 @@ static void update_repo(struct repo *repo, alpm_pkgcache_t *src)
             continue;
         }
 
-        repo->cache = _alpm_pkgcache_replace(repo->cache, pkg, old);
+        repo->cache = pkgcache_replace(repo->cache, pkg, old);
         unlink_pkg(repo, pkg);
         package_free(old);
         repo->dirty = true;
@@ -365,7 +365,7 @@ static int init_repo(struct repo *repo, const char *reponame, bool files,
     }
 
     if (load_cache) {
-        repo->cache = _alpm_pkgcache_create(100);
+        repo->cache = pkgcache_create(100);
 
         if (load_db(repo, repo->dbname) < 0) {
             /* Database doesn't exist. Mark it dirty so we force its
