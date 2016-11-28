@@ -1,5 +1,5 @@
 /*
- *  pkghash.c
+ *  pkgcache.c
  *
  *  Copyright (c) 2011-2013 Pacman Development Team <pacman-dev@archlinux.org>
  *
@@ -21,7 +21,7 @@
 #include <errno.h>
 
 /* #include "alpm_metadata.h" */
-#include "pkghash.h"
+#include "pkgcache.h"
 /* #include "util.h" */
 
 unsigned long _alpm_hash_sdbm(const char *str)
@@ -82,13 +82,13 @@ static const double max_hash_load = 0.68;
 static const double initial_hash_load = 0.58;
 
 /* Allocate a hash table with space for at least "size" elements */
-alpm_pkghash_t *_alpm_pkghash_create(unsigned int size)
+alpm_pkgcache_t *_alpm_pkgcache_create(unsigned int size)
 {
-	alpm_pkghash_t *hash = NULL;
+	alpm_pkgcache_t *hash = NULL;
 	unsigned int i, loopsize;
 
-	/* CALLOC(hash, 1, sizeof(alpm_pkghash_t), return NULL); */
-	hash = calloc(1, sizeof(alpm_pkghash_t));
+	/* CALLOC(hash, 1, sizeof(alpm_pkgcache_t), return NULL); */
+	hash = calloc(1, sizeof(alpm_pkgcache_t));
 	if(!hash)
 		return NULL;
 	size = size / initial_hash_load + 1;
@@ -120,7 +120,7 @@ alpm_pkghash_t *_alpm_pkghash_create(unsigned int size)
 }
 
 static unsigned int get_hash_position(unsigned long name_hash,
-		alpm_pkghash_t *hash)
+		alpm_pkgcache_t *hash)
 {
 	unsigned int position;
 
@@ -138,9 +138,9 @@ static unsigned int get_hash_position(unsigned long name_hash,
 }
 
 /* Expand the hash table size to the next increment and rebin the entries */
-static alpm_pkghash_t *rehash(alpm_pkghash_t *oldhash)
+static alpm_pkgcache_t *rehash(alpm_pkgcache_t *oldhash)
 {
-	alpm_pkghash_t *newhash;
+	alpm_pkgcache_t *newhash;
 	unsigned int newsize, i;
 
 	/* Hash tables will need resized in two cases:
@@ -162,7 +162,7 @@ static alpm_pkghash_t *rehash(alpm_pkghash_t *oldhash)
 		newsize = oldhash->buckets + 1;
 	}
 
-	newhash = _alpm_pkghash_create(newsize);
+	newhash = _alpm_pkgcache_create(newsize);
 	if(newhash == NULL) {
 		/* creation of newhash failed, stick with old one... */
 		return oldhash;
@@ -183,12 +183,12 @@ static alpm_pkghash_t *rehash(alpm_pkghash_t *oldhash)
 
 	newhash->entries = oldhash->entries;
 
-	_alpm_pkghash_free(oldhash);
+	_alpm_pkgcache_free(oldhash);
 
 	return newhash;
 }
 
-static alpm_pkghash_t *pkghash_add_pkg(alpm_pkghash_t *hash, struct pkg *pkg,
+static alpm_pkgcache_t *pkgcache_add_pkg(alpm_pkgcache_t *hash, struct pkg *pkg,
 		int sorted)
 {
 	alpm_list_t *ptr;
@@ -225,24 +225,24 @@ static alpm_pkghash_t *pkghash_add_pkg(alpm_pkghash_t *hash, struct pkg *pkg,
 }
 
 
-alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, struct pkg *pkg)
+alpm_pkgcache_t *_alpm_pkgcache_add(alpm_pkgcache_t *hash, struct pkg *pkg)
 {
-	return pkghash_add_pkg(hash, pkg, 0);
+	return pkgcache_add_pkg(hash, pkg, 0);
 }
 
-alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new, struct pkg *old)
+alpm_pkgcache_t *_alpm_pkgcache_replace(alpm_pkgcache_t *cache, struct pkg *new, struct pkg *old)
 {
-	cache = _alpm_pkghash_remove(cache, old, NULL);
-	return _alpm_pkghash_add(cache, new);
+	cache = _alpm_pkgcache_remove(cache, old, NULL);
+	return _alpm_pkgcache_add(cache, new);
 
 }
 
-alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, struct pkg *pkg)
+alpm_pkgcache_t *_alpm_pkgcache_add_sorted(alpm_pkgcache_t *hash, struct pkg *pkg)
 {
-	return pkghash_add_pkg(hash, pkg, 1);
+	return pkgcache_add_pkg(hash, pkg, 1);
 }
 
-static unsigned int move_one_entry(alpm_pkghash_t *hash,
+static unsigned int move_one_entry(alpm_pkgcache_t *hash,
 		unsigned int start, unsigned int end)
 {
 	/* Iterate backwards from 'end' to 'start', seeing if any of the items
@@ -272,7 +272,7 @@ static unsigned int move_one_entry(alpm_pkghash_t *hash,
 }
 
 /**
- * @brief Remove a package from a pkghash.
+ * @brief Remove a package from a pkgcache.
  *
  * @param hash     the hash to remove the package from
  * @param pkg      the package we are removing
@@ -280,7 +280,7 @@ static unsigned int move_one_entry(alpm_pkghash_t *hash,
  *
  * @return the resultant hash
  */
-alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, struct pkg *pkg,
+alpm_pkgcache_t *_alpm_pkgcache_remove(alpm_pkgcache_t *hash, struct pkg *pkg,
 		struct pkg **data)
 {
 	alpm_list_t *i;
@@ -346,7 +346,7 @@ alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, struct pkg *pkg,
 	return hash;
 }
 
-void _alpm_pkghash_free(alpm_pkghash_t *hash)
+void _alpm_pkgcache_free(alpm_pkgcache_t *hash)
 {
 	if(hash != NULL) {
 		unsigned int i;
@@ -358,7 +358,7 @@ void _alpm_pkghash_free(alpm_pkghash_t *hash)
 	free(hash);
 }
 
-struct pkg *_alpm_pkghash_find(alpm_pkghash_t *hash, const char *name)
+struct pkg *_alpm_pkgcache_find(alpm_pkgcache_t *hash, const char *name)
 {
 	alpm_list_t *lp;
 	unsigned long name_hash;

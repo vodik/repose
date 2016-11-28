@@ -4,7 +4,7 @@ import cffi
 
 CFLAGS = ['-std=c11', '-O0', '-g', '-D_GNU_SOURCE']
 SOURCES = ['../src/desc.c', '../src/pkginfo.c',
-           '../src/package.c', '../src/pkghash.c',
+           '../src/package.c', '../src/pkgcache.c',
            '../src/util.c', '../src/base64.c']
 
 

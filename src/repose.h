@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
-#include "pkghash.h"
+#include "pkgcache.h"
 #include "util.h"
 
 struct repo {
@@ -14,7 +14,7 @@ struct repo {
     char *filesname;
 
     bool dirty;
-    alpm_pkghash_t *cache;
+    alpm_pkgcache_t *cache;
 };
 
 struct config {

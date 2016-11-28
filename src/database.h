@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pkghash.h"
+#include "pkgcache.h"
 
 struct repo;
 
@@ -10,5 +10,5 @@ enum contents {
     DB_FILES   = 1 << 3
 };
 
-int load_database(int fd, alpm_pkghash_t **pkgcache);
+int load_database(int fd, alpm_pkgcache_t **pkgcache);
 int write_database(struct repo *repo, const char *repo_name, enum contents what);

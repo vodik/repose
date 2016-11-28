@@ -23,7 +23,7 @@
 #include "database.h"
 #include "filecache.h"
 #include "package.h"
-#include "pkghash.h"
+#include "pkgcache.h"
 #include "filters.h"
 #include "signing.h"
 #include "base64.h"
@@ -202,7 +202,7 @@ static void drop_from_repo(struct repo *repo, alpm_list_t *targets)
         if (match_targets(pkg, targets)) {
             trace("dropping %s\n", pkg->name);
 
-            repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
+            repo->cache = _alpm_pkgcache_remove(repo->cache, pkg, NULL);
             unlink_pkg(repo, pkg);
             package_free(pkg);
             repo->dirty = true;
@@ -234,7 +234,7 @@ static void reduce_repo(struct repo *repo)
                 err(EXIT_FAILURE, "couldn't access package %s", pkg->filename);
 
             trace("dropping %s\n", pkg->name);
-            repo->cache = _alpm_pkghash_remove(repo->cache, pkg, NULL);
+            repo->cache = _alpm_pkgcache_remove(repo->cache, pkg, NULL);
             unlink_pkg(repo, pkg);
             package_free(pkg);
             repo->dirty = true;
@@ -242,20 +242,20 @@ static void reduce_repo(struct repo *repo)
     }
 }
 
-static void update_repo(struct repo *repo, alpm_pkghash_t *src)
+static void update_repo(struct repo *repo, alpm_pkgcache_t *src)
 {
     if (!repo->cache)
-        repo->cache = _alpm_pkghash_create(src->entries);
+        repo->cache = _alpm_pkgcache_create(src->entries);
 
     alpm_list_t *node;
     for (node = src->list; node; node = node->next) {
         struct pkg *pkg = node->data;
-        struct pkg *old = _alpm_pkghash_find(repo->cache, pkg->name);
+        struct pkg *old = _alpm_pkgcache_find(repo->cache, pkg->name);
 
         if (!old) {
             /* The package isn't already in the database. Just add it */
             trace("adding %s %s\n", pkg->name, pkg->version);
-            repo->cache = _alpm_pkghash_add(repo->cache, pkg);
+            repo->cache = _alpm_pkgcache_add(repo->cache, pkg);
             repo->dirty = true;
             continue;
         }
@@ -284,7 +284,7 @@ static void update_repo(struct repo *repo, alpm_pkghash_t *src)
             continue;
         }
 
-        repo->cache = _alpm_pkghash_replace(repo->cache, pkg, old);
+        repo->cache = _alpm_pkgcache_replace(repo->cache, pkg, old);
         unlink_pkg(repo, pkg);
         package_free(old);
         repo->dirty = true;
@@ -365,7 +365,7 @@ static int init_repo(struct repo *repo, const char *reponame, bool files,
     }
 
     if (load_cache) {
-        repo->cache = _alpm_pkghash_create(100);
+        repo->cache = _alpm_pkgcache_create(100);
 
         if (load_db(repo, repo->dbname) < 0) {
             /* Database doesn't exist. Mark it dirty so we force its
@@ -543,7 +543,7 @@ int main(int argc, char *argv[])
             targets = load_manifest(&repo, rootname);
         }
 
-        alpm_pkghash_t *filecache = get_filecache(repo.poolfd, targets, config.arch);
+        alpm_pkgcache_t *filecache = get_filecache(repo.poolfd, targets, config.arch);
         check_null(filecache, "failed to get filecache");
 
         reduce_repo(&repo);

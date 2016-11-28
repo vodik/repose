@@ -17,7 +17,7 @@
 
 #include "repose.h"
 #include "package.h"
-#include "pkghash.h"
+#include "pkgcache.h"
 #include "util.h"
 #include "desc.h"
 #include "buffer.h"
@@ -109,7 +109,7 @@ static inline void dbentry_free(struct dbentry *dbentry)
 }
 
 static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
-                               alpm_pkghash_t **pkgcache, bool allocate)
+                               alpm_pkgcache_t **pkgcache, bool allocate)
 {
     struct pkg *pkg;
 
@@ -119,7 +119,7 @@ static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
             return db->likely_pkg;
     }
 
-    pkg = _alpm_pkghash_find(*pkgcache, dbentry->name);
+    pkg = _alpm_pkgcache_find(*pkgcache, dbentry->name);
     if (allocate && !pkg) {
         pkg = malloc(sizeof(struct pkg));
         if (!pkg)
@@ -132,7 +132,7 @@ static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
             .mtime = db->mtime
         };
 
-        *pkgcache = _alpm_pkghash_add_sorted(*pkgcache, pkg);
+        *pkgcache = _alpm_pkgcache_add_sorted(*pkgcache, pkg);
     }
 
     if (pkg)
@@ -159,7 +159,7 @@ static bool is_database_metadata(const char *entry_name)
 }
 
 static int parse_database_entry(struct db *db, struct archive_entry *entry,
-                                alpm_pkghash_t **pkgcache)
+                                alpm_pkgcache_t **pkgcache)
 {
     const char *pathname = archive_entry_pathname(entry);
     struct dbentry dbentry;
@@ -189,7 +189,7 @@ cleanup:
     return ret;
 }
 
-int load_database(int fd, alpm_pkghash_t **pkgcache)
+int load_database(int fd, alpm_pkgcache_t **pkgcache)
 {
     struct db db;
     struct archive_entry *entry;

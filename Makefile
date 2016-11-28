@@ -43,7 +43,7 @@ pkginfo.o: $(VPATH)/pkginfo.c
 pkginfo.dot: $(VPATH)/pkginfo.rl
 
 repose: repose.o database.o package.o util.o filecache.o \
-	pkghash.o buffer.o base64.o filters.o signing.o \
+	pkgcache.o buffer.o base64.o filters.o signing.o \
 	pkginfo.o desc.o
 
 tests: desc.c pkginfo.c

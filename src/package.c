@@ -12,7 +12,7 @@
 
 #include "util.h"
 #include "pkginfo.h"
-#include "pkghash.h"
+#include "pkgcache.h"
 #include "base64.h"
 
 int load_package(pkg_t *pkg, int fd)

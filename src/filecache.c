@@ -11,7 +11,7 @@
 #include <alpm.h>
 
 #include "package.h"
-#include "pkghash.h"
+#include "pkgcache.h"
 #include "filters.h"
 #include "util.h"
 
@@ -20,16 +20,16 @@ static inline bool is_file(int d_type)
     return d_type == DT_REG || d_type == DT_UNKNOWN;
 }
 
-static inline alpm_pkghash_t *pkgcache_add(alpm_pkghash_t *cache, struct pkg *pkg)
+static inline alpm_pkgcache_t *pkgcache_add(alpm_pkgcache_t *cache, struct pkg *pkg)
 {
-    struct pkg *old = _alpm_pkghash_find(cache, pkg->name);
+    struct pkg *old = _alpm_pkgcache_find(cache, pkg->name);
     if (!old) {
-        return _alpm_pkghash_add(cache, pkg);
+        return _alpm_pkgcache_add(cache, pkg);
     }
 
     int vercmp = alpm_pkg_vercmp(pkg->version, old->version);
     if (vercmp == 0 || vercmp == 1) {
-        return _alpm_pkghash_replace(cache, pkg, old);
+        return _alpm_pkgcache_replace(cache, pkg, old);
     }
 
     return cache;
@@ -70,7 +70,7 @@ static struct pkg *load_from_file(int dirfd, const char *filename)
     return pkg;
 }
 
-static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *dirp,
+static alpm_pkgcache_t *scan_for_targets(alpm_pkgcache_t *cache, int dirfd, DIR *dirp,
                                         alpm_list_t *targets, const char *arch)
 {
     const struct dirent *dp;
@@ -99,7 +99,7 @@ static alpm_pkghash_t *scan_for_targets(alpm_pkghash_t *cache, int dirfd, DIR *d
     return cache;
 }
 
-alpm_pkghash_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch)
+alpm_pkgcache_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch)
 {
     int dupfd = dup(dirfd);
     check_posix(dupfd, "failed to duplicate fd");
@@ -109,7 +109,7 @@ alpm_pkghash_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch)
     check_null(dirp, "fdopendir failed");
 
     size_t size = get_filecache_size(dirp);
-    alpm_pkghash_t *cache = _alpm_pkghash_create(size);
+    alpm_pkgcache_t *cache = _alpm_pkgcache_create(size);
 
     return scan_for_targets(cache, dirfd, dirp, targets, arch);
 }

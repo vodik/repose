@@ -1,5 +1,5 @@
 /*
- *  pkghash.h
+ *  pkgcache.h
  *
  *  Copyright (c) 2011-2013 Pacman Development Team <pacman-dev@archlinux.org>
  *
@@ -26,7 +26,7 @@
 #include "package.h"
 /* #include "alpm_metadata.h" */
 
-typedef struct __alpm_pkghash_t alpm_pkghash_t;
+typedef struct __alpm_pkgcache_t alpm_pkgcache_t;
 
 /**
  * @brief A hash table for holding struct pkg objects.
@@ -34,7 +34,7 @@ typedef struct __alpm_pkghash_t alpm_pkghash_t;
  * A combination of a hash table and a list, allowing for fast look-up
  * by package name but also iteration over the packages.
  */
-struct __alpm_pkghash_t {
+struct __alpm_pkgcache_t {
 	/** data held by the hash table */
 	alpm_list_t **hash_table;
 	/** head node of the hash table data in normal list format */
@@ -49,13 +49,13 @@ struct __alpm_pkghash_t {
 
 unsigned long _alpm_hash_sdbm(const char *str);
 
-alpm_pkghash_t *_alpm_pkghash_create(unsigned int size);
+alpm_pkgcache_t *_alpm_pkgcache_create(unsigned int size);
 
-alpm_pkghash_t *_alpm_pkghash_add(alpm_pkghash_t *hash, struct pkg *pkg);
-alpm_pkghash_t *_alpm_pkghash_replace(alpm_pkghash_t *cache, struct pkg *new, struct pkg *old);
-alpm_pkghash_t *_alpm_pkghash_add_sorted(alpm_pkghash_t *hash, struct pkg *pkg);
-alpm_pkghash_t *_alpm_pkghash_remove(alpm_pkghash_t *hash, struct pkg *pkg, struct pkg **data);
+alpm_pkgcache_t *_alpm_pkgcache_add(alpm_pkgcache_t *hash, struct pkg *pkg);
+alpm_pkgcache_t *_alpm_pkgcache_replace(alpm_pkgcache_t *cache, struct pkg *new, struct pkg *old);
+alpm_pkgcache_t *_alpm_pkgcache_add_sorted(alpm_pkgcache_t *hash, struct pkg *pkg);
+alpm_pkgcache_t *_alpm_pkgcache_remove(alpm_pkgcache_t *hash, struct pkg *pkg, struct pkg **data);
 
-void _alpm_pkghash_free(alpm_pkghash_t *hash);
+void _alpm_pkgcache_free(alpm_pkgcache_t *hash);
 
-struct pkg *_alpm_pkghash_find(alpm_pkghash_t *hash, const char *name);
+struct pkg *_alpm_pkgcache_find(alpm_pkgcache_t *hash, const char *name);
