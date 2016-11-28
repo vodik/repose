@@ -47,9 +47,9 @@ int load_package(pkg_t *pkg, int fd)
     archive_read_free(archive);
 
     if (found_pkginfo) {
+        pkg->hash = sdbm(pkg->name);
         pkg->size = st.st_size;
         pkg->mtime = st.st_mtime;
-        pkg->name_hash = _alpm_hash_sdbm(pkg->name);
         return 0;
     }
 

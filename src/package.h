@@ -1,8 +1,11 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
 #include <alpm_list.h>
+
+typedef uint64_t hash_t;
 
 enum pkg_entry {
     PKG_FILENAME,
@@ -31,7 +34,7 @@ enum pkg_entry {
 };
 
 typedef struct pkg {
-    unsigned long name_hash;
+    hash_t hash;
     char *filename;
     char *name;
     char *base;

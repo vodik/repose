@@ -109,13 +109,13 @@ static inline void dbentry_free(struct dbentry *dbentry)
 }
 
 static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
-                               alpm_pkgcache_t **pkgcache, bool allocate)
+                               struct pkgcache **pkgcache, bool allocate)
 {
     struct pkg *pkg;
 
     if (db->likely_pkg) {
-        unsigned long pkgname_hash = _alpm_hash_sdbm(dbentry->name);
-        if (pkgname_hash == db->likely_pkg->name_hash && streq(db->likely_pkg->name, dbentry->name))
+        hash_t pkgname_hash = sdbm(dbentry->name);
+        if (pkgname_hash == db->likely_pkg->hash && streq(db->likely_pkg->name, dbentry->name))
             return db->likely_pkg;
     }
 
@@ -126,8 +126,8 @@ static struct pkg *get_package(struct db *db, struct dbentry *dbentry,
             return NULL;
 
         *pkg = (struct pkg){
+            .hash = sdbm(dbentry->name),
             .name = strdup(dbentry->name),
-            .name_hash = _alpm_hash_sdbm(dbentry->name),
             .version = strdup(dbentry->version),
             .mtime = db->mtime
         };
@@ -159,7 +159,7 @@ static bool is_database_metadata(const char *entry_name)
 }
 
 static int parse_database_entry(struct db *db, struct archive_entry *entry,
-                                alpm_pkgcache_t **pkgcache)
+                                struct pkgcache **pkgcache)
 {
     const char *pathname = archive_entry_pathname(entry);
     struct dbentry dbentry;
@@ -189,7 +189,7 @@ cleanup:
     return ret;
 }
 
-int load_database(int fd, alpm_pkgcache_t **pkgcache)
+int load_database(int fd, struct pkgcache **pkgcache)
 {
     struct db db;
     struct archive_entry *entry;

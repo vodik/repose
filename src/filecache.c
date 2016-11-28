@@ -20,7 +20,7 @@ static inline bool is_file(int d_type)
     return d_type == DT_REG || d_type == DT_UNKNOWN;
 }
 
-static inline alpm_pkgcache_t *pkgcache_add(alpm_pkgcache_t *cache, struct pkg *pkg)
+static inline struct pkgcache *filecache_add(struct pkgcache *cache, struct pkg *pkg)
 {
     struct pkg *old = pkgcache_find(cache, pkg->name);
     if (!old) {
@@ -70,7 +70,7 @@ static struct pkg *load_from_file(int dirfd, const char *filename)
     return pkg;
 }
 
-static alpm_pkgcache_t *scan_for_targets(alpm_pkgcache_t *cache, int dirfd, DIR *dirp,
+static struct pkgcache *scan_for_targets(struct pkgcache *cache, int dirfd, DIR *dirp,
                                         alpm_list_t *targets, const char *arch)
 {
     const struct dirent *dp;
@@ -93,13 +93,13 @@ static alpm_pkgcache_t *scan_for_targets(alpm_pkgcache_t *cache, int dirfd, DIR 
             continue;
         }
 
-        cache = pkgcache_add(cache, pkg);
+        cache = filecache_add(cache, pkg);
     }
 
     return cache;
 }
 
-alpm_pkgcache_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch)
+struct pkgcache *get_filecache(int dirfd, alpm_list_t *targets, const char *arch)
 {
     int dupfd = dup(dirfd);
     check_posix(dupfd, "failed to duplicate fd");
@@ -109,7 +109,7 @@ alpm_pkgcache_t *get_filecache(int dirfd, alpm_list_t *targets, const char *arch
     check_null(dirp, "fdopendir failed");
 
     size_t size = get_filecache_size(dirp);
-    alpm_pkgcache_t *cache = pkgcache_create(size);
+    struct pkgcache *cache = pkgcache_create(size);
 
     return scan_for_targets(cache, dirfd, dirp, targets, arch);
 }

@@ -14,7 +14,7 @@ struct repo {
     char *filesname;
 
     bool dirty;
-    alpm_pkgcache_t *cache;
+    struct pkgcache *cache;
 };
 
 struct config {

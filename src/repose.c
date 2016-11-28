@@ -242,7 +242,7 @@ static void reduce_repo(struct repo *repo)
     }
 }
 
-static void update_repo(struct repo *repo, alpm_pkgcache_t *src)
+static void update_repo(struct repo *repo, struct pkgcache *src)
 {
     if (!repo->cache)
         repo->cache = pkgcache_create(src->entries);
@@ -543,7 +543,7 @@ int main(int argc, char *argv[])
             targets = load_manifest(&repo, rootname);
         }
 
-        alpm_pkgcache_t *filecache = get_filecache(repo.poolfd, targets, config.arch);
+        struct pkgcache *filecache = get_filecache(repo.poolfd, targets, config.arch);
         check_null(filecache, "failed to get filecache");
 
         reduce_repo(&repo);
