@@ -10,7 +10,7 @@
 #include <dirent.h>
 
 #define _unlikely_(x)       __builtin_expect(!!(x), 1)
-#define _unused_            __attribute__((unsused))
+#define _unused_            __attribute__((unused))
 #define _noreturn_          __attribute__((noreturn))
 #define _cleanup_(x)        __attribute__((cleanup(x)))
 #define _printf_(a,b)       __attribute__((format (printf, a, b)))

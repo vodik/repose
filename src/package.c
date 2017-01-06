@@ -153,15 +153,13 @@ static void pkg_set_string(const char *entry, size_t len, char **data)
     *data = strndup(entry, len);
 }
 
-static void pkg_set_size(const char *entry, size_t len, size_t *data)
+static void pkg_set_size(const char *entry, size_t _unused_ len, size_t *data)
 {
-    (void)len;
     parse_size(entry, data);
 }
 
-static void pkg_set_time(const char *entry, size_t len, time_t *data)
+static void pkg_set_time(const char *entry, size_t _unused_ len, time_t *data)
 {
-    (void)len;
     parse_time(entry, data);
 }
 
