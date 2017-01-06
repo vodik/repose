@@ -228,6 +228,9 @@ static void archive_entry_populate(struct archive_entry *e, unsigned int type,
 static void commit_entry(struct database_writer *db, const char *name,
                          const char *folder)
 {
+    if (!db->buf.len)
+        return;
+
     _cleanup_free_ char *entrypath = joinstring(folder, "/", name, NULL);
 
     archive_entry_populate(db->entry, AE_IFREG, entrypath, 0644);
@@ -342,6 +345,10 @@ static void compile_database_entry(struct database_writer *db, struct pkg *pkg)
     if (db->contents & DB_FILES) {
         compile_files_entry(db, pkg);
         commit_entry(db, "files", folder);
+    }
+    if (db->contents & DB_DELTAS) {
+        write_entry(&db->buf, "DELTAS", pkg->deltas);
+        commit_entry(db, "deltas", folder);
     }
 }
 

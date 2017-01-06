@@ -30,7 +30,8 @@ enum pkg_entry {
     PKG_OPTDEPENDS,
     PKG_MAKEDEPENDS,
     PKG_CHECKDEPENDS,
-    PKG_FILES
+    PKG_FILES,
+    PKG_DELTAS
 };
 
 typedef struct pkg {
@@ -60,6 +61,7 @@ typedef struct pkg {
     alpm_list_t *makedepends;
     alpm_list_t *checkdepends;
     alpm_list_t *files;
+    alpm_list_t *deltas;
 } pkg_t;
 
 int load_package(pkg_t *pkg, int fd);
