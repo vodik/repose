@@ -249,6 +249,9 @@ void package_set(pkg_t *pkg, enum pkg_entry type, const char *entry, size_t len)
     case PKG_FILES:
         pkg_set(entry, len, &pkg->files);
         break;
+    case PKG_DELTAS:
+        pkg_set(entry, len, &pkg->deltas);
+        break;
     default:
         errx(EXIT_FAILURE, "parse failure");
     }

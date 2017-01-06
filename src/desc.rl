@@ -45,7 +45,8 @@
            | '%OPTDEPENDS%'   %{ parser->entry = PKG_OPTDEPENDS; }
            | '%MAKEDEPENDS%'  %{ parser->entry = PKG_MAKEDEPENDS; }
            | '%CHECKDEPENDS%' %{ parser->entry = PKG_CHECKDEPENDS; }
-           | '%FILES%'        %{ parser->entry = PKG_FILES; };
+           | '%FILES%'        %{ parser->entry = PKG_FILES; }
+           | '%DELTAS%'       %{ parser->entry = PKG_FILES; };
 
       section = header '\n';
       contents = [^%\n]+ @store %emit '\n';
