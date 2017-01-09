@@ -8,6 +8,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <archive.h>
 
 #define WHITESPACE " \t\n\r"
 
@@ -191,4 +192,17 @@ char *strstrip(char *s)
 
     *e = 0;
     return s;
+}
+
+int archive_read(struct archive *archive, char **buf, size_t *buf_len)
+{
+    for (;;) {
+        int status = archive_read_data_block(archive, (void *)buf,
+                                             buf_len, &(int64_t){0});
+        if (status == ARCHIVE_RETRY)
+            continue;
+        if (status <= ARCHIVE_WARN)
+            warnx("%s", archive_error_string(archive));
+        return status;
+    }
 }

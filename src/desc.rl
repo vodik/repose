@@ -1,8 +1,8 @@
 #include "desc.h"
 
 #include <err.h>
-#include <archive.h>
 #include "package.h"
+#include "util.h"
 
 %%{
     machine desc;
@@ -77,19 +77,6 @@ ssize_t desc_parser_feed(struct desc_parser *parser, struct pkg *pkg,
         return -1;
 
     return buf_len;
-}
-
-static int archive_read(struct archive *archive, char **buf, size_t *buf_len)
-{
-    for (;;) {
-        int status = archive_read_data_block(archive, (void *)buf,
-                                             buf_len, &(int64_t){0});
-        if (status == ARCHIVE_RETRY)
-            continue;
-        if (status <= ARCHIVE_WARN)
-            warnx("%s", archive_error_string(archive));
-        return status;
-    }
 }
 
 ssize_t read_desc(struct archive *archive, struct pkg *pkg)

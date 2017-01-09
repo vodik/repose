@@ -31,6 +31,8 @@
     unsigned long long: __builtin_uaddll_overflow)(a, b, r)
 #endif
 
+struct archive;
+
 static inline void freep(void *p)      { free(*(void **)p); }
 static inline void fclosep(FILE **fp)  { if (*fp) fclose(*fp); }
 static inline void closedirp(DIR **dp) { if (*dp) closedir(*dp); }
@@ -51,3 +53,5 @@ int parse_time(const char *str, time_t *out);
 
 char *strstrip(char *s);
 char *hex_representation(unsigned char *bytes, size_t size);
+
+int archive_read(struct archive *archive, char **buf, size_t *buf_len);
