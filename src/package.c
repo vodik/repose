@@ -38,7 +38,9 @@ int load_package(pkg_t *pkg, int fd)
         const mode_t mode = archive_entry_mode(entry);
 
         if (S_ISREG(mode) && streq(entry_name, ".PKGINFO")) {
-            read_pkginfo(archive, pkg);
+            if (read_pkginfo(archive, pkg) < 0) {
+                errx(EXIT_FAILURE, "failed to parse PKGINFO");
+            }
             found_pkginfo = true;
         }
     }
