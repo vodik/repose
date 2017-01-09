@@ -79,6 +79,10 @@ class Package(object):
     url = marshal_string('url')
 
 
+class ParserError(Exception):
+    pass
+
+
 class Parser(object):
     __metaclass__ = abc.ABCMeta
 
@@ -91,6 +95,8 @@ class Parser(object):
     def feed(self, pkg, data):
         data = self._saved + data.encode()
         result = self.feed_parser(self.parser, pkg._struct, data)
+        if result == -1:
+            raise ParserError("Failed to parse input")
         self._saved = data[result:]
 
     @property
