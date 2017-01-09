@@ -80,6 +80,12 @@ def test_parse_chunked(pkg, parser, chunksize):
     assert pkg.licenses == ['GPL']
 
 
+def test_pkginfo_with_backup(pkg, parser):
+    parser.feed(pkg, '''pkgname = example
+backup = etc/example/conf
+''')
+
+
 def test_invalid_pkginfo_entry(pkg, parser):
     with pytest.raises(ParserError):
         parser.feed(pkg, '''pkgname = example

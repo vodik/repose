@@ -40,7 +40,8 @@
            | 'provides'    %{ parser->entry = PKG_PROVIDES; }
            | 'optdepend'   %{ parser->entry = PKG_OPTDEPENDS; }
            | 'makedepend'  %{ parser->entry = PKG_MAKEDEPENDS; }
-           | 'checkdepend' %{ parser->entry = PKG_CHECKDEPENDS; };
+           | 'checkdepend' %{ parser->entry = PKG_CHECKDEPENDS; }
+           | 'backup'      %{ parser->entry = PKG_BACKUP; };
 
     entry = header ' = ' [^\n]+ @store %emit '\n';
     comment = '#' [^\n]* '\n';
