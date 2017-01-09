@@ -17,5 +17,4 @@ struct desc_parser {
 void desc_parser_init(struct desc_parser *parser);
 ssize_t desc_parser_feed(struct desc_parser *parser, struct pkg *pkg,
                       char *buf, size_t buf_len);
-
-void read_desc(struct archive *archive, struct pkg *pkg);
+ssize_t read_desc(struct archive *archive, struct pkg *pkg);

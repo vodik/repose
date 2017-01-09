@@ -17,4 +17,4 @@ struct pkginfo_parser {
 void pkginfo_parser_init(struct pkginfo_parser *parser);
 ssize_t pkginfo_parser_feed(struct pkginfo_parser *parser, struct pkg *pkg,
                             char *buf, size_t buf_len);
-void read_pkginfo(struct archive *archive, struct pkg *pkg);
+ssize_t read_pkginfo(struct archive *archive, struct pkg *pkg);

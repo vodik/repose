@@ -253,6 +253,6 @@ void package_set(pkg_t *pkg, enum pkg_entry type, const char *entry, size_t len)
         pkg_set(entry, len, &pkg->deltas);
         break;
     default:
-        errx(EXIT_FAILURE, "parse failure");
+        break;
     }
 }

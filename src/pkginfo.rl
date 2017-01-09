@@ -86,16 +86,26 @@ static int archive_read(struct archive *archive, char **buf, size_t *buf_len)
     }
 }
 
-void read_pkginfo(struct archive *archive, struct pkg *pkg)
+ssize_t read_pkginfo(struct archive *archive, struct pkg *pkg)
 {
     char *buf;
+    ssize_t nbytes_r = 0;
     struct pkginfo_parser parser;
     pkginfo_parser_init(&parser);
 
-     for (;;) {
-         size_t nbytes_r;
-         archive_read(archive, &buf, &nbytes_r);
-         pkginfo_parser_feed(&parser, pkg, buf, nbytes_r);
-         break;
+    for (;;) {
+        size_t bufsize;
+        archive_read(archive, &buf, &bufsize);
+
+        ssize_t result = pkginfo_parser_feed(&parser, pkg, buf, bufsize);
+        if (result < 0) {
+            return result;
+        } else {
+            nbytes_r += result;
+        }
+
+        break;
     }
+
+    return nbytes_r;
 }

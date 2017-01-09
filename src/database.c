@@ -164,8 +164,8 @@ static int parse_database_entry(struct database_reader *db, struct archive_entry
             goto cleanup;
         }
 
-        if (pkg) {
-            read_desc(db->archive, pkg);
+        if (pkg && read_desc(db->archive, pkg) < 0) {
+            errx(EXIT_FAILURE, "failed to parse %s", entry_info.type);
         }
     }
 
