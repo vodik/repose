@@ -14,7 +14,7 @@ COMPILE.dot = $(DOT) $(DOT_FLAGS)
 %.png: %.dot
 	$(COMPILE.dot) -Tpng $(OUTPUT_OPTION) $<
 
-VERSION=7
+VERSION=7.1
 GIT_DESC=$(shell test -d .git && git describe 2>/dev/null)
 
 ifneq "$(GIT_DESC)" ""
