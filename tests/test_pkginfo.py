@@ -88,6 +88,12 @@ backup = etc/example/conf
 
 def test_invalid_pkginfo_entry(pkg, parser):
     with pytest.raises(ParserError):
-        parser.feed(pkg, '''pkgname = example
+        parser.feed(pkg, '''pkgname = invalid_pkginfo_entry
 badentry = etc/example/conf
+''')
+
+
+def test_empty_pkginfo_entry(pkg, parser):
+    parser.feed(pkg, '''pkgname = empty_pkginfo_entry
+url = 
 ''')

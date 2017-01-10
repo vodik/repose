@@ -15,12 +15,14 @@
     }
 
     action emit {
-        const char *entry = parser->store;
-        const size_t entry_len = parser->pos;
-        parser->store[parser->pos] = 0;
-        parser->pos = 0;
+        if (parser->pos) {
+            const char *entry = parser->store;
+            const size_t entry_len = parser->pos;
+            parser->store[parser->pos] = 0;
+            parser->pos = 0;
 
-        package_set(pkg, parser->entry, entry, entry_len);
+            package_set(pkg, parser->entry, entry, entry_len);
+        }
     }
 
     header = 'pkgname'     %{ parser->entry = PKG_PKGNAME; }
@@ -43,7 +45,7 @@
            | 'checkdepend' %{ parser->entry = PKG_CHECKDEPENDS; }
            | 'backup'      %{ parser->entry = PKG_BACKUP; };
 
-    entry = header ' = ' [^\n]+ @store %emit '\n';
+    entry = header ' = ' [^\n]* @store %emit '\n';
     comment = '#' [^\n]* '\n';
 
     main := ( entry | comment )*;
