@@ -60,7 +60,10 @@ enum pkg_entry {
     PKG_OPTDEPENDS,
     PKG_MAKEDEPENDS,
     PKG_CHECKDEPENDS,
-    PKG_FILES
+    PKG_FILES,
+    PKG_BACKUP,
+    PKG_DELTAS,
+    PKG_MAKEPKGOPT
 };
 
 // desc

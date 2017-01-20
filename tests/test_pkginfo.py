@@ -98,7 +98,9 @@ def test_empty_pkginfo_entry(pkg, parser):
 url = 
 ''')
 
+
 def test_makepkgopt(pkg, parser):
     parser.feed(pkg, '''pkgname = ttf-ms-win10-sea
 makepkgopt = strip
+makepkgopt = !debug
 ''')
