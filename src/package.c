@@ -1,7 +1,6 @@
 #include "package.h"
 
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <err.h>
 #include <archive.h>
@@ -17,6 +16,7 @@
 
 int load_package(pkg_t *pkg, int fd)
 {
+    int ret = 0;
     struct archive *archive;
     struct stat st;
 
@@ -27,35 +27,31 @@ int load_package(pkg_t *pkg, int fd)
     archive_read_support_format_all(archive);
 
     if (archive_read_open_fd(archive, fd, 8192) != ARCHIVE_OK) {
-        archive_read_free(archive);
-        return -1;
+        ret = -1;
+        goto cleanup;
     }
 
-    bool found_pkginfo = false;
     struct archive_entry *entry;
-    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK && !found_pkginfo) {
+    while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
         const char *entry_name = archive_entry_pathname(entry);
         const mode_t mode = archive_entry_mode(entry);
 
         if (S_ISREG(mode) && streq(entry_name, ".PKGINFO")) {
             if (read_pkginfo(archive, pkg) < 0) {
-                errx(EXIT_FAILURE, "failed to parse PKGINFO on %s", pkg->filename);
+                fprintf(stderr, "failed to parse PKGINFO on %s", pkg->filename);
             }
-            found_pkginfo = true;
+
+            pkg->hash = sdbm(pkg->name);
+            pkg->size = st.st_size;
+            pkg->mtime = st.st_mtime;
+            break;
         }
     }
 
+cleanup:
     archive_read_close(archive);
     archive_read_free(archive);
-
-    if (found_pkginfo) {
-        pkg->hash = sdbm(pkg->name);
-        pkg->size = st.st_size;
-        pkg->mtime = st.st_mtime;
-        return 0;
-    }
-
-    return -1;
+    return ret;
 }
 
 int load_package_signature(struct pkg *pkg, int dirfd)
