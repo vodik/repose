@@ -49,7 +49,7 @@ repose: repose.o database.o package.o util.o filecache.o \
 tests: desc.c pkginfo.c
 	py.test tests $(PYTEST_FLAGS)
 
-graphs: desc.png pkginfo.dot
+graphs: desc.png pkginfo.png
 
 install: repose
 	install -Dm755 repose $(DESTDIR)$(PREFIX)/bin/repose
