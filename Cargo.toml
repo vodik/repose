@@ -1,0 +1,22 @@
+[package]
+name = "repose"
+description = "Arch linux repository and package utilities"
+license = "GPL-2.0+"
+version = "0.1.0"
+authors = ["Simon Gomizelj <simon@vodik.xyz>"]
+
+[dependencies]
+base64 = "0.3.0"
+getopts = "0.2"
+glob = "0.2.11"
+libarchive = "0.1.1"
+libc = "0.2.20"
+nom = "^2.0"
+rand = "0.3"
+rust-crypto = "^0.2"
+time = "0.1"
+uname = "0.1.1"
+
+[replace]
+"libarchive:0.1.1" = { path = 'vendor/libarchive' }
+"libarchive3-sys:0.1.2" = { path = 'vendor/libarchive3-sys' }

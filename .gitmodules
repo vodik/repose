@@ -1,0 +1,6 @@
+[submodule "vendor/libarchive"]
+	path = vendor/libarchive
+	url = git@github.com:vodik/libarchive-rust.git
+[submodule "vendor/libarchive3-sys"]
+	path = vendor/libarchive3-sys
+	url = git@github.com:vodik/libarchive3-sys.git
