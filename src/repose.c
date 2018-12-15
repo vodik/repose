@@ -553,10 +553,10 @@ int main(int argc, char *argv[])
     if (!repo.dirty) {
         trace("repo does not need updating\n");
     } else {
-        write_database(&repo, repo.dbname, DB_DESC | DB_DEPENDS);
+        write_database(&repo, repo.dbname, DB_DESC);
 
         if (repo.filesname) {
-            write_database(&repo, repo.filesname, DB_FILES);
+            write_database(&repo, repo.filesname, DB_DESC | DB_FILES);
         }
 
         link_db(&repo);
