@@ -21,7 +21,7 @@ ifneq "$(GIT_DESC)" ""
 VERSION=$(GIT_DESC)
 endif
 
-CFLAGS := -std=c11 -g \
+CFLAGS := -std=c18 -g \
 	-Wall -Wextra -pedantic \
 	-Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes \
 	-Wno-missing-field-initializers \
