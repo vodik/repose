@@ -39,10 +39,8 @@ x86_64
 
 %PACKAGER%
 Simon Gomizelj <simongmzlj@gmail.com>
-'''
 
-
-REPOSE_DEPENDS = '''%DEPENDS%
+%DEPENDS%
 pacman
 libarchive
 gnupg
@@ -80,7 +78,7 @@ def pkg():
 
 def test_parse_desc(pkg, parser):
     parser.feed(pkg, REPOSE_DESC)
-    assert parser.entry == lib.PKG_PACKAGER
+    assert parser.entry == lib.PKG_MAKEDEPENDS
 
     assert pkg.base is None
     assert pkg.base64sig is None
@@ -94,12 +92,6 @@ def test_parse_desc(pkg, parser):
     assert pkg.builddate == "Nov 28, 2015, 06:04:29"
     assert pkg.packager == 'Simon Gomizelj <simongmzlj@gmail.com>'
     assert pkg.licenses == ['GPL']
-
-
-def test_parse_depends(pkg, parser):
-    parser.feed(pkg, REPOSE_DEPENDS)
-    assert parser.entry == lib.PKG_MAKEDEPENDS
-
     assert pkg.depends == ['pacman', 'libarchive', 'gnupg']
     assert pkg.conflicts == ['repose']
     assert pkg.provides == ['repose']

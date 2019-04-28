@@ -301,10 +301,7 @@ static void compile_desc_entry(struct database_writer *db, struct pkg *pkg)
     write_entry(&db->buf, "BUILDDATE", pkg->builddate);
     write_entry(&db->buf, "PACKAGER",  pkg->packager);
     write_entry(&db->buf, "REPLACES",  pkg->replaces);
-}
 
-static void compile_depends_entry(struct database_writer *db, struct pkg *pkg)
-{
     write_entry(&db->buf, "DEPENDS",      pkg->depends);
     write_entry(&db->buf, "CONFLICTS",    pkg->conflicts);
     write_entry(&db->buf, "PROVIDES",     pkg->provides);
@@ -337,10 +334,6 @@ static void compile_database_entry(struct database_writer *db, struct pkg *pkg)
     if (db->contents & DB_DESC) {
         compile_desc_entry(db, pkg);
         commit_entry(db, "desc", folder);
-    }
-    if (db->contents & DB_DEPENDS) {
-        compile_depends_entry(db, pkg);
-        commit_entry(db, "depends", folder);
     }
     if (db->contents & DB_FILES) {
         compile_files_entry(db, pkg);
