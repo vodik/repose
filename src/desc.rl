@@ -49,7 +49,7 @@
            | '%DELTAS%'       %{ parser->entry = PKG_FILES; };
 
       section = header '\n';
-      contents = [^%\n]+ @store %emit '\n';
+      contents = [^\n]+ @store %emit '\n';
 
       main := ( section contents* '\n' | '\n' )*;
 }%%
