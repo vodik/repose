@@ -60,6 +60,7 @@ static _noreturn_ void usage(FILE *out)
           " -J, --xz              filter the archive through xz\n"
           " -z, --gzip            filter the archive through gzip\n"
           " -Z, --compress        filter the archive through compress\n"
+          "     --packagefiles    list packages files in the repository\n"
           "     --reflink         make repose make reflinks instead of symlinks\n"
           "     --rebuild         force rebuild the repo\n", out);
 
@@ -217,6 +218,16 @@ static void list_repo(struct repo *repo)
         struct pkg *pkg = node->data;
 
         printf("%s %s\n", pkg->name, pkg->version);
+    }
+}
+
+static void list_repo_pkgfiles(struct repo *repo)
+{
+    alpm_list_t *node;
+    for (node = repo->cache->list; node; node = node->next) {
+        struct pkg *pkg = node->data;
+
+        printf("%s %s\n", pkg->name, pkg->filename);
     }
 }
 
@@ -417,28 +428,29 @@ static char *get_rootname(char *name)
 int main(int argc, char *argv[])
 {
     const char *rootname;
-    bool files = false, rebuild = false, drop = false, list = false;
+    bool files = false, rebuild = false, drop = false, list = false, pkgfiles = false;
 
     setlocale(LC_ALL, "");
 
     static const struct option opts[] = {
-        { "help",     no_argument,       0, 'h' },
-        { "version",  no_argument,       0, 'V' },
-        { "drop",     no_argument,       0, 'd' },
-        { "list",     no_argument,       0, 'l' },
-        { "verbose",  no_argument,       0, 'v' },
-        { "files",    no_argument,       0, 'f' },
-        { "sign",     no_argument,       0, 's' },
-        { "root",     required_argument, 0, 'r' },
-        { "pool",     required_argument, 0, 'p' },
-        { "arch",     required_argument, 0, 'm' },
-        { "bzip2",    no_argument,       0, 'j' },
-        { "xz",       no_argument,       0, 'J' },
-        { "gzip",     no_argument,       0, 'z' },
-        { "compress", no_argument,       0, 'Z' },
-        { "reflink",  no_argument,       0, 0x100 },
-        { "rebuild",  no_argument,       0, 0x101 },
-        { "elephant", no_argument,       0, 0x102 },
+        { "help",         no_argument,       0, 'h' },
+        { "version",      no_argument,       0, 'V' },
+        { "drop",         no_argument,       0, 'd' },
+        { "list",         no_argument,       0, 'l' },
+        { "verbose",      no_argument,       0, 'v' },
+        { "files",        no_argument,       0, 'f' },
+        { "sign",         no_argument,       0, 's' },
+        { "root",         required_argument, 0, 'r' },
+        { "pool",         required_argument, 0, 'p' },
+        { "arch",         required_argument, 0, 'm' },
+        { "bzip2",        no_argument,       0, 'j' },
+        { "xz",           no_argument,       0, 'J' },
+        { "gzip",         no_argument,       0, 'z' },
+        { "compress",     no_argument,       0, 'Z' },
+        { "reflink",      no_argument,       0, 0x100 },
+        { "rebuild",      no_argument,       0, 0x101 },
+        { "elephant",     no_argument,       0, 0x102 },
+        { "packagefiles", no_argument,       0, 0x103 },
         { 0, 0, 0, 0 }
     };
 
@@ -502,6 +514,9 @@ int main(int argc, char *argv[])
         case 0x102:
             elephant();
             break;
+        case 0x103:
+            pkgfiles = true;
+            break;
         }
     }
 
@@ -517,11 +532,11 @@ int main(int argc, char *argv[])
         config.arch = strdup(uts.machine);
     }
 
-    if (list && drop)
-        errx(EXIT_FAILURE, "List and drop operations are mutually exclusive");
+    if ((list || pkgfiles) && drop)
+        errx(EXIT_FAILURE, "List, packagefiles and drop operations are mutually exclusive");
 
-    if (rebuild && (list || drop)) {
-        fprintf(stderr, "Can't rebuild while performing a list or drop operation.\n"
+    if (rebuild && (list || pkgfiles || drop)) {
+        fprintf(stderr, "Can't rebuild while performing a list, packagefiles or drop operation.\n"
                         "Ignoring the --rebuild flag.\n");
         rebuild = false;
     }
@@ -531,6 +546,11 @@ int main(int argc, char *argv[])
     if (list) {
         check_posix(ret, "failed to open database %s.db", rootname);
         list_repo(&repo);
+        return 0;
+    }
+    if (pkgfiles) {
+        check_posix(ret, "failed to open database %s.db", rootname);
+        list_repo_pkgfiles(&repo);
         return 0;
     }
 
